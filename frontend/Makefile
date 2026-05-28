@@ -5,7 +5,7 @@ RUNNING_DIR := $(REPO_ROOT)/_running
 
 VITE := $(MAKEFILE_DIR)node_modules/.bin/vite
 
-.PHONY: setup start stop restart status build logs
+.PHONY: setup start stop restart status build type-check logs
 
 setup:
 	@echo "Installing frontend dependencies..."
@@ -15,7 +15,7 @@ setup:
 start: _ensure_running_dirs
 	@echo "Starting Vite dev server (port 4501)..."
 	@cd $(MAKEFILE_DIR) && $(VITE) \
-	  >> $(RUNNING_DIR)/logs/vite.log 2>&1 & echo $$! > $(RUNNING_DIR)/pids/vite.pid
+	  > $(RUNNING_DIR)/logs/vite.log 2>&1 & echo $$! > $(RUNNING_DIR)/pids/vite.pid
 	@echo "Frontend running at http://localhost:4501"
 
 stop:
@@ -47,6 +47,9 @@ status:
 
 build:
 	@cd $(MAKEFILE_DIR) && npm run build
+
+type-check:
+	@cd $(MAKEFILE_DIR) && node_modules/.bin/vue-tsc --noEmit
 
 logs:
 	@tail -f $(RUNNING_DIR)/logs/vite.log
