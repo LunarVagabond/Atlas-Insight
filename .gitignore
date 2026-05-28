@@ -1,0 +1,40 @@
+Overview.md
+TASKS.md
+# Python
+backend/.venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+backend/build/
+
+# Django
+backend/staticfiles/
+backend/mediafiles/
+*.sqlite3
+
+# Running state (monorepo root)
+_running/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo

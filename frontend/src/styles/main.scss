@@ -1,0 +1,45 @@
+@use 'variables' as *;
+@use 'reset';
+@use 'typography';
+
+// Home view
+.home {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: $space-10 $space-6;
+
+  &__header {
+    text-align: center;
+    margin-bottom: $space-16;
+  }
+
+  &__title {
+    font-size: clamp(2.5rem, 6vw, 4rem);
+    font-weight: 700;
+    background: linear-gradient(135deg, $color-accent 0%, $color-accent-hover 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: $space-3;
+    letter-spacing: -0.02em;
+  }
+
+  &__subtitle {
+    color: $color-text-secondary;
+    font-size: 1.125rem;
+    font-weight: 400;
+  }
+
+  &__content {
+    text-align: center;
+  }
+
+  &__placeholder {
+    color: $color-text-muted;
+    font-style: italic;
+    font-size: 0.9375rem;
+  }
+}
