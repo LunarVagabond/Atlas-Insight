@@ -90,6 +90,14 @@ def _heuristic_opportunities(
                 'difficulty': 'beginner', 'risk': 'low', 'category': 'security',
             })
 
+    if structure and structure.get('roadmap_file'):
+        opps.append({
+            'id': 'roadmap',
+            'title': f'Review the project roadmap ({structure["roadmap_file"]})',
+            'description': 'A roadmap file exists — it likely lists planned features and known gaps. Good starting point for finding impactful work that aligns with maintainer intent.',
+            'difficulty': 'beginner', 'risk': 'low', 'category': 'feature',
+        })
+
     for i, warning in enumerate(deps.get('missing_lockfile_warnings', [])[:2]):
         opps.append({
             'id': f'lockfile_{i}',

@@ -2,11 +2,12 @@
 import { computed, ref } from 'vue'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
-import type { ContributionOpportunity } from '../../stores/analysis'
+import type { ContributionOpportunity, StructureData } from '../../stores/analysis'
 
 const props = defineProps<{
   opportunities: ContributionOpportunity[]
   repoUrl?: string
+  structure?: StructureData
 }>()
 
 type CategoryFilter = 'all' | ContributionOpportunity['category']

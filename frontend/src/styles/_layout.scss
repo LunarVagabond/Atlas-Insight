@@ -284,3 +284,95 @@
   color: var(--color-text-muted);
   background: var(--color-surface);
 }
+
+// ===== MOBILE RESPONSIVE =====
+@media (max-width: $bp-md) {
+  .hero {
+    padding: $space-12 $space-4 $space-8;
+  }
+
+  .results-layout {
+    padding: $space-4;
+  }
+
+  .panel__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .home-runs {
+    padding: 0 $space-4 $space-8;
+  }
+
+  .navbar {
+    padding: 0 $space-4;
+  }
+}
+
+@media (max-width: $bp-sm) {
+  .hero {
+    padding: $space-8 $space-4 $space-6;
+
+    &--compact {
+      padding-bottom: $space-4;
+    }
+  }
+
+  .panel__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .results-layout {
+    padding: $space-3;
+  }
+
+  .results-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .status-card {
+    flex-direction: column;
+    gap: $space-4;
+
+    &__stack {
+      margin-left: 0;
+    }
+  }
+
+  .runs-search {
+    flex-wrap: wrap;
+    gap: $space-2;
+  }
+
+  .home-runs {
+    padding: 0 $space-3 $space-6;
+
+    &__header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: $space-3;
+    }
+
+    &__controls {
+      width: 100%;
+
+      input {
+        max-width: 100% !important;
+        width: 100%;
+      }
+    }
+  }
+
+  .data-table {
+    font-size: 0.8125rem;
+
+    th, td {
+      padding: $space-2;
+    }
+  }
+
+  // Hide URL column on mobile — repo name is enough
+  .runs-table__url {
+    display: none;
+  }
+}

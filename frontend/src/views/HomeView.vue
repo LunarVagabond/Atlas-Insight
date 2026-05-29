@@ -80,6 +80,7 @@ function goToCompare() {
   const [a, b] = [...selectedIds.value]
   router.push(`/compare?a=${a}&b=${b}`)
 }
+
 </script>
 
 <template>

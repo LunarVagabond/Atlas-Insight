@@ -259,6 +259,11 @@ def analyze_structure(repo_obj: Repo, repo_dir: str, deps: dict | None = None) -
     coc_file = _find_file(base, COC_PATHS)
     security_policy_file = _find_file(base, SECURITY_POLICY_PATHS)
     changelog_file = _find_file(base, CHANGELOG_PATHS)
+    roadmap_file = _find_file(base, [
+        'ROADMAP.md', 'ROADMAP.rst', 'ROADMAP.txt', 'ROADMAP',
+        'roadmap.md', 'roadmap.rst', 'TODO.md', 'todo.md',
+        'docs/ROADMAP.md', 'docs/roadmap.md',
+    ])
 
     # License detection from file content
     license_type = None
@@ -317,6 +322,8 @@ def analyze_structure(repo_obj: Repo, repo_dir: str, deps: dict | None = None) -
         'security_policy_file': security_policy_file,
         'has_changelog': bool(changelog_file),
         'changelog_file': changelog_file,
+        'roadmap_file': roadmap_file,
+        'roadmap_parsed': _parse_roadmap_file(base, roadmap_file),
         'community_files_content': community_files_content,
         'releases': releases,
         'release_count': release_count,
@@ -356,6 +363,17 @@ def _is_test_file(path: Path, base: Path) -> bool:
         or name.endswith('_spec')
         or name.startswith('spec_')
     )
+
+
+def _parse_roadmap_file(base: Path, roadmap_file: str | None) -> dict | None:
+    if not roadmap_file:
+        return None
+    try:
+        from .roadmap_parser import parse_roadmap
+        content = (base / roadmap_file).read_text(errors='ignore')
+        return parse_roadmap(content)
+    except Exception:
+        return None
 
 
 def _find_file(base: Path, candidates: list[str]) -> str | None:

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAnalysisStore } from '../stores/analysis'
 import AppTabs from '../components/ui/AppTabs.vue'
@@ -13,22 +13,27 @@ import DependenciesPanel from '../components/analysis/DependenciesPanel.vue'
 import HeuristicsPanel from '../components/analysis/HeuristicsPanel.vue'
 import ProjectPanel from '../components/analysis/ProjectPanel.vue'
 import ContributingPanel from '../components/analysis/ContributingPanel.vue'
+import RoadmapTimeline from '../components/analysis/RoadmapTimeline.vue'
 
 const route = useRoute()
 const router = useRouter()
 const store = useAnalysisStore()
-const runId = route.params.runId as string
+const runId = computed(() => route.params.runId as string)
 
-const TABS = ['Overview', 'Project', 'Architecture', 'Dependencies', 'Timeline', 'Heuristics', 'Contributing']
+const hasRoadmap = computed(() => (result.value?.structure?.roadmap_parsed?.milestones?.length ?? 0) > 0)
+const TABS = computed(() => {
+  const base = ['Overview', 'Project', 'Architecture', 'Dependencies', 'Timeline', 'Heuristics', 'Contributing']
+  if (hasRoadmap.value) base.push('Roadmap')
+  return base
+})
 const activeTab = ref('Overview')
 
-onMounted(async () => {
-  if (!runId) {
-    router.push('/')
-    return
-  }
-  await store.pollRun(runId)
-})
+watch(runId, async (id) => {
+  if (!id) { router.push('/'); return }
+  store._stopPolling()
+  await store.pollRun(id)
+}, { immediate: true })
+
 
 onUnmounted(() => store._stopPolling())
 
@@ -75,7 +80,13 @@ const isPolling = computed(() => ['pending', 'running'].includes(store.run?.stat
         <DependenciesPanel v-if="activeTab === 'Dependencies'" :deps="result.dependencies" />
         <CommitTimelineChart v-if="activeTab === 'Timeline'" :commits="result.commits" />
         <HeuristicsPanel v-if="activeTab === 'Heuristics'" :signals="result.heuristics" />
-        <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" />
+        <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" :structure="result.structure" />
+        <div v-if="activeTab === 'Roadmap' && result.structure?.roadmap_parsed" class="panel">
+          <RoadmapTimeline
+            :milestones="result.structure.roadmap_parsed.milestones"
+            :roadmap-file="result.structure.roadmap_file ?? 'ROADMAP.md'"
+          />
+        </div>
       </div>
     </div>
   </div>

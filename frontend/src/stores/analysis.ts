@@ -14,6 +14,16 @@ export interface AnalysisRun {
   last_fetched_at: string | null
 }
 
+export interface RoadmapMilestone {
+  title: string
+  date: string | null
+  status: 'done' | 'in-progress' | 'planned'
+  done_count: number
+  todo_count: number
+  done_items: string[]
+  todo_items: string[]
+}
+
 export interface ContributionOpportunity {
   id: string
   title: string
@@ -93,6 +103,10 @@ export interface StructureData {
   security_policy_file: string | null
   has_changelog: boolean
   changelog_file: string | null
+  roadmap_file?: string | null
+  roadmap_parsed?: {
+    milestones: RoadmapMilestone[]
+  } | null
   community_files_content: CommunityFilesContent
   releases: { name: string; date: string }[]
   release_count: number
