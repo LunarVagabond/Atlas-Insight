@@ -577,38 +577,41 @@
 .overview-langs {
   margin-top: $space-4;
   display: flex;
-  height: 8px;
-  border-radius: $radius-sm;
-  overflow: hidden;
   gap: 2px;
 
+  &__segment {
+    display: flex;
+    flex-direction: column;
+    min-width: 2px;
+    overflow: hidden;
+  }
+
   &__bar {
+    height: 8px;
     border-radius: $radius-sm;
     transition: width 0.4s ease;
     opacity: 0.85;
-    min-width: 2px;
-  }
-
-  &__labels {
-    display: flex;
-    flex-wrap: wrap;
-    gap: $space-3;
-    margin-top: $space-2;
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
   }
 
   &__label {
     display: flex;
-    align-items: center;
-    gap: $space-1;
+    flex-direction: column;
+    margin-top: $space-1;
+    overflow: hidden;
   }
 
-  &__dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
+  &__name {
+    font-size: 0.7rem;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__pct {
+    font-size: 0.65rem;
+    color: var(--color-text-muted);
+    opacity: 0.85;
   }
 }
 

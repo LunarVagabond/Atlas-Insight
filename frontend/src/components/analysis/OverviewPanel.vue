@@ -131,19 +131,18 @@ const langBarColors = ['#0969da', '#2da44e', '#e36209', '#8250df']
       <div
         v-for="(lang, idx) in topLanguages"
         :key="lang.name"
-        class="overview-langs__bar"
-        :style="{ width: `${lang.pct}%`, background: langBarColors[idx] }"
-        :title="`${lang.name}: ${lang.pct}%`"
-      />
-      <div class="overview-langs__labels">
-        <span
-          v-for="(lang, idx) in topLanguages"
-          :key="lang.name"
-          class="overview-langs__label"
-        >
-          <span class="overview-langs__dot" :style="{ background: langBarColors[idx] }" />
-          {{ lang.name }} {{ lang.pct }}%
-        </span>
+        class="overview-langs__segment"
+        :style="{ width: `${lang.pct}%` }"
+      >
+        <div
+          class="overview-langs__bar"
+          :style="{ background: langBarColors[idx] }"
+          :title="`${lang.name}: ${lang.pct}%`"
+        />
+        <div class="overview-langs__label">
+          <span class="overview-langs__name">{{ lang.name }}</span>
+          <span class="overview-langs__pct">{{ lang.pct }}%</span>
+        </div>
       </div>
     </div>
   </div>
