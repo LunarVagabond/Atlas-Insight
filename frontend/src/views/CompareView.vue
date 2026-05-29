@@ -43,6 +43,10 @@ onMounted(async () => {
           ← All Runs
         </RouterLink>
       </div>
+      <p class="compare-view__purpose">
+        Use this tool to decide which project is the better fit for your next open-source contribution —
+        compare activity, health signals, and contribution opportunities side by side.
+      </p>
     </div>
     <div class="results-layout__content">
       <LoadingSpinner v-if="loading" label="Loading runs…" />

@@ -1,4 +1,5 @@
 import logging
+import os
 
 from celery import shared_task
 from django.utils import timezone
@@ -6,8 +7,8 @@ from django.utils import timezone
 from apps.repositories.models import AnalysisRun
 
 from .classifications import classify_repo
-from .contribution_analysis import analyze_contributions
 from .commit_analysis import analyze_commits
+from .contribution_analysis import analyze_contributions
 from .dep_report import analyze_dependencies
 from .git_ops import clone_or_fetch
 from .github_meta import fetch_github_meta
@@ -170,3 +171,63 @@ def cleanup_old_runs():
         deleted_total += deleted
 
     logger.info('Run cleanup complete: %d old runs deleted (keeping %d per repo)', deleted_total, keep)
+
+
+@shared_task
+def evict_stale_clones():
+    """Delete local cache clones not fetched within EVICT_AFTER_DAYS.
+
+    AnalysisRun.result JSON is untouched. clone_or_fetch re-clones on next run.
+    """
+    import shutil
+    from datetime import timedelta
+
+    from django.conf import settings
+
+    from apps.repositories.models import Repository
+
+    from .git_ops import get_cache_path
+
+    threshold = timezone.now() - timedelta(days=settings.EVICT_AFTER_DAYS)
+    evicted = 0
+
+    for repo in Repository.objects.filter(last_fetched_at__lt=threshold):
+        try:
+            path = get_cache_path(repo.url)
+        except ValueError:
+            continue
+        if os.path.exists(path):
+            shutil.rmtree(path)
+            evicted += 1
+            logger.info('Evicted clone cache for %s/%s (%s)', repo.owner, repo.name, path)
+
+    logger.info(
+        'Clone eviction complete: %d clones removed (threshold: %d days)',
+        evicted, settings.EVICT_AFTER_DAYS,
+    )
+
+
+@shared_task
+def cleanup_old_logs():
+    """Delete rotated log backup files older than LOG_RETENTION_DAYS."""
+    import time
+
+    from django.conf import settings
+
+    retention_seconds = settings.LOG_RETENTION_DAYS * 86400
+    cutoff = time.time() - retention_seconds
+    log_dir = settings.LOG_DIR
+    deleted = 0
+
+    for entry in log_dir.iterdir():
+        # RotatingFileHandler backups: django.log.1, celery.log.2, etc.
+        if entry.is_file() and entry.suffix.lstrip('.').isdigit():
+            if entry.stat().st_mtime < cutoff:
+                entry.unlink()
+                deleted += 1
+                logger.info('Deleted old log backup: %s', entry.name)
+
+    logger.info(
+        'Log cleanup complete: %d backup files removed (retention: %d days)',
+        deleted, settings.LOG_RETENTION_DAYS,
+    )

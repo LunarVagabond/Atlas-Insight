@@ -5,6 +5,7 @@ import axios from 'axios'
 import AppBadge from '../components/ui/AppBadge.vue'
 import AppButton from '../components/ui/AppButton.vue'
 import LoadingSpinner from '../components/ui/LoadingSpinner.vue'
+import CompareModal from '../components/ui/CompareModal.vue'
 import type { RunListItem } from '../stores/analysis'
 
 const router = useRouter()
@@ -14,7 +15,7 @@ const sort = ref<'triggered_at' | 'completed_at' | 'status'>('triggered_at')
 const order = ref<'desc' | 'asc'>('desc')
 const page = ref(1)
 const perPage = 25
-const selectedIds = ref<Set<string>>(new Set())
+const showCompareModal = ref(false)
 
 const items = ref<RunListItem[]>([])
 const total = ref(0)
@@ -65,20 +66,6 @@ function goToRun(id: string) {
   router.push(`/results/${id}`)
 }
 
-function toggleSelect(id: string) {
-  const s = new Set(selectedIds.value)
-  if (s.has(id)) {
-    s.delete(id)
-  } else if (s.size < 2) {
-    s.add(id)
-  }
-  selectedIds.value = s
-}
-
-function goToCompare() {
-  const [a, b] = [...selectedIds.value]
-  router.push(`/compare?a=${a}&b=${b}`)
-}
 
 </script>
 
@@ -100,17 +87,9 @@ function goToCompare() {
           style="max-width:400px"
         />
         <span class="runs-search__count">{{ total }} repo{{ total !== 1 ? 's' : '' }}</span>
-        <AppButton
-          v-if="selectedIds.size === 2"
-          variant="primary"
-          @click="goToCompare"
-          style="margin-left:1rem"
-        >
-          Compare ({{ selectedIds.size }})
+        <AppButton variant="secondary" @click="showCompareModal = true" style="margin-left:1rem">
+          Compare
         </AppButton>
-        <span v-else-if="selectedIds.size === 1" style="margin-left:1rem;font-size:0.875rem;color:var(--color-text-secondary)">
-          Select 1 more to compare
-        </span>
       </div>
     </div>
 
@@ -127,7 +106,6 @@ function goToCompare() {
         <table class="data-table runs-table">
           <thead>
             <tr>
-              <th style="width:2rem"></th>
               <th>Author</th>
               <th>Repository</th>
               <th>Status</th>
@@ -143,15 +121,6 @@ function goToCompare() {
               class="runs-table__row"
               @click="goToRun(run.id)"
             >
-              <td @click.stop>
-                <input
-                  type="checkbox"
-                  :checked="selectedIds.has(run.id)"
-                  :disabled="!selectedIds.has(run.id) && selectedIds.size >= 2"
-                  @change="toggleSelect(run.id)"
-                  style="cursor:pointer"
-                />
-              </td>
               <td>
                 <span class="runs-table__author">{{ run.repo_owner }}</span>
               </td>
@@ -185,4 +154,6 @@ function goToCompare() {
       </template>
     </div>
   </div>
+
+  <CompareModal v-if="showCompareModal" @close="showCompareModal = false" />
 </template>

@@ -6,6 +6,7 @@ import URLInputForm from '../components/analysis/URLInputForm.vue'
 import AppBadge from '../components/ui/AppBadge.vue'
 import AppButton from '../components/ui/AppButton.vue'
 import LoadingSpinner from '../components/ui/LoadingSpinner.vue'
+import CompareModal from '../components/ui/CompareModal.vue'
 import { useAnalysisStore } from '../stores/analysis'
 import type { RunListItem } from '../stores/analysis'
 
@@ -27,7 +28,7 @@ const sort = ref<'triggered_at' | 'status'>('triggered_at')
 const order = ref<'desc' | 'asc'>('desc')
 const page = ref(1)
 const perPage = 10
-const selectedIds = ref<Set<string>>(new Set())
+const showCompareModal = ref(false)
 const items = ref<RunListItem[]>([])
 const total = ref(0)
 const loading = ref(false)
@@ -67,18 +68,6 @@ function formatDate(iso: string) {
 
 function goToRun(id: string) {
   router.push(`/results/${id}`)
-}
-
-function toggleSelect(id: string) {
-  const s = new Set(selectedIds.value)
-  if (s.has(id)) s.delete(id)
-  else if (s.size < 2) s.add(id)
-  selectedIds.value = s
-}
-
-function goToCompare() {
-  const [a, b] = [...selectedIds.value]
-  router.push(`/compare?a=${a}&b=${b}`)
 }
 
 // ── Watchlist ────────────────────────────────────────────────────────────────
@@ -132,12 +121,9 @@ const unpinnedItems = computed(() => items.value.filter(r => !watchlist.value.ha
             style="max-width:320px"
           />
           <span class="runs-search__count">{{ total }} repo{{ total !== 1 ? 's' : '' }}</span>
-          <AppButton v-if="selectedIds.size === 2" variant="primary" @click="goToCompare">
-            Compare ({{ selectedIds.size }})
+          <AppButton variant="secondary" @click="showCompareModal = true">
+            Compare
           </AppButton>
-          <span v-else-if="selectedIds.size === 1" class="home-runs__compare-hint">
-            Select 1 more to compare
-          </span>
         </div>
       </div>
 
@@ -151,7 +137,6 @@ const unpinnedItems = computed(() => items.value.filter(r => !watchlist.value.ha
         <table class="data-table runs-table">
           <thead>
             <tr>
-              <th style="width:2rem"></th>
               <th style="width:2rem"></th>
               <th>Author</th>
               <th>Repository</th>
@@ -174,15 +159,6 @@ const unpinnedItems = computed(() => items.value.filter(r => !watchlist.value.ha
                 @click="goToRun(run.id)"
               >
                 <td @click.stop>
-                  <input
-                    type="checkbox"
-                    :checked="selectedIds.has(run.id)"
-                    :disabled="!selectedIds.has(run.id) && selectedIds.size >= 2"
-                    @change="toggleSelect(run.id)"
-                    style="cursor:pointer"
-                  />
-                </td>
-                <td @click.stop>
                   <button class="runs-table__pin runs-table__pin--active" @click="togglePin(run.repo_url)" title="Unpin">★</button>
                 </td>
                 <td><span class="runs-table__author">{{ run.repo_owner }}</span></td>
@@ -204,7 +180,7 @@ const unpinnedItems = computed(() => items.value.filter(r => !watchlist.value.ha
                 </td>
               </tr>
               <tr v-if="unpinnedItems.length" class="runs-table__divider">
-                <td colspan="7"><span>Other repos</span></td>
+                <td colspan="6"><span>Other repos</span></td>
               </tr>
             </template>
 
@@ -215,15 +191,6 @@ const unpinnedItems = computed(() => items.value.filter(r => !watchlist.value.ha
               class="runs-table__row"
               @click="goToRun(run.id)"
             >
-              <td @click.stop>
-                <input
-                  type="checkbox"
-                  :checked="selectedIds.has(run.id)"
-                  :disabled="!selectedIds.has(run.id) && selectedIds.size >= 2"
-                  @change="toggleSelect(run.id)"
-                  style="cursor:pointer"
-                />
-              </td>
               <td @click.stop>
                 <button
                   :class="['runs-table__pin', { 'runs-table__pin--active': isPinned(run.repo_url) }]"
@@ -260,4 +227,6 @@ const unpinnedItems = computed(() => items.value.filter(r => !watchlist.value.ha
       </template>
     </div>
   </div>
+
+  <CompareModal v-if="showCompareModal" @close="showCompareModal = false" />
 </template>

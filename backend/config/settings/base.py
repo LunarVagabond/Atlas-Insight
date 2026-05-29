@@ -180,9 +180,19 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.analysis.tasks.cleanup_old_runs',
         'schedule': crontab(minute=30, hour=2),  # daily at 02:30 UTC
     },
+    'evict-stale-clones': {
+        'task': 'apps.analysis.tasks.evict_stale_clones',
+        'schedule': crontab(minute=0, hour=3),  # daily at 03:00 UTC
+    },
+    'cleanup-old-logs': {
+        'task': 'apps.analysis.tasks.cleanup_old_logs',
+        'schedule': crontab(minute=30, hour=3),  # daily at 03:30 UTC
+    },
 }
 
 RUNS_TO_KEEP_PER_REPO = config('RUNS_TO_KEEP_PER_REPO', default=10, cast=int)
+EVICT_AFTER_DAYS = config('EVICT_AFTER_DAYS', default=30, cast=int)
+LOG_RETENTION_DAYS = config('LOG_RETENTION_DAYS', default=30, cast=int)
 
 # Logging
 LOG_DIR = REPO_ROOT / '_running' / 'logs'
@@ -231,7 +241,7 @@ LOGGING = {
         },
         'django.server': {
             'handlers': ['django_file'],
-            'level': 'WARNING',
+            'level': 'ERROR',
             'propagate': False,
         },
         'django.template': {
