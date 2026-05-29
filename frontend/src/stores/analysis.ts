@@ -140,6 +140,13 @@ export interface GitHubMeta {
   pushed_at: string | null
   homepage: string | null
   contributors: GitHubContributor[]
+  releases_meta?: {
+    stable_count: number
+    prerelease_count: number
+    total_count: number
+    latest_stable: { name: string; date: string } | null
+    latest_prerelease: { name: string; date: string } | null
+  }
 }
 
 export interface ClassificationLevel {

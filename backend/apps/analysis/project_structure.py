@@ -398,7 +398,6 @@ def _detect_license_type(path: Path) -> str | None:
 def _get_releases(repo_obj: Repo) -> tuple[int, list[dict]]:
     try:
         tags = sorted(repo_obj.tags, key=lambda t: t.commit.committed_date, reverse=True)
-        total_count = len(tags)
         recent = [
             {
                 'name': t.name,
@@ -408,7 +407,7 @@ def _get_releases(repo_obj: Repo) -> tuple[int, list[dict]]:
             }
             for t in tags[:20]
         ]
-        return total_count, recent
+        return len(tags), recent
     except Exception:
         return 0, []
 

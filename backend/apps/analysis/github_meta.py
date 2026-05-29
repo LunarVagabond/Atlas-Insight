@@ -88,10 +88,9 @@ def fetch_github_meta(owner: str, name: str, token: Optional[str] = None) -> dic
         pass
 
     license_info = data.get('license') or {}
-
     contributors = _fetch_contributors(owner, name, headers)
-
     contribution_data = fetch_contribution_data(owner, name, headers)
+    releases_meta = _fetch_releases_meta(owner, name, headers)
 
     return {
         'stars': data.get('stargazers_count', 0),
@@ -115,7 +114,48 @@ def fetch_github_meta(owner: str, name: str, token: Optional[str] = None) -> dic
         'homepage': data.get('homepage') or None,
         'contributors': contributors,
         'contribution_data': contribution_data,
+        'releases_meta': releases_meta,
     }
+
+
+def _fetch_releases_meta(owner: str, name: str, headers: dict) -> dict | None:
+    """Fetch release counts using GitHub's prerelease flag. Up to 2 pages (200 releases)."""
+    base_url = f'https://api.github.com/repos/{owner}/{name}/releases'
+    try:
+        all_releases: list[dict] = []
+        for page in range(1, 3):
+            r = requests.get(
+                base_url,
+                params={'per_page': 100, 'page': page},
+                headers=headers,
+                timeout=10,
+            )
+            if r.status_code != 200:
+                break
+            batch = r.json()
+            all_releases.extend(batch)
+            if 'rel="next"' not in r.headers.get('Link', ''):
+                break
+
+        if not all_releases:
+            return None
+
+        stable = [r for r in all_releases if not r.get('prerelease') and not r.get('draft')]
+        prereleases = [r for r in all_releases if r.get('prerelease') and not r.get('draft')]
+
+        def _rel(r: dict) -> dict:
+            return {'name': r.get('tag_name', ''), 'date': r.get('published_at', '')}
+
+        return {
+            'stable_count': len(stable),
+            'prerelease_count': len(prereleases),
+            'total_count': len(stable) + len(prereleases),
+            'latest_stable': _rel(stable[0]) if stable else None,
+            'latest_prerelease': _rel(prereleases[0]) if prereleases else None,
+        }
+    except Exception as exc:
+        logger.warning('_fetch_releases_meta failed for %s/%s: %s', owner, name, exc)
+        return None
 
 
 _CONTRIBUTION_LABELS = frozenset({

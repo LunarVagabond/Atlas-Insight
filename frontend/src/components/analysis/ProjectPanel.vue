@@ -356,17 +356,40 @@ const communityFiles = computed(() => [
             <div class="stat__label">Repository Age</div>
           </div>
         </AppCard>
-        <AppCard>
-          <div class="stat">
-            <div class="stat__value stat__value--md">{{ structure.release_count }}</div>
-            <div class="stat__label">
-              Releases
-              <span v-if="structure.last_release" class="stat__sub">
-                (latest: {{ structure.last_release.name }}
-                <template v-if="lastReleaseAge">, {{ lastReleaseAge }}</template>)
-              </span>
+        <AppCard class="release-card">
+          <template v-if="gh?.releases_meta">
+            <div class="release-card__stats">
+              <div class="release-card__col">
+                <div class="stat__value stat__value--md">{{ gh.releases_meta.stable_count }}</div>
+                <div class="stat__label">Releases</div>
+              </div>
+              <div class="release-card__divider" />
+              <div class="release-card__col">
+                <div class="stat__value stat__value--md">{{ gh.releases_meta.prerelease_count }}</div>
+                <div class="stat__label">Pre-releases</div>
+              </div>
+              <div class="release-card__divider" />
+              <div class="release-card__col">
+                <div class="stat__value stat__value--md">{{ gh.releases_meta.total_count }}</div>
+                <div class="stat__label">Total</div>
+              </div>
             </div>
-          </div>
+            <div v-if="gh.releases_meta.latest_stable" class="release-card__latest">
+              Latest: <strong>{{ gh.releases_meta.latest_stable.name }}</strong>
+              <template v-if="lastReleaseAge"> · {{ lastReleaseAge }}</template>
+            </div>
+          </template>
+          <template v-else>
+            <div class="stat">
+              <div class="stat__value stat__value--md">{{ structure.release_count }}</div>
+              <div class="stat__label">
+                Releases
+                <span v-if="structure.last_release" class="stat__sub">
+                  (latest: {{ structure.last_release.name }}<template v-if="lastReleaseAge">, {{ lastReleaseAge }}</template>)
+                </span>
+              </div>
+            </div>
+          </template>
         </AppCard>
         <AppCard>
           <div class="stat">

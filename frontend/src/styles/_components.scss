@@ -213,6 +213,36 @@
   }
 }
 
+// ===== RELEASE CARD =====
+.release-card {
+  &__stats {
+    display: flex;
+    align-items: center;
+    gap: $space-4;
+  }
+
+  &__col {
+    flex: 1;
+    text-align: center;
+  }
+
+  &__divider {
+    width: 1px;
+    height: 2rem;
+    background: var(--color-border);
+    flex-shrink: 0;
+  }
+
+  &__latest {
+    margin-top: $space-3;
+    padding-top: $space-3;
+    border-top: 1px solid var(--color-border);
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+    text-align: center;
+  }
+}
+
 // ===== URL FORM =====
 .url-form {
   width: 100%;
