@@ -109,6 +109,7 @@ def fetch_github_meta(owner: str, name: str, token: Optional[str] = None) -> dic
         'has_discussions': data.get('has_discussions', False),
         'archived': data.get('archived', False),
         'is_fork': data.get('fork', False),
+        'is_private': data.get('private', False),
         'created_at': data.get('created_at'),
         'pushed_at': data.get('pushed_at'),
         'homepage': data.get('homepage') or None,

@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAnalysisStore } from '../stores/analysis'
 import AppTabs from '../components/ui/AppTabs.vue'
 import AppButton from '../components/ui/AppButton.vue'
-import LoadingSpinner from '../components/ui/LoadingSpinner.vue'
 import AnalysisStatusCard from '../components/analysis/AnalysisStatusCard.vue'
 import OverviewPanel from '../components/analysis/OverviewPanel.vue'
 import CommitTimelineChart from '../components/analysis/CommitTimelineChart.vue'
@@ -22,6 +21,32 @@ const store = useAnalysisStore()
 const runId = computed(() => route.params.runId as string)
 const result = computed(() => store.run?.result)
 const isPolling = computed(() => ['pending', 'running'].includes(store.run?.status ?? ''))
+const isInitialLoading = computed(() => store.status === 'polling' && !store.run)
+const showProgress = computed(() => isInitialLoading.value || isPolling.value)
+
+const ANALYSIS_STEPS = [
+  'Connecting to GitHub…',
+  'Cloning repository…',
+  'Scanning file structure…',
+  'Parsing dependencies…',
+  'Analyzing commit history…',
+  'Computing heuristics…',
+  'Building dependency graph…',
+  'Finalizing results…',
+]
+const currentStep = ref(0)
+let stepTimer: ReturnType<typeof setInterval> | null = null
+
+watch(isPolling, (polling) => {
+  if (polling) {
+    currentStep.value = 0
+    stepTimer = setInterval(() => {
+      if (currentStep.value < ANALYSIS_STEPS.length - 1) currentStep.value++
+    }, 8000)
+  } else {
+    if (stepTimer) { clearInterval(stepTimer); stepTimer = null }
+  }
+}, { immediate: true })
 
 const hasRoadmap = computed(() => (result.value?.structure?.roadmap_parsed?.milestones?.length ?? 0) > 0)
 const TABS = computed(() => {
@@ -47,7 +72,10 @@ watch(runId, async (id) => {
   await store.pollRun(id)
 }, { immediate: true })
 
-onUnmounted(() => store._stopPolling())
+onUnmounted(() => {
+  store._stopPolling()
+  if (stepTimer) { clearInterval(stepTimer); stepTimer = null }
+})
 
 // Re-analyze
 const reanalyzing = ref(false)
@@ -114,15 +142,29 @@ function copyLink() {
       </div>
     </div>
 
-    <div v-if="isPolling" class="results-layout__content">
-      <LoadingSpinner size="lg" label="Analysis in progress — this may take a minute..." />
+    <div v-if="showProgress" class="results-layout__content">
+      <div class="analysis-progress">
+        <div class="spinner spinner--xl" />
+        <p class="analysis-progress__step">
+          {{ isInitialLoading ? 'Loading analysis…' : ANALYSIS_STEPS[currentStep] }}
+        </p>
+        <p class="analysis-progress__hint">Typical analyses take 30–90 seconds.</p>
+        <div v-if="isPolling" class="analysis-progress__track">
+          <span
+            v-for="(_, i) in ANALYSIS_STEPS"
+            :key="i"
+            :class="['analysis-progress__dot', i === currentStep && 'analysis-progress__dot--active', i < currentStep && 'analysis-progress__dot--done']"
+          />
+        </div>
+      </div>
     </div>
 
-    <div v-else-if="store.status === 'error'" class="results-layout__content">
+    <div v-if="!showProgress && store.status === 'error'" class="results-layout__content">
       <div class="empty-state">Analysis failed. {{ store.error }}</div>
     </div>
 
-    <div v-else-if="result" class="results-layout__content">
+    <Transition name="fade">
+    <div v-if="!showProgress && result" class="results-layout__content">
       <AppTabs :tabs="TABS" v-model="activeTab" />
       <div style="margin-top: 1.5rem">
         <OverviewPanel v-if="activeTab === 'Overview'" :result="result" />
@@ -145,5 +187,6 @@ function copyLink() {
         </div>
       </div>
     </div>
+    </Transition>
   </div>
 </template>

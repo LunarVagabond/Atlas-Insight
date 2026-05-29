@@ -1,10 +1,25 @@
 import os
 import re
+import shutil
 from typing import Optional
 
 import git
 from django.conf import settings
 from django.utils import timezone
+
+# Override git config via env to disable any system credential helper
+# (VSCode, GNOME keyring, etc.) for every git operation we run.
+# GIT_CONFIG_COUNT / KEY / VALUE syntax requires git 2.32+ (2021).
+# DISPLAY/WAYLAND_DISPLAY cleared so no GUI dialog can spawn from the worker.
+_GIT_ENV = {
+    'GIT_TERMINAL_PROMPT': '0',       # never block waiting for a terminal prompt
+    'GIT_CONFIG_COUNT': '1',
+    'GIT_CONFIG_KEY_0': 'credential.helper',
+    'GIT_CONFIG_VALUE_0': '',          # empty = disabled
+    'DISPLAY': '',                     # no X11 GUI dialogs from Celery worker
+    'WAYLAND_DISPLAY': '',             # no Wayland GUI dialogs
+    'DBUS_SESSION_BUS_ADDRESS': '',    # no desktop session bus (keyring, VSCode)
+}
 
 
 def get_cache_path(url: str) -> str:
@@ -23,20 +38,28 @@ def _inject_pat(url: str, pat: str) -> str:
 def clone_or_fetch(url: str, pat: Optional[str] = None) -> tuple:
     cache_path = get_cache_path(url)
     clone_url = _inject_pat(url, pat) if pat else url
+
     if os.path.exists(cache_path):
-        repo = git.Repo(cache_path)
-        if pat:
-            repo.remotes.origin.set_url(clone_url)
-        repo.remotes.origin.fetch()
-        if pat:
-            # Strip PAT from stored remote immediately after fetch
-            repo.remotes.origin.set_url(url)
-    else:
-        os.makedirs(cache_path, exist_ok=True)
-        repo = git.Repo.clone_from(clone_url, cache_path)
-        if pat:
-            # Strip PAT from stored remote so it never persists on disk
-            repo.remotes.origin.set_url(url)
-    sha = repo.head.commit.hexsha
-    fetched_at = timezone.now()
-    return repo, sha, fetched_at
+        try:
+            repo = git.Repo(cache_path)
+        except git.InvalidGitRepositoryError:
+            # Previous clone failed and left a broken dir — wipe and re-clone
+            shutil.rmtree(cache_path)
+        else:
+            if pat:
+                repo.remotes.origin.set_url(clone_url)
+            repo.git.update_environment(**_GIT_ENV)
+            repo.remotes.origin.fetch()
+            if pat:
+                repo.remotes.origin.set_url(url)
+            sha = repo.head.commit.hexsha
+            return repo, sha, timezone.now()
+
+    # Fresh clone (or after wipe above)
+    g = git.Git()
+    g.update_environment(**_GIT_ENV)
+    repo = git.Repo.clone_from(clone_url, cache_path, env=_GIT_ENV)
+    if pat:
+        repo.remotes.origin.set_url(url)
+
+    return repo, repo.head.commit.hexsha, timezone.now()

@@ -51,6 +51,79 @@
     align-items: center;
     gap: $space-3;
   }
+
+  &__login {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    font-size: 0.875rem;
+    padding: 6px 14px;
+  }
+
+  &__github-icon {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+    flex-shrink: 0;
+  }
+
+  &__user {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: $radius-md;
+    transition: background $transition-fast;
+
+    &:hover { background: var(--color-surface-hover); }
+  }
+
+  &__avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid var(--color-border);
+  }
+
+  &__username {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text);
+  }
+
+  &__chevron {
+    font-size: 0.625rem;
+    color: var(--color-text-muted);
+  }
+
+  &__dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: $radius-md;
+    box-shadow: 0 4px 16px var(--color-shadow);
+    min-width: 140px;
+    z-index: 100;
+    overflow: hidden;
+  }
+
+  &__dropdown-item {
+    width: 100%;
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 0.875rem;
+    color: var(--color-text);
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: background $transition-fast;
+
+    &:hover { background: var(--color-surface-hover); }
+  }
 }
 
 .theme-toggle {
@@ -181,6 +254,60 @@
   gap: $space-4;
   padding: $space-16 $space-6;
   color: var(--color-text-secondary);
+}
+
+.analysis-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $space-5;
+  padding: $space-20 $space-6;
+
+  &__step {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--color-text);
+    transition: opacity 0.4s ease;
+    min-height: 1.5em;
+  }
+
+  &__hint {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin: 0;
+  }
+
+  &__track {
+    display: flex;
+    gap: $space-2;
+    align-items: center;
+    margin-top: $space-2;
+  }
+
+  &__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-border);
+    transition: background 0.35s ease, transform 0.35s ease;
+
+    &--active {
+      background: var(--color-accent);
+      transform: scale(1.4);
+    }
+
+    &--done {
+      background: var(--color-success);
+    }
+  }
+}
+
+// Content fade-in when analysis completes
+.fade-enter-active {
+  transition: opacity 0.5s ease;
+}
+.fade-enter-from {
+  opacity: 0;
 }
 
 .runs-search {

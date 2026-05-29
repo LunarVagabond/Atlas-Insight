@@ -33,6 +33,25 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
     run.save(update_fields=['status'])
     logger.info('Starting analysis for run %s: %s', run_id, run.repo.url)
 
+    # Set is_private immediately via a lightweight API check so that even
+    # failed runs are correctly hidden from users who don't own them.
+    try:
+        import requests as _requests
+        _headers = {'Accept': 'application/vnd.github+json'}
+        if pat:
+            _headers['Authorization'] = f'Bearer {pat}'
+        _r = _requests.get(
+            f'https://api.github.com/repos/{run.repo.owner}/{run.repo.name}',
+            headers=_headers, timeout=10,
+        )
+        if _r.status_code == 200:
+            _is_private = _r.json().get('private', False)
+            if run.repo.is_private != _is_private:
+                run.repo.is_private = _is_private
+                run.repo.save(update_fields=['is_private'])
+    except Exception:
+        pass
+
     try:
         repo_obj, sha, fetched_at = clone_or_fetch(run.repo.url, pat=pat)
         repo_dir = repo_obj.working_dir
@@ -71,7 +90,8 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
         repo.last_analyzed_at = timezone.now()
         repo.last_fetched_at = fetched_at
         repo.is_stale = False
-        repo.save(update_fields=['last_commit_sha', 'last_analyzed_at', 'last_fetched_at', 'is_stale'])
+        repo.is_private = github_meta.get('is_private', False)
+        repo.save(update_fields=['last_commit_sha', 'last_analyzed_at', 'last_fetched_at', 'is_stale', 'is_private'])
         logger.info('Analysis completed for run %s', run_id)
 
     except Exception as exc:

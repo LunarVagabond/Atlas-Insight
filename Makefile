@@ -4,6 +4,9 @@ ROOT_DIR    := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 RUNNING_DIR := $(ROOT_DIR)/_running
 COMPOSE     := docker compose -f $(ROOT_DIR)/docker-compose.yml
 
+# Read CLOUDFLARE_TUNNEL_TOKEN from backend/.env if not already set in environment
+CLOUDFLARE_TUNNEL_TOKEN ?= $(shell grep '^CLOUDFLARE_TUNNEL_TOKEN=' $(ROOT_DIR)/backend/.env 2>/dev/null | cut -d= -f2- | tr -d '[:space:]')
+
 .PHONY: help setup start stop restart status logs \
         start-django  stop-django \
         start-celery  stop-celery \
@@ -11,6 +14,7 @@ COMPOSE     := docker compose -f $(ROOT_DIR)/docker-compose.yml
         start-vite    stop-vite \
         start-postgres stop-postgres \
         start-redis    stop-redis \
+        start-tunnel  stop-tunnel \
         migrate makemigrations createsuperuser shell dbshell collectstatic \
         test lint format build type-check \
         logs-django logs-celery logs-flower logs-vite \
@@ -36,6 +40,7 @@ help:
 	@echo "    start-vite   / stop-vite        Vite dev server    (port 4501)"
 	@echo "    start-postgres / stop-postgres  Postgres container (port 4503)"
 	@echo "    start-redis    / stop-redis     Redis container    (port 4502)"
+	@echo "    start-tunnel   / stop-tunnel    Cloudflare tunnel  (requires CLOUDFLARE_TUNNEL_TOKEN)"
 	@echo ""
 	@echo "  ── Django management ────────────────────────────────────────────────"
 	@echo "    migrate            Run migrations  (ARGS=app_label)"
@@ -77,13 +82,22 @@ start: _ensure_running_dirs
 	@until $(COMPOSE) exec -T postgres pg_isready -q 2>/dev/null; do sleep 1; done
 	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend start
 	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/frontend start
+	@$(MAKE) --no-print-directory start-tunnel
 	@echo ""
 	@echo "Atlas Insight running:"
 	@echo "  API:    http://localhost:4500/api/v1/docs"
 	@echo "  App:    http://localhost:4501"
 	@echo "  Flower: http://localhost:4504"
+	@if [ -n "$(CLOUDFLARE_TUNNEL_TOKEN)" ]; then \
+	  echo ""; \
+	  echo "  Tunnel:"; \
+	  echo "    App:    https://atlas.dsyndicate.dev"; \
+	  echo "    API:    https://ai-api.dsyndicate.dev"; \
+	  echo "    Flower: https://ai-flower.dsyndicate.dev"; \
+	fi
 
 stop:
+	@$(MAKE) --no-print-directory stop-tunnel
 	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/frontend stop
 	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend stop
 	@$(COMPOSE) stop 2>&1 | grep -v "^$$"
@@ -113,12 +127,26 @@ status:
 	  fi; \
 	done
 	@echo ""
+	@echo "━━━ Tunnel ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@if docker inspect cloudflared >/dev/null 2>&1; then \
+	  STATUS=$$(docker inspect --format='{{.State.Status}}' cloudflared 2>/dev/null); \
+	  printf "  %-14s %s\n" "cloudflared:" "$$STATUS"; \
+	else \
+	  printf "  %-14s %s\n" "cloudflared:" "not running"; \
+	fi
+	@echo ""
 	@echo "━━━ URLs ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@printf "  %-14s %s\n" "Django API:"  "http://localhost:4500/api/v1/docs"
 	@printf "  %-14s %s\n" "Vite app:"    "http://localhost:4501"
 	@printf "  %-14s %s\n" "Flower:"      "http://localhost:4504"
 	@printf "  %-14s %s\n" "Redis:"       "localhost:4502"
 	@printf "  %-14s %s\n" "Postgres:"    "localhost:4503"
+	@if docker inspect cloudflared >/dev/null 2>&1 && [ "$$(docker inspect --format='{{.State.Status}}' cloudflared 2>/dev/null)" = "running" ]; then \
+	  echo ""; \
+	  printf "  %-14s %s\n" "App tunnel:"    "https://atlas.dsyndicate.dev"; \
+	  printf "  %-14s %s\n" "API tunnel:"    "https://ai-api.dsyndicate.dev"; \
+	  printf "  %-14s %s\n" "Flower tunnel:" "https://ai-flower.dsyndicate.dev"; \
+	fi
 	@echo ""
 
 # ── Individual services ────────────────────────────────────────────────────────
@@ -158,6 +186,20 @@ start-redis:
 
 stop-redis:
 	@$(COMPOSE) stop redis
+
+start-tunnel:
+	@if [ -z "$(CLOUDFLARE_TUNNEL_TOKEN)" ]; then \
+	  echo "  tunnel:    skipped (CLOUDFLARE_TUNNEL_TOKEN not set)"; \
+	else \
+	  echo "Starting Cloudflare tunnel..."; \
+	  docker stop cloudflared 2>/dev/null || true; \
+	  docker rm cloudflared 2>/dev/null || true; \
+	  CLOUDFLARE_TUNNEL_TOKEN=$(CLOUDFLARE_TUNNEL_TOKEN) $(COMPOSE) --profile tunnel up -d cloudflared 2>&1 | grep -v "^$$"; \
+	fi
+
+stop-tunnel:
+	@docker stop cloudflared 2>/dev/null || true
+	@docker rm cloudflared 2>/dev/null || true
 
 # ── Django management ──────────────────────────────────────────────────────────
 

@@ -7,18 +7,43 @@ REPO_ROOT = BASE_DIR.parent
 
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me-in-production')
 DEBUG = config('DEBUG', default=False, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    default='ai-api.dsyndicate.dev,atlas.dsyndicate.dev,ai-flower.dsyndicate.dev,localhost,127.0.0.1',
+    cast=Csv(),
+)
 
 SITE_NAME = config('SITE_NAME', default='Atlas Insight')
 
+# ── CORS / CSRF ──────────────────────────────────────────────────────────────
+CORS_ALLOWED_ORIGINS = config(
+    'CORS_ALLOWED_ORIGINS',
+    default='https://atlas.dsyndicate.dev,http://localhost:4501',
+    cast=Csv(),
+)
+CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='https://atlas.dsyndicate.dev,https://ai-api.dsyndicate.dev,http://localhost:4501,http://localhost:4500',
+    cast=Csv(),
+)
+
 INSTALLED_APPS = [
+    'corsheaders',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.github',
     'ninja',
+    'apps.users.apps.UsersConfig',
     'apps.repositories.apps.RepositoriesConfig',
     'apps.analysis.apps.AnalysisConfig',
     'apps.api.apps.ApiConfig',
@@ -26,10 +51,13 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    'apps.users.middleware.OAuthCallbackHostMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -53,6 +81,51 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+
+# ── Custom user model ────────────────────────────────────────────────────────
+AUTH_USER_MODEL = 'users.User'
+
+# ── django-allauth ───────────────────────────────────────────────────────────
+SITE_ID = 1
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
+
+SOCIALACCOUNT_PROVIDERS = {
+    'github': {
+        'APP': {
+            'client_id': config('GITHUB_CLIENT_ID', default=''),
+            'secret': config('GITHUB_CLIENT_SECRET', default=''),
+            'key': '',
+        },
+        'SCOPE': ['read:user', 'user:email', 'repo'],
+    }
+}
+
+ACCOUNT_LOGIN_METHODS = {'username'}
+ACCOUNT_SIGNUP_FIELDS = ['username*', 'password1*', 'password2*']
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = config('ACCOUNT_DEFAULT_HTTP_PROTOCOL', default='https')
+ACCOUNT_EMAIL_VERIFICATION = 'none'
+SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_LOGIN_ON_GET = True
+
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+FRONTEND_URL = config('FRONTEND_URL', default='https://atlas.dsyndicate.dev')
+BACKEND_URL = config('BACKEND_URL', default='https://ai-api.dsyndicate.dev')
+
+# Share session + CSRF cookies across all *.dsyndicate.dev subdomains so the
+# OAuth state set during login (atlas.dsyndicate.dev) is readable at the callback
+# (ai-api.dsyndicate.dev). Falls back to None (host-only) for localhost dev.
+_COOKIE_DOMAIN = config('SESSION_COOKIE_DOMAIN', default='.dsyndicate.dev') or None
+SESSION_COOKIE_DOMAIN = _COOKIE_DOMAIN
+CSRF_COOKIE_DOMAIN = _COOKIE_DOMAIN
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=True, cast=bool)
+LOGIN_REDIRECT_URL = FRONTEND_URL + '/?login=success'
+LOGOUT_REDIRECT_URL = FRONTEND_URL
 
 DATABASES = {
     'default': {
@@ -153,7 +226,17 @@ LOGGING = {
         },
         'django.request': {
             'handlers': ['console', 'django_file'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'django.server': {
+            'handlers': ['django_file'],
             'level': 'WARNING',
+            'propagate': False,
+        },
+        'django.template': {
+            'handlers': ['django_file'],
+            'level': 'ERROR',
             'propagate': False,
         },
         'django.db.backends': {

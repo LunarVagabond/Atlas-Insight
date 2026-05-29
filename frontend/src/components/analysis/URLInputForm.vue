@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import AppButton from '../ui/AppButton.vue'
+import { useAuthStore } from '../../stores/auth'
 
 const emit = defineEmits<{ submitted: [url: string, pat?: string] }>()
 defineProps<{ loading?: boolean; error?: string | null }>()
+
+const auth = useAuthStore()
 
 const url = ref('')
 const localError = ref('')
@@ -23,11 +26,12 @@ function submit() {
     localError.value = 'Must be a valid GitHub repository URL (e.g. https://github.com/owner/repo)'
     return
   }
-  if (isPrivate.value && !pat.value.trim()) {
+  // PAT only needed when not authenticated and private toggle is on
+  if (!auth.isAuthenticated && isPrivate.value && !pat.value.trim()) {
     localError.value = 'Please enter a Personal Access Token for private repos'
     return
   }
-  emit('submitted', trimmed, isPrivate.value && pat.value.trim() ? pat.value.trim() : undefined)
+  emit('submitted', trimmed, !auth.isAuthenticated && isPrivate.value && pat.value.trim() ? pat.value.trim() : undefined)
 }
 </script>
 
@@ -48,21 +52,28 @@ function submit() {
       </AppButton>
     </div>
 
-    <label class="url-form__private-toggle">
-      <input type="checkbox" v-model="isPrivate" :disabled="loading" />
-      Private repository (requires PAT)
-    </label>
+    <!-- Private repo toggle: only show if not logged in (logged-in users use their OAuth token) -->
+    <template v-if="!auth.isAuthenticated">
+      <label class="url-form__private-toggle">
+        <input type="checkbox" v-model="isPrivate" :disabled="loading" />
+        Private repository (requires PAT)
+      </label>
 
-    <div v-if="isPrivate" class="url-form__input-row" style="margin-top:0.5rem">
-      <input
-        v-model="pat"
-        type="password"
-        class="url-form__input"
-        placeholder="GitHub Personal Access Token (repo scope)"
-        :disabled="loading"
-        autocomplete="off"
-      />
-    </div>
+      <div v-if="isPrivate" class="url-form__input-row" style="margin-top:0.5rem">
+        <input
+          v-model="pat"
+          type="password"
+          class="url-form__input"
+          placeholder="GitHub Personal Access Token (repo scope)"
+          :disabled="loading"
+          autocomplete="off"
+        />
+      </div>
+    </template>
+
+    <p v-else class="url-form__auth-note">
+      Logged in as <strong>{{ auth.displayName }}</strong> — private repos you have access to are supported automatically.
+    </p>
 
     <p v-if="localError || error" class="url-form__error">{{ localError || error }}</p>
   </form>

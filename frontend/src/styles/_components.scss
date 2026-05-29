@@ -27,10 +27,12 @@
   &--pending {
     background: var(--badge-pending-bg);
     color: var(--badge-pending-text);
+    animation: badge-pulse 2.5s ease-in-out infinite;
   }
   &--running {
     background: var(--badge-running-bg);
     color: var(--badge-running-text);
+    animation: badge-pulse 2s ease-in-out infinite;
   }
   &--completed {
     background: var(--badge-completed-bg);
@@ -40,6 +42,11 @@
     background: var(--badge-failed-bg);
     color: var(--badge-failed-text);
   }
+
+@keyframes badge-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
   &--warning {
     background: var(--color-warning-bg);
     color: var(--color-warning);
@@ -95,6 +102,11 @@
     padding: $space-3 $space-6;
     font-size: 1rem;
   }
+
+  &--sm {
+    padding: $space-1 $space-3;
+    font-size: 0.8125rem;
+  }
 }
 
 // ===== TABS =====
@@ -137,10 +149,17 @@
   border-top-color: var(--color-accent);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
 
   &--lg {
     width: 40px;
     height: 40px;
+  }
+
+  &--xl {
+    width: 52px;
+    height: 52px;
+    border-width: 3px;
   }
 }
 
@@ -312,6 +331,14 @@
     input[type='checkbox'] {
       cursor: pointer;
     }
+  }
+
+  &__auth-note {
+    margin-top: $space-3;
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+
+    strong { color: var(--color-accent); font-weight: 600; }
   }
 }
 

@@ -39,7 +39,10 @@ async function reanalyze() {
       </div>
       <div class="status-card__row">
         <span class="status-card__label">Status</span>
-        <AppBadge :variant="run.status">{{ run.status }}</AppBadge>
+        <div style="display:flex;align-items:center;gap:6px">
+          <AppBadge :variant="run.status">{{ run.status }}</AppBadge>
+          <span v-if="run.status === 'running' || run.status === 'pending'" class="spinner" style="width:14px;height:14px;border-width:2px" />
+        </div>
       </div>
       <div class="status-card__row">
         <span class="status-card__label">Triggered</span>

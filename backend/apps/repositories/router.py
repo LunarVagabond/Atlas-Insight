@@ -63,6 +63,21 @@ class RunListSchema(Schema):
     per_page: int
 
 
+def _resolve_token(request, pat: Optional[str]) -> Optional[str]:
+    """PAT from request > user's GitHub OAuth token > None (server token used in tasks)."""
+    if pat:
+        return pat
+    if request.user.is_authenticated:
+        from allauth.socialaccount.models import SocialToken
+        social = SocialToken.objects.filter(
+            account__user=request.user,
+            account__provider='github',
+        ).first()
+        if social:
+            return social.token
+    return None
+
+
 @router.post('/analyze', response=AnalyzeResponse)
 def analyze(request, payload: AnalyzeRequest):
     match = GITHUB_URL_RE.match(payload.url.strip())
@@ -79,15 +94,17 @@ def analyze(request, payload: AnalyzeRequest):
         repo.name = name
         repo.save(update_fields=['owner', 'name'])
 
-    latest_sha = fetch_latest_sha(owner, name, token=payload.pat)
+    token = _resolve_token(request, payload.pat)
+    latest_sha = fetch_latest_sha(owner, name, token=token)
 
     if latest_sha and latest_sha == repo.last_commit_sha:
         latest_run = repo.runs.filter(status='completed').order_by('-triggered_at').first()
         if latest_run:
             return AnalyzeResponse(run_id=latest_run.id, status='completed', cached=True)
 
-    run = AnalysisRun.objects.create(repo=repo, status='pending')
-    task = analyze_repository.delay(str(run.id), pat=payload.pat)
+    user = request.user if request.user.is_authenticated else None
+    run = AnalysisRun.objects.create(repo=repo, status='pending', user=user)
+    task = analyze_repository.delay(str(run.id), pat=token)
     run.celery_task_id = task.id
     run.save(update_fields=['celery_task_id'])
 
@@ -113,7 +130,16 @@ def list_runs(
         latest_id=Subquery(latest_per_repo)
     ).values('latest_id')
 
-    qs = AnalysisRun.objects.filter(pk__in=latest_ids).select_related('repo')
+    qs = AnalysisRun.objects.filter(pk__in=latest_ids).select_related('repo', 'user')
+
+    # Visibility: public repos shown to everyone; private only to the run's owner
+    if request.user.is_authenticated:
+        qs = qs.filter(
+            Q(repo__is_private=False) |
+            Q(repo__is_private=True, user=request.user)
+        )
+    else:
+        qs = qs.filter(repo__is_private=False)
 
     if q:
         qs = qs.filter(
@@ -155,9 +181,12 @@ def list_runs(
 @router.get('/runs/{run_id}', response=RunStatusSchema)
 def get_run(request, run_id: uuid.UUID):
     try:
-        run = AnalysisRun.objects.select_related('repo').get(id=run_id)
+        run = AnalysisRun.objects.select_related('repo', 'user').get(id=run_id)
     except AnalysisRun.DoesNotExist:
         raise HttpError(404, 'Run not found')
+    if run.repo.is_private:
+        if not request.user.is_authenticated or run.user != request.user:
+            raise HttpError(403, 'Access denied')
     return RunStatusSchema(
         id=run.id,
         status=run.status,
@@ -179,8 +208,10 @@ def retry_run(request, run_id: uuid.UUID):
         original = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
         raise HttpError(404, 'Run not found')
-    run = AnalysisRun.objects.create(repo=original.repo, status='pending')
-    task = analyze_repository.delay(str(run.id))
+    token = _resolve_token(request, None)
+    user = request.user if request.user.is_authenticated else None
+    run = AnalysisRun.objects.create(repo=original.repo, status='pending', user=user)
+    task = analyze_repository.delay(str(run.id), pat=token)
     run.celery_task_id = task.id
     run.save(update_fields=['celery_task_id'])
     return AnalyzeResponse(run_id=run.id, status='pending', cached=False)
@@ -215,7 +246,12 @@ def get_by_slug(request, owner: str, name: str):
         repo = Repository.objects.get(owner__iexact=owner, name__iexact=name)
     except Repository.DoesNotExist:
         raise HttpError(404, 'Repository not found')
-    run = repo.runs.order_by('-triggered_at').first()
+    if repo.is_private:
+        if not request.user.is_authenticated:
+            raise HttpError(403, 'Access denied')
+    run = repo.runs.select_related('user').order_by('-triggered_at').first()
     if not run:
         raise HttpError(404, 'No runs found for this repository')
+    if repo.is_private and run.user != request.user:
+        raise HttpError(403, 'Access denied')
     return SlugRunSchema(run_id=run.id, status=run.status)

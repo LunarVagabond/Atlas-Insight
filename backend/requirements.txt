@@ -11,3 +11,5 @@ requests>=2.32
 networkx>=3.3
 packaging>=24
 uuid7>=0.1.0  # imports as uuid_extensions
+django-allauth[socialaccount]>=65.0
+django-cors-headers>=4.0
