@@ -11,6 +11,10 @@ const props = defineProps<{ graph: GraphData }>()
 const container = ref<HTMLDivElement>()
 let cy: cytoscape.Core | null = null
 
+function cssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
+
 const LAYOUT_BASE = {
   name: 'fcose',
   quality: 'default',
@@ -76,14 +80,14 @@ function initGraph() {
           'text-margin-y': 3,
           width: 16,
           height: 16,
-          'background-color': '#0969da',
-          color: '#1f2328',
+          'background-color': cssVar('--color-accent'),
+          color: cssVar('--color-text'),
         },
       },
       {
         selector: 'node[?isGod]',
         style: {
-          'background-color': '#cf222e',
+          'background-color': cssVar('--color-error'),
           width: 26,
           height: 26,
         },
@@ -92,8 +96,8 @@ function initGraph() {
         selector: 'edge',
         style: {
           width: 1,
-          'line-color': '#d0d7de',
-          'target-arrow-color': '#d0d7de',
+          'line-color': cssVar('--color-border'),
+          'target-arrow-color': cssVar('--color-border'),
           'target-arrow-shape': 'triangle',
           'curve-style': 'bezier',
           opacity: 0.45,
@@ -142,7 +146,13 @@ function initGraph() {
   })
 }
 
-onMounted(initGraph)
+onMounted(() => {
+  initGraph()
+  // Re-init when theme attribute changes so canvas colors update
+  const observer = new MutationObserver(initGraph)
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+  onUnmounted(() => observer.disconnect())
+})
 onUnmounted(() => cy?.destroy())
 watch(() => props.graph, initGraph)
 </script>

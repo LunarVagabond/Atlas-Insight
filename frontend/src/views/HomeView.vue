@@ -12,9 +12,9 @@ import type { RunListItem } from '../stores/analysis'
 const router = useRouter()
 const store = useAnalysisStore()
 
-async function handleSubmit(url: string, pat?: string) {
+async function handleSubmit(url: string) {
   try {
-    const runId = await store.submitUrl(url, pat)
+    const runId = await store.submitUrl(url)
     router.push(`/results/${runId}`)
   } catch {
     // error shown in form
@@ -109,7 +109,7 @@ const unpinnedItems = computed(() => items.value.filter(r => !watchlist.value.ha
 <template>
   <div>
     <main class="hero hero--compact">
-      <h1 class="hero__title">Repository <span>Archaeology</span></h1>
+      <h1 class="hero__title">Atlas <span>Insight</span></h1>
       <p class="hero__subtitle">
         Submit any public GitHub repository and get a deep analysis of its commit history,
         architecture, dependencies, and health signals.

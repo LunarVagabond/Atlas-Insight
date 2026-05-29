@@ -20,10 +20,14 @@
 
   &__main {
     flex: 1;
+    padding-bottom: 48px; // clearance for fixed footer
   }
 }
 
 .navbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
   height: 56px;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
@@ -411,8 +415,13 @@
 }
 
 .app-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
   text-align: center;
-  padding: $space-5 $space-6;
+  padding: $space-3 $space-6;
   border-top: 1px solid var(--color-border);
   font-size: 0.8125rem;
   color: var(--color-text-muted);
