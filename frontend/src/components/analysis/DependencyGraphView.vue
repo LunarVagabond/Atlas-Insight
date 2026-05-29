@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import cytoscape from 'cytoscape'
+// @ts-ignore — no types for fcose
+import fcose from 'cytoscape-fcose'
 import type { GraphData } from '../../stores/analysis'
+
+cytoscape.use(fcose)
 
 const props = defineProps<{ graph: GraphData }>()
 const container = ref<HTMLDivElement>()
@@ -17,7 +21,7 @@ function initGraph() {
 
   const godModuleIds = new Set(props.graph.god_modules.map(g => g.module))
 
-  const nodes = props.graph.nodes.slice(0, 200).map(n => ({
+  const nodes = props.graph.nodes.slice(0, 300).map(n => ({
     data: {
       id: n.id,
       label: n.id.split('/').pop() ?? n.id,
@@ -29,7 +33,7 @@ function initGraph() {
   const nodeIds = new Set(nodes.map(n => n.data.id))
   const edges = props.graph.edges
     .filter(e => nodeIds.has(e.source) && nodeIds.has(e.target))
-    .slice(0, 500)
+    .slice(0, 600)
     .map((e, i) => ({ data: { id: `e${i}`, source: e.source, target: e.target } }))
 
   cy = cytoscape({
@@ -40,11 +44,12 @@ function initGraph() {
         selector: 'node',
         style: {
           label: 'data(label)',
-          'font-size': '10px',
+          'font-size': '9px',
           'text-valign': 'bottom',
           'text-halign': 'center',
-          width: 20,
-          height: 20,
+          'text-margin-y': 3,
+          width: 16,
+          height: 16,
           'background-color': '#0969da',
           color: '#1f2328',
         },
@@ -53,8 +58,8 @@ function initGraph() {
         selector: 'node[?isGod]',
         style: {
           'background-color': '#cf222e',
-          width: 30,
-          height: 30,
+          width: 26,
+          height: 26,
         },
       },
       {
@@ -65,12 +70,40 @@ function initGraph() {
           'target-arrow-color': '#d0d7de',
           'target-arrow-shape': 'triangle',
           'curve-style': 'bezier',
-          opacity: 0.6,
+          opacity: 0.45,
         },
       },
     ],
-    layout: { name: 'cose', animate: false, randomize: true } as cytoscape.LayoutOptions,
+    layout: {
+      name: 'fcose',
+      quality: 'default',
+      animate: true,
+      animationDuration: 600,
+      fit: true,
+      padding: 32,
+      // repulsion — push nodes apart
+      nodeRepulsion: 6500,
+      idealEdgeLength: 80,
+      edgeElasticity: 0.45,
+      nestingFactor: 0.1,
+      gravity: 0.25,
+      gravityRange: 3.8,
+      // prevent overlap
+      nodeSeparation: 75,
+      uniformNodeDimensions: false,
+      // iterations
+      numIter: 2500,
+      tile: true,
+      tilingPaddingVertical: 10,
+      tilingPaddingHorizontal: 10,
+    } as cytoscape.LayoutOptions,
+    userZoomingEnabled: true,
+    userPanningEnabled: true,
+    minZoom: 0.05,
+    maxZoom: 4,
   })
+
+  cy.one('layoutstop', () => cy?.fit(undefined, 32))
 }
 
 onMounted(initGraph)

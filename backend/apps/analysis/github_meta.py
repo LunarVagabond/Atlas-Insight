@@ -7,6 +7,30 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
+def _fetch_contributors(owner: str, name: str, headers: dict) -> list[dict]:
+    try:
+        r = requests.get(
+            f'https://api.github.com/repos/{owner}/{name}/contributors',
+            params={'per_page': 30, 'anon': 0},
+            headers=headers,
+            timeout=15,
+        )
+        if r.status_code != 200:
+            return []
+        return [
+            {
+                'login': c.get('login', ''),
+                'avatar_url': c.get('avatar_url', ''),
+                'html_url': c.get('html_url', ''),
+                'contributions': c.get('contributions', 0),
+            }
+            for c in r.json()
+            if c.get('type') != 'Anonymous'
+        ]
+    except Exception:
+        return []
+
+
 def fetch_github_meta(owner: str, name: str) -> dict:
     headers: dict[str, str] = {'Accept': 'application/vnd.github+json'}
     token = getattr(settings, 'GITHUB_TOKEN', '')
@@ -43,6 +67,8 @@ def fetch_github_meta(owner: str, name: str) -> dict:
 
     license_info = data.get('license') or {}
 
+    contributors = _fetch_contributors(owner, name, headers)
+
     return {
         'stars': data.get('stargazers_count', 0),
         'forks': data.get('forks_count', 0),
@@ -63,4 +89,5 @@ def fetch_github_meta(owner: str, name: str) -> dict:
         'created_at': data.get('created_at'),
         'pushed_at': data.get('pushed_at'),
         'homepage': data.get('homepage') or None,
+        'contributors': contributors,
     }

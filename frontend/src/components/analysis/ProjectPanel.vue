@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
 import type { RunResult } from '../../stores/analysis'
@@ -7,6 +7,17 @@ import type { RunResult } from '../../stores/analysis'
 const props = defineProps<{ result: RunResult }>()
 
 const { readme, structure, security, github_meta: gh, classification: cls } = props.result
+
+// Community file viewer
+const expandedFile = ref<string | null>(null)
+
+function toggleFile(key: string) {
+  expandedFile.value = expandedFile.value === key ? null : key
+}
+
+function fileContent(key: string): string | null {
+  return structure?.community_files_content?.[key as keyof typeof structure.community_files_content] ?? null
+}
 
 const description = computed(() =>
   gh?.github_description || readme?.description || null
@@ -99,16 +110,17 @@ function langColor(idx: number): string {
 }
 
 const communityFiles = computed(() => [
-  { label: 'README', present: readme?.found ?? false, icon: '📄' },
+  { key: null, label: 'README', present: readme?.found ?? false, icon: '📄' },
   {
+    key: 'license',
     label: structure?.license_type ? `License (${structure.license_type})` : 'License',
     present: !!structure?.license_file,
     icon: '⚖️',
   },
-  { label: 'Contributing Guide', present: !!structure?.has_contributing, icon: '🤝' },
-  { label: 'Changelog', present: !!structure?.has_changelog, icon: '📋' },
-  { label: 'Code of Conduct', present: !!structure?.has_coc, icon: '🌐' },
-  { label: 'Security Policy', present: !!structure?.has_security_policy, icon: '🔒' },
+  { key: 'contributing', label: 'Contributing Guide', present: !!structure?.has_contributing, icon: '🤝' },
+  { key: 'changelog', label: 'Changelog', present: !!structure?.has_changelog, icon: '📋' },
+  { key: 'coc', label: 'Code of Conduct', present: !!structure?.has_coc, icon: '🌐' },
+  { key: 'security', label: 'Security Policy', present: !!structure?.has_security_policy, icon: '🔒' },
 ])
 </script>
 
@@ -280,13 +292,38 @@ const communityFiles = computed(() => [
           <div
             v-for="item in communityFiles"
             :key="item.label"
-            :class="['health-item', item.present ? 'health-item--present' : 'health-item--missing']"
+            :class="[
+              'health-item',
+              item.present ? 'health-item--present' : 'health-item--missing',
+              item.present && item.key && fileContent(item.key) ? 'health-item--clickable' : '',
+            ]"
+            @click="item.present && item.key && fileContent(item.key) ? toggleFile(item.key) : undefined"
           >
             <span class="health-item__check">{{ item.present ? '✓' : '✗' }}</span>
             <span class="health-item__icon">{{ item.icon }}</span>
             <span class="health-item__label">{{ item.label }}</span>
+            <span
+              v-if="item.present && item.key && fileContent(item.key)"
+              class="health-item__expand"
+            >
+              {{ expandedFile === item.key ? '▲' : '▼' }}
+            </span>
           </div>
         </div>
+
+        <!-- File content viewers -->
+        <template v-for="item in communityFiles" :key="`content-${item.label}`">
+          <div
+            v-if="item.key && expandedFile === item.key && fileContent(item.key)"
+            class="file-viewer"
+          >
+            <div class="file-viewer__header">
+              {{ item.icon }} {{ item.label }}
+              <button class="file-viewer__close" @click="expandedFile = null">✕</button>
+            </div>
+            <pre class="file-viewer__content">{{ fileContent(item.key) }}</pre>
+          </div>
+        </template>
       </AppCard>
     </section>
 
@@ -342,6 +379,33 @@ const communityFiles = computed(() => [
           Tests: {{ (structure.test_ratio * 100).toFixed(0) }}% ratio
         </AppBadge>
       </div>
+    </section>
+
+    <!-- GitHub Contributors -->
+    <section v-if="gh?.contributors?.length" class="project-panel__section">
+      <h2 class="panel__title">GitHub Contributors <span class="panel__title-sub">(top 30 by commits)</span></h2>
+      <AppCard>
+        <div class="contributor-grid">
+          <a
+            v-for="contrib in gh.contributors"
+            :key="contrib.login"
+            :href="contrib.html_url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="contributor-card"
+            :title="`${contrib.login} — ${contrib.contributions} commits`"
+          >
+            <img
+              :src="contrib.avatar_url + '&s=64'"
+              :alt="contrib.login"
+              class="contributor-card__avatar"
+              loading="lazy"
+            />
+            <span class="contributor-card__login">{{ contrib.login }}</span>
+            <span class="contributor-card__count">{{ contrib.contributions.toLocaleString() }}</span>
+          </a>
+        </div>
+      </AppCard>
     </section>
 
     <!-- Top Contributors -->

@@ -25,6 +25,12 @@ function formatDate(iso: string) {
         <span class="status-card__label">Completed</span>
         <span class="status-card__value">{{ formatDate(run.completed_at) }}</span>
       </div>
+      <div v-if="run.repo_url" class="status-card__row">
+        <span class="status-card__label">Repository</span>
+        <a :href="run.repo_url" target="_blank" rel="noopener noreferrer" class="status-card__link">
+          {{ run.repo_owner }}/{{ run.repo_name }} ↗
+        </a>
+      </div>
     </div>
   </AppCard>
 </template>

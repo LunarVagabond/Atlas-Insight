@@ -63,6 +63,7 @@ function formatDate(iso: string) {
 function goToRun(id: string) {
   router.push(`/results/${id}`)
 }
+
 </script>
 
 <template>
@@ -82,7 +83,7 @@ function goToRun(id: string) {
           placeholder="Search by URL or project name…"
           style="max-width:400px"
         />
-        <span class="runs-search__count">{{ total }} run{{ total !== 1 ? 's' : '' }}</span>
+        <span class="runs-search__count">{{ total }} repo{{ total !== 1 ? 's' : '' }}</span>
       </div>
     </div>
 
@@ -102,12 +103,11 @@ function goToRun(id: string) {
               <th>Repository</th>
               <th>Status</th>
               <th class="runs-table__sortable" @click="setSort('triggered_at')">
-                Triggered {{ sortIcon('triggered_at') }}
+                Last Scan {{ sortIcon('triggered_at') }}
               </th>
               <th class="runs-table__sortable" @click="setSort('completed_at')">
                 Completed {{ sortIcon('completed_at') }}
               </th>
-              <th></th>
             </tr>
           </thead>
           <tbody>

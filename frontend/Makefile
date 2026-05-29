@@ -32,7 +32,7 @@ start-vite: _ensure_running_dirs
 	  echo "  vite already running (PID $$(cat $$PID_FILE)), skipping"; \
 	else \
 	  rm -f "$$PID_FILE"; \
-	  cd $(MAKEFILE_DIR) && $(VITE) \
+	  (cd $(MAKEFILE_DIR) && exec $(VITE)) \
 	    > $(RUNNING_DIR)/logs/vite.log 2>&1 & echo $$! > $(RUNNING_DIR)/pids/vite.pid; \
 	  echo "  Frontend running at http://localhost:4501"; \
 	fi
@@ -41,15 +41,23 @@ stop-vite:
 	@PID_FILE=$(RUNNING_DIR)/pids/vite.pid; \
 	if [ -f "$$PID_FILE" ]; then \
 	  PID=$$(cat "$$PID_FILE"); \
-	  echo "Stopping vite (PID $$PID)..."; \
-	  kill "$$PID" 2>/dev/null || true; \
+	  echo "Stopping vite..."; \
+	  PGID=$$(ps -o pgid= $$PID 2>/dev/null | tr -d ' '); \
+	  if [ -n "$$PGID" ] && [ "$$PGID" != "0" ]; then \
+	    kill -TERM -$$PGID 2>/dev/null || true; \
+	  fi; \
+	  kill $$PID 2>/dev/null || true; \
 	  rm -f "$$PID_FILE"; \
-	  for pid in $$(ss -tlnp "sport = :4501" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | sort -u); do \
-	    kill "$$pid" 2>/dev/null || true; \
-	  done; \
 	else \
 	  echo "  vite not running"; \
-	fi
+	fi; \
+	for pid in $$(ss -tlnp "sport = :4501" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | sort -u); do \
+	  echo "  Killing stale process on port 4501 (PID $$pid)..."; \
+	  kill -9 "$$pid" 2>/dev/null || true; \
+	done; \
+	i=12; while [ $$i -gt 0 ] && ss -tlnp "sport = :4501" 2>/dev/null | grep -q 4501; do \
+	  sleep 0.25; i=$$((i - 1)); \
+	done
 
 # ── Build & type check ─────────────────────────────────────────────────────────
 

@@ -172,14 +172,24 @@ def analyze_structure(repo_obj: Repo, repo_dir: str) -> dict:
     # Community health files
     has_contributing = _find_file(base, CONTRIBUTING_PATHS)
     license_file = _find_file(base, LICENSE_PATHS)
-    has_coc = _find_file(base, COC_PATHS)
-    has_security_policy = _find_file(base, SECURITY_POLICY_PATHS)
-    has_changelog = _find_file(base, CHANGELOG_PATHS)
+    coc_file = _find_file(base, COC_PATHS)
+    security_policy_file = _find_file(base, SECURITY_POLICY_PATHS)
+    changelog_file = _find_file(base, CHANGELOG_PATHS)
 
     # License detection from file content
     license_type = None
     if license_file:
         license_type = _detect_license_type(base / license_file)
+
+    # Read community file content (truncated to 12KB each)
+    community_files_content = _read_community_files(
+        base,
+        contributing=has_contributing,
+        license_f=license_file,
+        coc=coc_file,
+        security=security_policy_file,
+        changelog=changelog_file,
+    )
 
     # Releases / tags
     releases = _get_releases(repo_obj)
@@ -210,9 +220,13 @@ def analyze_structure(repo_obj: Repo, repo_dir: str) -> dict:
         'contributing_file': has_contributing,
         'license_file': license_file,
         'license_type': license_type,
-        'has_coc': bool(has_coc),
-        'has_security_policy': bool(has_security_policy),
-        'has_changelog': bool(has_changelog),
+        'has_coc': bool(coc_file),
+        'coc_file': coc_file,
+        'has_security_policy': bool(security_policy_file),
+        'security_policy_file': security_policy_file,
+        'has_changelog': bool(changelog_file),
+        'changelog_file': changelog_file,
+        'community_files_content': community_files_content,
         'releases': releases,
         'release_count': len(releases),
         'last_release': releases[0] if releases else None,
@@ -356,6 +370,37 @@ def _compute_bus_factor(repo_obj: Repo) -> tuple[int, list[dict]]:
             break
 
     return max(1, bus_factor), top_contributors
+
+
+def _read_community_files(
+    base: Path,
+    contributing: str | None,
+    license_f: str | None,
+    coc: str | None,
+    security: str | None,
+    changelog: str | None,
+    max_bytes: int = 12_000,
+) -> dict:
+    result: dict[str, str | None] = {}
+    mapping = {
+        'contributing': contributing,
+        'license': license_f,
+        'coc': coc,
+        'security': security,
+        'changelog': changelog,
+    }
+    for key, filename in mapping.items():
+        if not filename:
+            result[key] = None
+            continue
+        try:
+            content = (base / filename).read_text(errors='replace')
+            if len(content) > max_bytes:
+                content = content[:max_bytes] + '\n\n[… truncated …]'
+            result[key] = content
+        except Exception:
+            result[key] = None
+    return result
 
 
 def _parse_license_spdx_from_content(content: str) -> str | None:

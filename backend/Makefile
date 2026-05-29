@@ -51,7 +51,7 @@ start-django: _ensure_running_dirs
 	  echo "  django already running (PID $$(cat $$PID_FILE)), skipping"; \
 	else \
 	  rm -f "$$PID_FILE"; \
-	  cd $(MAKEFILE_DIR) && $(DJANGO_ENV) $(PYTHON) manage.py runserver 0.0.0.0:4500 --noreload \
+	  (cd $(MAKEFILE_DIR) && exec env $(DJANGO_ENV) $(PYTHON) manage.py runserver 0.0.0.0:4500 --noreload) \
 	    > $(RUNNING_DIR)/logs/django.log 2>&1 & echo $$! > $(RUNNING_DIR)/pids/django.pid; \
 	fi
 
@@ -59,12 +59,19 @@ stop-django:
 	@PID_FILE=$(RUNNING_DIR)/pids/django.pid; \
 	if [ -f "$$PID_FILE" ]; then \
 	  PID=$$(cat "$$PID_FILE"); \
-	  echo "Stopping django (PID $$PID)..."; \
-	  kill "$$PID" 2>/dev/null || true; \
+	  echo "Stopping django..."; \
+	  PGID=$$(ps -o pgid= $$PID 2>/dev/null | tr -d ' '); \
+	  if [ -n "$$PGID" ] && [ "$$PGID" != "0" ]; then \
+	    kill -TERM -$$PGID 2>/dev/null || true; \
+	  fi; \
+	  kill $$PID 2>/dev/null || true; \
 	  rm -f "$$PID_FILE"; \
 	else \
 	  echo "  django not running"; \
-	fi
+	fi; \
+	for pid in $$(ss -tlnp "sport = :4500" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | sort -u); do \
+	  kill "$$pid" 2>/dev/null || true; \
+	done
 
 start-celery: _ensure_running_dirs
 	@echo "Starting Celery worker..."
@@ -101,7 +108,7 @@ start-flower: _ensure_running_dirs
 	else \
 	  rm -f "$$PID_FILE"; \
 	  sleep 2; \
-	  cd $(MAKEFILE_DIR) && $(DJANGO_ENV) $(CELERY) -A config flower --port=4504 \
+	  (cd $(MAKEFILE_DIR) && exec env $(DJANGO_ENV) $(CELERY) -A config flower --port=4504) \
 	    > $(RUNNING_DIR)/logs/flower.log 2>&1 & echo $$! > $(RUNNING_DIR)/pids/flower.pid; \
 	fi
 
@@ -109,12 +116,19 @@ stop-flower:
 	@PID_FILE=$(RUNNING_DIR)/pids/flower.pid; \
 	if [ -f "$$PID_FILE" ]; then \
 	  PID=$$(cat "$$PID_FILE"); \
-	  echo "Stopping flower (PID $$PID)..."; \
-	  kill "$$PID" 2>/dev/null || true; \
+	  echo "Stopping flower..."; \
+	  PGID=$$(ps -o pgid= $$PID 2>/dev/null | tr -d ' '); \
+	  if [ -n "$$PGID" ] && [ "$$PGID" != "0" ]; then \
+	    kill -TERM -$$PGID 2>/dev/null || true; \
+	  fi; \
+	  kill $$PID 2>/dev/null || true; \
 	  rm -f "$$PID_FILE"; \
 	else \
 	  echo "  flower not running"; \
-	fi
+	fi; \
+	for pid in $$(ss -tlnp "sport = :4504" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | sort -u); do \
+	  kill "$$pid" 2>/dev/null || true; \
+	done
 
 # ── Django management ──────────────────────────────────────────────────────────
 

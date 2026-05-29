@@ -7,6 +7,9 @@ export interface AnalysisRun {
   triggered_at: string
   completed_at: string | null
   result: RunResult | null
+  repo_url: string
+  repo_owner: string
+  repo_name: string
 }
 
 export interface RunResult {
@@ -44,6 +47,14 @@ export interface LanguageInfo {
   pct: number
 }
 
+export interface CommunityFilesContent {
+  contributing: string | null
+  license: string | null
+  coc: string | null
+  security: string | null
+  changelog: string | null
+}
+
 export interface StructureData {
   total_files: number
   total_lines: number
@@ -60,8 +71,12 @@ export interface StructureData {
   license_file: string | null
   license_type: string | null
   has_coc: boolean
+  coc_file: string | null
   has_security_policy: boolean
+  security_policy_file: string | null
   has_changelog: boolean
+  changelog_file: string | null
+  community_files_content: CommunityFilesContent
   releases: { name: string; date: string }[]
   release_count: number
   last_release: { name: string; date: string } | null
@@ -76,6 +91,13 @@ export interface SecurityData {
   score: number
   gitignore_exists: boolean
   gitignore_gaps: string[]
+}
+
+export interface GitHubContributor {
+  login: string
+  avatar_url: string
+  html_url: string
+  contributions: number
 }
 
 export interface GitHubMeta {
@@ -98,6 +120,7 @@ export interface GitHubMeta {
   created_at: string | null
   pushed_at: string | null
   homepage: string | null
+  contributors: GitHubContributor[]
 }
 
 export interface ClassificationLevel {
@@ -238,6 +261,11 @@ export const useAnalysisStore = defineStore('analysis', {
         this.error = axiosErr.response?.data?.detail ?? 'Failed to fetch run'
         this._stopPolling()
       }
+    },
+
+    async retryRun(runId: string): Promise<string> {
+      const { data } = await axios.post(`/api/v1/repositories/runs/${runId}/retry`)
+      return data.run_id as string
     },
 
     clearRun() {

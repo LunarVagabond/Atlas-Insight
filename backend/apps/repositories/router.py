@@ -31,6 +31,9 @@ class RunStatusSchema(Schema):
     triggered_at: str
     completed_at: Optional[str]
     result: Optional[dict]
+    repo_url: str
+    repo_owner: str
+    repo_name: str
 
 
 class AnalyzeResponse(Schema):
@@ -116,7 +119,17 @@ def list_runs(
     page: int = 1,
     per_page: int = 25,
 ):
-    qs = AnalysisRun.objects.select_related('repo').all()
+    from django.db.models import OuterRef, Subquery
+
+    # Latest run per repo
+    latest_per_repo = AnalysisRun.objects.filter(
+        repo=OuterRef('pk')
+    ).order_by('-triggered_at').values('id')[:1]
+    latest_ids = Repository.objects.annotate(
+        latest_id=Subquery(latest_per_repo)
+    ).values('latest_id')
+
+    qs = AnalysisRun.objects.filter(pk__in=latest_ids).select_related('repo')
 
     if q:
         qs = qs.filter(
@@ -165,7 +178,24 @@ def get_run(request, run_id: uuid.UUID):
         triggered_at=run.triggered_at.isoformat(),
         completed_at=run.completed_at.isoformat() if run.completed_at else None,
         result=run.result,
+        repo_url=run.repo.url,
+        repo_owner=run.repo.owner,
+        repo_name=run.repo.name,
     )
+
+
+@router.post('/runs/{run_id}/retry', response=AnalyzeResponse)
+def retry_run(request, run_id: uuid.UUID):
+    """Force a fresh analysis regardless of cached SHA — testing only."""
+    try:
+        original = AnalysisRun.objects.select_related('repo').get(id=run_id)
+    except AnalysisRun.DoesNotExist:
+        raise HttpError(404, 'Run not found')
+    run = AnalysisRun.objects.create(repo=original.repo, status='pending')
+    task = analyze_repository.delay(str(run.id))
+    run.celery_task_id = task.id
+    run.save(update_fields=['celery_task_id'])
+    return AnalyzeResponse(run_id=run.id, status='pending', cached=False)
 
 
 @router.get('/runs/{run_id}/timeline')

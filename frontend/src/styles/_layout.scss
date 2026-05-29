@@ -118,6 +118,19 @@
     font-weight: 700;
     color: var(--color-text);
   }
+
+  &__repo-link {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--color-primary);
+    text-decoration: none;
+    opacity: 0.85;
+
+    &:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+  }
 }
 
 .panel {

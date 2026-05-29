@@ -39,7 +39,12 @@ const isPolling = computed(() => ['pending', 'running'].includes(store.run?.stat
   <div class="results-layout">
     <div class="results-layout__header">
       <div class="results-header">
-        <h1 class="results-header__title">Analysis Results</h1>
+        <div style="display:flex;align-items:baseline;gap:0.75rem">
+          <h1 class="results-header__title">Analysis Results</h1>
+          <a v-if="store.run?.repo_url" :href="store.run.repo_url" target="_blank" rel="noopener noreferrer" class="results-header__repo-link">
+            {{ store.run.repo_owner }}/{{ store.run.repo_name }} ↗
+          </a>
+        </div>
         <a href="/" class="btn btn--secondary" style="font-size:0.875rem">← New Analysis</a>
       </div>
       <div v-if="store.run" style="margin-top: 1rem">
