@@ -252,13 +252,13 @@ export const useAnalysisStore = defineStore('analysis', {
   }),
 
   actions: {
-    async submitUrl(url: string) {
+    async submitUrl(url: string, pat?: string) {
       this.url = url
       this.status = 'submitting'
       this.error = null
       this.run = null
       try {
-        const { data } = await axios.post('/api/v1/repositories/analyze', { url })
+        const { data } = await axios.post('/api/v1/repositories/analyze', { url, pat: pat || undefined })
         this.currentRunId = data.run_id
         this.status = 'polling'
         this._startPolling(data.run_id)
@@ -273,14 +273,17 @@ export const useAnalysisStore = defineStore('analysis', {
 
     async pollRun(runId: string) {
       this.currentRunId = runId
+      this.run = null
+      this.error = null
       this.status = 'polling'
       await this._fetchRun(runId)
-      if (this.run?.status !== 'completed' && this.run?.status !== 'failed') {
+      const run = this.run as AnalysisRun | null
+      if (!run || (run.status !== 'completed' && run.status !== 'failed')) {
         this._startPolling(runId)
       } else {
-        this.status = this.run.status === 'completed' ? 'done' : 'error'
-        if (this.run.status === 'failed') {
-          this.error = this.run.result?.error ?? 'Analysis failed'
+        this.status = run.status === 'completed' ? 'done' : 'error'
+        if (run.status === 'failed') {
+          this.error = run.result?.error ?? 'Analysis failed'
         }
       }
     },

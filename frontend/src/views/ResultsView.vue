@@ -160,7 +160,13 @@ function copyLink() {
     </div>
 
     <div v-if="!showProgress && store.status === 'error'" class="results-layout__content">
-      <div class="empty-state">Analysis failed. {{ store.error }}</div>
+      <div class="empty-state">
+        <p>Analysis failed. {{ store.error }}</p>
+        <p v-if="store.error && /private|access|403|permission|inaccessible|denied/i.test(store.error)" class="results-error-pat">
+          This repository may require a Personal Access Token.
+          <a href="/" class="results-error-pat__link">Go back and use the PAT option</a> when submitting.
+        </p>
+      </div>
     </div>
 
     <Transition name="fade">

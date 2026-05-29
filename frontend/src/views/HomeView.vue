@@ -13,9 +13,9 @@ import type { RunListItem } from '../stores/analysis'
 const router = useRouter()
 const store = useAnalysisStore()
 
-async function handleSubmit(url: string) {
+async function handleSubmit(url: string, pat?: string) {
   try {
-    const runId = await store.submitUrl(url)
+    const runId = await store.submitUrl(url, pat)
     router.push(`/results/${runId}`)
   } catch {
     // error shown in form

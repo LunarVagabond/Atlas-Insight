@@ -7,6 +7,7 @@ export interface AuthUser {
   email: string
   github_login: string
   avatar_url: string
+  github_connected: boolean
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -43,6 +44,10 @@ export const useAuthStore = defineStore('auth', {
 
     loginWithGithub() {
       window.location.href = '/accounts/github/login/'
+    },
+
+    connectGithub() {
+      window.location.href = '/accounts/github/login/?process=connect&next=' + encodeURIComponent(window.location.pathname)
     },
   },
 })

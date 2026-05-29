@@ -14,18 +14,25 @@ class UserSchema(Schema):
     email: str
     github_login: str
     avatar_url: str
+    github_connected: bool
 
 
 @router.get('/me', response={200: UserSchema, 401: dict})
 def me(request):
     if not request.user.is_authenticated:
         raise HttpError(401, 'Not authenticated')
+    from allauth.socialaccount.models import SocialToken
+    has_token = SocialToken.objects.filter(
+        account__user=request.user,
+        account__provider='github',
+    ).exists()
     return 200, UserSchema(
         id=request.user.id,
         username=request.user.username,
         email=request.user.email or '',
         github_login=request.user.github_login,
         avatar_url=request.user.avatar_url,
+        github_connected=has_token,
     )
 
 

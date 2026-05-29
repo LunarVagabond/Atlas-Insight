@@ -35,6 +35,11 @@ def _inject_pat(url: str, pat: str) -> str:
     return url.replace('https://', f'https://{pat}@', 1)
 
 
+def _is_auth_error(exc: git.GitCommandError) -> bool:
+    msg = str(exc).lower()
+    return any(p in msg for p in ('terminal prompts disabled', 'authentication failed', 'could not read username', 'access denied', 'repository not found'))
+
+
 def clone_or_fetch(url: str, pat: Optional[str] = None) -> tuple:
     cache_path = get_cache_path(url)
     clone_url = _inject_pat(url, pat) if pat else url
@@ -49,7 +54,17 @@ def clone_or_fetch(url: str, pat: Optional[str] = None) -> tuple:
             if pat:
                 repo.remotes.origin.set_url(clone_url)
             repo.git.update_environment(**_GIT_ENV)
-            repo.remotes.origin.fetch()
+            try:
+                repo.remotes.origin.fetch()
+            except git.GitCommandError as exc:
+                if pat:
+                    repo.remotes.origin.set_url(url)
+                if _is_auth_error(exc):
+                    raise PermissionError(
+                        'Repository is private or inaccessible. '
+                        'Connect your GitHub account to analyze private repositories.'
+                    ) from None
+                raise
             if pat:
                 repo.remotes.origin.set_url(url)
             sha = repo.head.commit.hexsha
@@ -58,7 +73,18 @@ def clone_or_fetch(url: str, pat: Optional[str] = None) -> tuple:
     # Fresh clone (or after wipe above)
     g = git.Git()
     g.update_environment(**_GIT_ENV)
-    repo = git.Repo.clone_from(clone_url, cache_path, env=_GIT_ENV)
+    try:
+        repo = git.Repo.clone_from(clone_url, cache_path, env=_GIT_ENV)
+    except git.GitCommandError as exc:
+        # Remove partial clone dir so the next attempt starts clean
+        if os.path.exists(cache_path):
+            shutil.rmtree(cache_path)
+        if _is_auth_error(exc):
+            raise PermissionError(
+                'Repository is private or inaccessible. '
+                'Connect your GitHub account to analyze private repositories.'
+            ) from None
+        raise
     if pat:
         repo.remotes.origin.set_url(url)
 
