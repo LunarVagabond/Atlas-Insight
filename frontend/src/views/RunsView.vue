@@ -1,0 +1,146 @@
+<script setup lang="ts">
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import axios from 'axios'
+import AppBadge from '../components/ui/AppBadge.vue'
+import AppButton from '../components/ui/AppButton.vue'
+import LoadingSpinner from '../components/ui/LoadingSpinner.vue'
+import type { RunListItem } from '../stores/analysis'
+
+const router = useRouter()
+
+const q = ref('')
+const sort = ref<'triggered_at' | 'completed_at' | 'status'>('triggered_at')
+const order = ref<'desc' | 'asc'>('desc')
+const page = ref(1)
+const perPage = 25
+
+const items = ref<RunListItem[]>([])
+const total = ref(0)
+const loading = ref(false)
+const error = ref<string | null>(null)
+
+async function fetchRuns() {
+  loading.value = true
+  error.value = null
+  try {
+    const { data } = await axios.get('/api/v1/repositories/runs/', {
+      params: { q: q.value, sort: sort.value, order: order.value, page: page.value, per_page: perPage },
+    })
+    items.value = data.items
+    total.value = data.total
+  } catch {
+    error.value = 'Failed to load runs'
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(fetchRuns)
+watch([q, sort, order], () => { page.value = 1; fetchRuns() })
+watch(page, fetchRuns)
+
+const totalPages = computed(() => Math.ceil(total.value / perPage))
+
+function setSort(field: typeof sort.value) {
+  if (sort.value === field) {
+    order.value = order.value === 'desc' ? 'asc' : 'desc'
+  } else {
+    sort.value = field
+    order.value = 'desc'
+  }
+}
+
+function sortIcon(field: string) {
+  if (sort.value !== field) return '↕'
+  return order.value === 'desc' ? '↓' : '↑'
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleString()
+}
+
+function goToRun(id: string) {
+  router.push(`/results/${id}`)
+}
+</script>
+
+<template>
+  <div class="results-layout">
+    <div class="results-layout__header">
+      <div class="results-header">
+        <h1 class="results-header__title">All Runs</h1>
+        <RouterLink to="/" class="btn btn--secondary" style="font-size:0.875rem">
+          + New Analysis
+        </RouterLink>
+      </div>
+
+      <div class="runs-search">
+        <input
+          v-model="q"
+          class="url-form__input"
+          placeholder="Search by URL or project name…"
+          style="max-width:400px"
+        />
+        <span class="runs-search__count">{{ total }} run{{ total !== 1 ? 's' : '' }}</span>
+      </div>
+    </div>
+
+    <div class="results-layout__content">
+      <LoadingSpinner v-if="loading" label="Loading runs…" />
+
+      <div v-else-if="error" class="empty-state">{{ error }}</div>
+
+      <div v-else-if="!items.length" class="empty-state">
+        No runs found{{ q ? ` matching "${q}"` : '' }}.
+      </div>
+
+      <template v-else>
+        <table class="data-table runs-table">
+          <thead>
+            <tr>
+              <th>Repository</th>
+              <th>Status</th>
+              <th class="runs-table__sortable" @click="setSort('triggered_at')">
+                Triggered {{ sortIcon('triggered_at') }}
+              </th>
+              <th class="runs-table__sortable" @click="setSort('completed_at')">
+                Completed {{ sortIcon('completed_at') }}
+              </th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="run in items"
+              :key="run.id"
+              class="runs-table__row"
+              @click="goToRun(run.id)"
+            >
+              <td>
+                <div class="runs-table__repo">
+                  <span class="runs-table__project">{{ run.repo_owner }}/{{ run.repo_name }}</span>
+                  <span class="runs-table__url">{{ run.repo_url }}</span>
+                </div>
+              </td>
+              <td><AppBadge :variant="run.status">{{ run.status }}</AppBadge></td>
+              <td>{{ formatDate(run.triggered_at) }}</td>
+              <td>{{ run.completed_at ? formatDate(run.completed_at) : '—' }}</td>
+              <td>
+                <AppButton variant="secondary" @click.stop="goToRun(run.id)" style="font-size:0.8125rem;padding:4px 12px">
+                  View
+                </AppButton>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div v-if="totalPages > 1" class="runs-pagination">
+          <AppButton variant="secondary" :disabled="page <= 1" @click="page--">← Prev</AppButton>
+          <span class="runs-pagination__info">Page {{ page }} of {{ totalPages }}</span>
+          <AppButton variant="secondary" :disabled="page >= totalPages" @click="page++">Next →</AppButton>
+        </div>
+      </template>
+    </div>
+  </div>
+</template>

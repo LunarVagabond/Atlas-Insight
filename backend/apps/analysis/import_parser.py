@@ -39,9 +39,11 @@ def parse_imports(repo_dir: str) -> list[dict]:
                     dep = m.group(1) or m.group(2)
                     if dep:
                         for d in dep.split(','):
-                            d = d.strip().split()[0]
-                            if d:
-                                edges.append({'source': source, 'target': d, 'lang': 'python'})
+                            parts = d.strip().split()
+                            if parts:
+                                edges.append(
+                                    {'source': source, 'target': parts[0], 'lang': 'python'}
+                                )
             elif ext in {'.js', '.ts', '.jsx', '.tsx', '.mjs'}:
                 for m in JS_IMPORT.finditer(content):
                     dep = m.group(1) or m.group(2)

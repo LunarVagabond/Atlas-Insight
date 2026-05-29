@@ -152,3 +152,66 @@
   padding: $space-16 $space-6;
   color: var(--color-text-secondary);
 }
+
+.runs-search {
+  display: flex;
+  align-items: center;
+  gap: $space-4;
+  margin-top: $space-4;
+
+  &__count {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+  }
+}
+
+.runs-table {
+  &__sortable {
+    cursor: pointer;
+    user-select: none;
+
+    &:hover {
+      color: var(--color-accent);
+    }
+  }
+
+  &__row {
+    cursor: pointer;
+
+    &:hover td {
+      background: var(--color-surface-hover);
+    }
+  }
+
+  &__repo {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__project {
+    font-weight: 600;
+    color: var(--color-text);
+    font-family: $font-mono;
+    font-size: 0.875rem;
+  }
+
+  &__url {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+}
+
+.runs-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $space-4;
+  margin-top: $space-6;
+
+  &__info {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+  }
+}

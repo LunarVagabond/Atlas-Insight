@@ -82,7 +82,12 @@ stop-celery:
 	if [ -f "$$PID_FILE" ]; then \
 	  PID=$$(cat "$$PID_FILE"); \
 	  echo "Stopping celery (PID $$PID)..."; \
-	  kill "$$PID" 2>/dev/null || true; \
+	  PGID=$$(ps -o pgid= $$PID 2>/dev/null | tr -d ' '); \
+	  if [ -n "$$PGID" ] && [ "$$PGID" != "0" ]; then \
+	    kill -TERM -$$PGID 2>/dev/null || kill $$PID 2>/dev/null || true; \
+	  else \
+	    kill $$PID 2>/dev/null || true; \
+	  fi; \
 	  rm -f "$$PID_FILE"; \
 	else \
 	  echo "  celery not running"; \

@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import axios from 'axios'
 
 export interface AnalysisRun {
-  id: number
+  id: string
   status: 'pending' | 'running' | 'completed' | 'failed'
   triggered_at: string
   completed_at: string | null
@@ -14,6 +14,7 @@ export interface RunResult {
   graph: GraphData
   dependencies: DepsData
   heuristics: HeuristicSignal[]
+  error?: string
 }
 
 export interface CommitData {
@@ -54,10 +55,20 @@ export interface HeuristicSignal {
   description: string
 }
 
+export interface RunListItem {
+  id: string
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  triggered_at: string
+  completed_at: string | null
+  repo_url: string
+  repo_owner: string
+  repo_name: string
+}
+
 export const useAnalysisStore = defineStore('analysis', {
   state: () => ({
     url: '' as string,
-    currentRunId: null as number | null,
+    currentRunId: null as string | null,
     status: 'idle' as 'idle' | 'submitting' | 'polling' | 'done' | 'error',
     run: null as AnalysisRun | null,
     error: null as string | null,
@@ -75,7 +86,7 @@ export const useAnalysisStore = defineStore('analysis', {
         this.currentRunId = data.run_id
         this.status = 'polling'
         this._startPolling(data.run_id)
-        return data.run_id as number
+        return data.run_id as string
       } catch (err: unknown) {
         this.status = 'error'
         const axiosErr = err as { response?: { data?: { detail?: string } } }
@@ -84,7 +95,7 @@ export const useAnalysisStore = defineStore('analysis', {
       }
     },
 
-    async pollRun(runId: number) {
+    async pollRun(runId: string) {
       this.currentRunId = runId
       this.status = 'polling'
       await this._fetchRun(runId)
@@ -92,10 +103,13 @@ export const useAnalysisStore = defineStore('analysis', {
         this._startPolling(runId)
       } else {
         this.status = this.run.status === 'completed' ? 'done' : 'error'
+        if (this.run.status === 'failed') {
+          this.error = this.run.result?.error ?? 'Analysis failed'
+        }
       }
     },
 
-    _startPolling(runId: number) {
+    _startPolling(runId: string) {
       this._stopPolling()
       this._pollInterval = setInterval(async () => {
         await this._fetchRun(runId)
@@ -104,7 +118,7 @@ export const useAnalysisStore = defineStore('analysis', {
           this._stopPolling()
         } else if (this.run?.status === 'failed') {
           this.status = 'error'
-          this.error = 'Analysis failed'
+          this.error = this.run.result?.error ?? 'Analysis failed'
           this._stopPolling()
         }
       }, 3000)
@@ -117,7 +131,7 @@ export const useAnalysisStore = defineStore('analysis', {
       }
     },
 
-    async _fetchRun(runId: number) {
+    async _fetchRun(runId: string) {
       try {
         const { data } = await axios.get(`/api/v1/repositories/runs/${runId}`)
         this.run = data

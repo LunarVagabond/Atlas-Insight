@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task(bind=True)
-def analyze_repository(self, run_id: int):
+def analyze_repository(self, run_id: str):
     try:
         run = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:

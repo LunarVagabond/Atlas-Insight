@@ -139,6 +139,11 @@ LOGGING = {
             'level': 'WARNING',
             'propagate': False,
         },
+        'django.db.backends': {
+            'handlers': ['django_file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
         'celery': {
             'handlers': ['console', 'celery_file'],
             'level': LOG_LEVEL,

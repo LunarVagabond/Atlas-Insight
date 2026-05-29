@@ -1,7 +1,9 @@
 from django.db import models
+from uuid_extensions import uuid7
 
 
 class Repository(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
     url = models.URLField(unique=True)
     owner = models.CharField(max_length=255)
     name = models.CharField(max_length=255)
@@ -23,6 +25,7 @@ class AnalysisRun(models.Model):
         ('completed', 'Completed'),
         ('failed', 'Failed'),
     ]
+    id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
     repo = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name='runs')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     triggered_at = models.DateTimeField(auto_now_add=True)
@@ -31,4 +34,4 @@ class AnalysisRun(models.Model):
     celery_task_id = models.CharField(max_length=255, blank=True, default='')
 
     def __str__(self):
-        return f'{self.repo} run #{self.pk} ({self.status})'
+        return f'{self.repo} run {self.pk} ({self.status})'

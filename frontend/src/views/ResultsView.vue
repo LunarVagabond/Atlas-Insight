@@ -15,13 +15,13 @@ import HeuristicsPanel from '../components/analysis/HeuristicsPanel.vue'
 const route = useRoute()
 const router = useRouter()
 const store = useAnalysisStore()
-const runId = Number(route.params.runId)
+const runId = route.params.runId as string
 
 const TABS = ['Overview', 'Architecture', 'Dependencies', 'Timeline', 'Heuristics']
 const activeTab = ref('Overview')
 
 onMounted(async () => {
-  if (!runId || isNaN(runId)) {
+  if (!runId) {
     router.push('/')
     return
   }

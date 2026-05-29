@@ -29,6 +29,9 @@ onMounted(() => {
       </RouterLink>
       <div class="navbar__spacer" />
       <div class="navbar__actions">
+        <RouterLink to="/runs" class="btn btn--secondary" style="font-size:0.8125rem;padding:6px 12px">
+          Browse Runs
+        </RouterLink>
         <button class="theme-toggle" @click="toggleTheme" :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'">
           {{ isDark ? '☀️' : '🌙' }}
         </button>

@@ -63,15 +63,20 @@ help:
 # ── Full stack ─────────────────────────────────────────────────────────────────
 
 setup:
-	@$(MAKE) -C $(ROOT_DIR)/backend setup
-	@$(MAKE) -C $(ROOT_DIR)/frontend setup
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend setup
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/frontend setup
+
 
 start: _ensure_running_dirs
-	@$(COMPOSE) up -d
+	@> $(RUNNING_DIR)/logs/django.log
+	@> $(RUNNING_DIR)/logs/celery.log
+	@> $(RUNNING_DIR)/logs/flower.log
+	@> $(RUNNING_DIR)/logs/vite.log
+	@$(COMPOSE) up -d --quiet-pull 2>&1 | grep -v "^$$"
 	@echo "Waiting for Postgres..."
 	@until $(COMPOSE) exec -T postgres pg_isready -q 2>/dev/null; do sleep 1; done
-	@$(MAKE) -C $(ROOT_DIR)/backend start
-	@$(MAKE) -C $(ROOT_DIR)/frontend start
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend start
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/frontend start
 	@echo ""
 	@echo "Atlas Insight running:"
 	@echo "  API:    http://localhost:4500/api/v1/docs"
@@ -79,9 +84,9 @@ start: _ensure_running_dirs
 	@echo "  Flower: http://localhost:4504"
 
 stop:
-	@$(MAKE) -C $(ROOT_DIR)/frontend stop
-	@$(MAKE) -C $(ROOT_DIR)/backend stop
-	@$(COMPOSE) stop
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/frontend stop
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend stop
+	@$(COMPOSE) stop 2>&1 | grep -v "^$$"
 
 restart: stop start
 
@@ -119,28 +124,28 @@ status:
 # ── Individual services ────────────────────────────────────────────────────────
 
 start-django:
-	@$(MAKE) -C $(ROOT_DIR)/backend start-django
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend start-django
 
 stop-django:
-	@$(MAKE) -C $(ROOT_DIR)/backend stop-django
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend stop-django
 
 start-celery:
-	@$(MAKE) -C $(ROOT_DIR)/backend start-celery
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend start-celery
 
 stop-celery:
-	@$(MAKE) -C $(ROOT_DIR)/backend stop-celery
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend stop-celery
 
 start-flower:
-	@$(MAKE) -C $(ROOT_DIR)/backend start-flower
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend start-flower
 
 stop-flower:
-	@$(MAKE) -C $(ROOT_DIR)/backend stop-flower
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend stop-flower
 
 start-vite:
-	@$(MAKE) -C $(ROOT_DIR)/frontend start-vite
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/frontend start-vite
 
 stop-vite:
-	@$(MAKE) -C $(ROOT_DIR)/frontend stop-vite
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/frontend stop-vite
 
 start-postgres:
 	@$(COMPOSE) start postgres
@@ -157,39 +162,39 @@ stop-redis:
 # ── Django management ──────────────────────────────────────────────────────────
 
 migrate:
-	@$(MAKE) -C $(ROOT_DIR)/backend migrate ARGS="$(ARGS)"
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend migrate ARGS="$(ARGS)"
 
 makemigrations:
-	@$(MAKE) -C $(ROOT_DIR)/backend makemigrations ARGS="$(ARGS)"
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend makemigrations ARGS="$(ARGS)"
 
 createsuperuser:
-	@$(MAKE) -C $(ROOT_DIR)/backend createsuperuser
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend createsuperuser
 
 shell:
-	@$(MAKE) -C $(ROOT_DIR)/backend shell
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend shell
 
 dbshell:
-	@$(MAKE) -C $(ROOT_DIR)/backend dbshell
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend dbshell
 
 collectstatic:
-	@$(MAKE) -C $(ROOT_DIR)/backend collectstatic
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend collectstatic
 
 # ── Testing & quality ──────────────────────────────────────────────────────────
 
 test:
-	@$(MAKE) -C $(ROOT_DIR)/backend test ARGS="$(ARGS)"
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend test ARGS="$(ARGS)"
 
 lint:
-	@$(MAKE) -C $(ROOT_DIR)/backend lint
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend lint
 
 format:
-	@$(MAKE) -C $(ROOT_DIR)/backend format
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend format
 
 build:
-	@$(MAKE) -C $(ROOT_DIR)/frontend build
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/frontend build
 
 type-check:
-	@$(MAKE) -C $(ROOT_DIR)/frontend type-check
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/frontend type-check
 
 # ── Logs ───────────────────────────────────────────────────────────────────────
 
@@ -197,16 +202,16 @@ logs:
 	@tail -f $(RUNNING_DIR)/logs/*.log
 
 logs-django:
-	@$(MAKE) -C $(ROOT_DIR)/backend logs-django
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend logs-django
 
 logs-celery:
-	@$(MAKE) -C $(ROOT_DIR)/backend logs-celery
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend logs-celery
 
 logs-flower:
-	@$(MAKE) -C $(ROOT_DIR)/backend logs-flower
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend logs-flower
 
 logs-vite:
-	@$(MAKE) -C $(ROOT_DIR)/frontend logs-vite
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/frontend logs-vite
 
 # ── Internal ───────────────────────────────────────────────────────────────────
 

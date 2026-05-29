@@ -1,8 +1,11 @@
 import logging
 import re
+import uuid
+from typing import Optional
 
 import requests
 from django.conf import settings
+from django.db.models import Q
 from ninja import Router, Schema
 from ninja.errors import HttpError
 
@@ -23,20 +26,37 @@ class AnalyzeRequest(Schema):
 
 
 class RunStatusSchema(Schema):
-    id: int
+    id: uuid.UUID
     status: str
     triggered_at: str
-    completed_at: str | None
-    result: dict | None
+    completed_at: Optional[str]
+    result: Optional[dict]
 
 
 class AnalyzeResponse(Schema):
-    run_id: int
+    run_id: uuid.UUID
     status: str
     cached: bool
 
 
-def _fetch_latest_sha(owner: str, name: str) -> str | None:
+class RunListItemSchema(Schema):
+    id: uuid.UUID
+    status: str
+    triggered_at: str
+    completed_at: Optional[str]
+    repo_url: str
+    repo_owner: str
+    repo_name: str
+
+
+class RunListSchema(Schema):
+    items: list[RunListItemSchema]
+    total: int
+    page: int
+    per_page: int
+
+
+def _fetch_latest_sha(owner: str, name: str) -> Optional[str]:
     headers = {'Accept': 'application/vnd.github.v3+json'}
     if settings.GITHUB_TOKEN:
         headers['Authorization'] = f'Bearer {settings.GITHUB_TOKEN}'
@@ -80,15 +100,61 @@ def analyze(request, payload: AnalyzeRequest):
             return AnalyzeResponse(run_id=latest_run.id, status='completed', cached=True)
 
     run = AnalysisRun.objects.create(repo=repo, status='pending')
-    task = analyze_repository.delay(run.id)
+    task = analyze_repository.delay(str(run.id))
     run.celery_task_id = task.id
     run.save(update_fields=['celery_task_id'])
 
     return AnalyzeResponse(run_id=run.id, status='pending', cached=False)
 
 
+@router.get('/runs/', response=RunListSchema)
+def list_runs(
+    request,
+    q: str = '',
+    sort: str = 'triggered_at',
+    order: str = 'desc',
+    page: int = 1,
+    per_page: int = 25,
+):
+    qs = AnalysisRun.objects.select_related('repo').all()
+
+    if q:
+        qs = qs.filter(
+            Q(repo__url__icontains=q) | Q(repo__owner__icontains=q) | Q(repo__name__icontains=q)
+        )
+
+    allowed_sort = {'triggered_at', 'completed_at', 'status'}
+    sort_field = sort if sort in allowed_sort else 'triggered_at'
+    if order == 'asc':
+        qs = qs.order_by(sort_field)
+    else:
+        qs = qs.order_by(f'-{sort_field}')
+
+    total = qs.count()
+    offset = (page - 1) * per_page
+    runs = qs[offset : offset + per_page]
+
+    return RunListSchema(
+        items=[
+            RunListItemSchema(
+                id=r.id,
+                status=r.status,
+                triggered_at=r.triggered_at.isoformat(),
+                completed_at=r.completed_at.isoformat() if r.completed_at else None,
+                repo_url=r.repo.url,
+                repo_owner=r.repo.owner,
+                repo_name=r.repo.name,
+            )
+            for r in runs
+        ],
+        total=total,
+        page=page,
+        per_page=per_page,
+    )
+
+
 @router.get('/runs/{run_id}', response=RunStatusSchema)
-def get_run(request, run_id: int):
+def get_run(request, run_id: uuid.UUID):
     try:
         run = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
@@ -103,7 +169,7 @@ def get_run(request, run_id: int):
 
 
 @router.get('/runs/{run_id}/timeline')
-def get_timeline(request, run_id: int):
+def get_timeline(request, run_id: uuid.UUID):
     try:
         run = AnalysisRun.objects.get(id=run_id, status='completed')
     except AnalysisRun.DoesNotExist:

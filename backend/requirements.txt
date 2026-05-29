@@ -10,3 +10,4 @@ gitpython>=3.1
 requests>=2.32
 networkx>=3.3
 packaging>=24
+uuid7>=0.1.0  # imports as uuid_extensions
