@@ -11,6 +11,32 @@ const props = defineProps<{ graph: GraphData }>()
 const container = ref<HTMLDivElement>()
 let cy: cytoscape.Core | null = null
 
+const LAYOUT_BASE = {
+  name: 'fcose',
+  quality: 'default',
+  animate: true,
+  animationDuration: 600,
+  fit: true,
+  padding: 32,
+  nodeRepulsion: 6500,
+  idealEdgeLength: 80,
+  edgeElasticity: 0.45,
+  nestingFactor: 0.1,
+  gravity: 0.25,
+  gravityRange: 3.8,
+  nodeSeparation: 75,
+  uniformNodeDimensions: false,
+  numIter: 2500,
+  tile: true,
+  tilingPaddingVertical: 10,
+  tilingPaddingHorizontal: 10,
+}
+
+function runLayout(options: Record<string, unknown> = {}) {
+  if (!cy) return
+  cy.layout({ ...LAYOUT_BASE, ...options } as cytoscape.LayoutOptions).run()
+}
+
 function initGraph() {
   if (!container.value || !props.graph.nodes.length) return
 
@@ -74,29 +100,7 @@ function initGraph() {
         },
       },
     ],
-    layout: {
-      name: 'fcose',
-      quality: 'default',
-      animate: true,
-      animationDuration: 600,
-      fit: true,
-      padding: 32,
-      // repulsion — push nodes apart
-      nodeRepulsion: 6500,
-      idealEdgeLength: 80,
-      edgeElasticity: 0.45,
-      nestingFactor: 0.1,
-      gravity: 0.25,
-      gravityRange: 3.8,
-      // prevent overlap
-      nodeSeparation: 75,
-      uniformNodeDimensions: false,
-      // iterations
-      numIter: 2500,
-      tile: true,
-      tilingPaddingVertical: 10,
-      tilingPaddingHorizontal: 10,
-    } as cytoscape.LayoutOptions,
+    layout: { ...LAYOUT_BASE } as cytoscape.LayoutOptions,
     userZoomingEnabled: true,
     userPanningEnabled: true,
     minZoom: 0.05,
@@ -104,6 +108,38 @@ function initGraph() {
   })
 
   cy.one('layoutstop', () => cy?.fit(undefined, 32))
+
+  // push nearby nodes away while dragging
+  cy.on('drag', 'node', (evt) => {
+    const dragged = evt.target as cytoscape.NodeSingular
+    const pos = dragged.position()
+    const RADIUS = 90
+    cy!.nodes().not(dragged).forEach((other) => {
+      const opos = other.position()
+      const dx = opos.x - pos.x
+      const dy = opos.y - pos.y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      if (dist < RADIUS && dist > 0) {
+        const push = ((RADIUS - dist) / RADIUS) * 28
+        other.position({ x: opos.x + (dx / dist) * push, y: opos.y + (dy / dist) * push })
+      }
+    })
+  })
+
+  // re-settle graph from current positions when drag ends
+  cy.on('dragfree', 'node', (evt) => {
+    const node = evt.target as cytoscape.NodeSingular
+    const pos = { x: node.position().x, y: node.position().y }
+    runLayout({
+      randomize: false,
+      animate: true,
+      animationDuration: 500,
+      quality: 'draft',
+      numIter: 1000,
+      fit: false,
+      fixedNodeConstraint: [{ nodeId: node.id(), position: pos }],
+    })
+  })
 }
 
 onMounted(initGraph)

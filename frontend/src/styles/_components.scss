@@ -103,6 +103,7 @@
   display: flex;
   gap: 0;
   overflow-x: auto;
+  overflow-y: hidden;
 
   &__tab {
     padding: $space-3 $space-4;
@@ -284,7 +285,7 @@
 
   &__link {
     font-size: 0.875rem;
-    color: var(--color-primary);
+    color: var(--color-accent);
     text-decoration: none;
 
     &:hover {
@@ -332,6 +333,67 @@
 
     &--normal::before { background: #0969da; }
     &--god::before { background: #cf222e; }
+  }
+}
+
+// ===== TIMELINE FILTER =====
+.tl-filter {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+  margin-bottom: $space-2;
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+  }
+
+  &__label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    min-width: 44px;
+  }
+
+  &__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-2;
+  }
+
+  &__chip {
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+
+    &:hover:not(:disabled) {
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+    }
+
+    &--active {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: #fff;
+
+      &:hover {
+        background: var(--color-accent);
+        color: #fff;
+      }
+    }
+
+    &--disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
   }
 }
 
@@ -753,8 +815,14 @@
 // ===== HEURISTICS =====
 .heuristics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: $space-4;
+}
+
+.heuristic-card {
+  &--low    { border-left: 3px solid var(--color-success); }
+  &--medium { border-left: 3px solid var(--color-warning); }
+  &--high   { border-left: 3px solid var(--color-error); }
 }
 
 .heuristic {
@@ -762,30 +830,106 @@
   flex-direction: column;
   gap: $space-3;
 
-  &__header {
+  &__top {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: $space-2;
-    flex-wrap: wrap;
+    gap: $space-3;
+  }
+
+  &__title-group {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
   }
 
   &__label {
     font-weight: 600;
-    font-size: 0.9375rem;
+    font-size: 1rem;
     color: var(--color-text);
+    line-height: 1.3;
   }
 
-  &__badges {
+  &__risk {
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+
+    &--low    { color: var(--color-success); }
+    &--medium { color: var(--color-warning); }
+    &--high   { color: var(--color-error); }
+  }
+
+  &__score-display {
     display: flex;
-    gap: $space-2;
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+
+  &__score-number {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+
+    &--low    { color: var(--color-success); }
+    &--medium { color: var(--color-warning); }
+    &--high   { color: var(--color-error); }
+  }
+
+  &__score-label {
+    font-size: 0.6875rem;
+    color: var(--color-text-muted);
+    text-align: right;
+  }
+
+  &__bar {
+    height: 8px;
+    background: var(--color-border);
+    border-radius: $radius-sm;
+    overflow: hidden;
+
+    &-fill {
+      height: 100%;
+      border-radius: $radius-sm;
+      transition: width 0.4s ease;
+
+      &--low    { background: var(--color-success); }
+      &--medium { background: var(--color-warning); }
+      &--high   { background: var(--color-error); }
+    }
   }
 
   &__description {
     font-size: 0.8125rem;
     color: var(--color-text-secondary);
     margin: 0;
-    line-height: 1.5;
+    line-height: 1.6;
+  }
+
+  &__footer {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding-top: $space-2;
+    border-top: 1px solid var(--color-border);
+  }
+
+  &__confidence-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+
+    &--high   { background: var(--color-success); }
+    &--medium { background: var(--color-warning); }
+    &--low    { background: var(--color-text-muted); }
+  }
+
+  &__confidence-text {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
   }
 }
