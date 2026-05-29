@@ -17,16 +17,16 @@ samp {
 
 pre {
   overflow-x: auto;
-  background: $color-surface;
-  border: 1px solid $color-border;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: $radius-md;
   padding: $space-4;
 }
 
-.text-secondary { color: $color-text-secondary; }
-.text-muted     { color: $color-text-muted; }
-.text-accent    { color: $color-accent; }
-.text-success   { color: $color-success; }
-.text-warning   { color: $color-warning; }
-.text-error     { color: $color-error; }
+.text-secondary { color: var(--color-text-secondary); }
+.text-muted     { color: var(--color-text-muted); }
+.text-accent    { color: var(--color-accent); }
+.text-success   { color: var(--color-success); }
+.text-warning   { color: var(--color-warning); }
+.text-error     { color: var(--color-error); }
 .text-mono      { font-family: $font-mono; }

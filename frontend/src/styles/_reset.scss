@@ -15,8 +15,8 @@ html {
 }
 
 body {
-  background-color: $color-bg;
-  color: $color-text-primary;
+  background-color: var(--color-bg);
+  color: var(--color-text);
   font-family: $font-sans;
   font-size: 1rem;
   line-height: 1.6;
@@ -26,12 +26,12 @@ body {
 }
 
 a {
-  color: $color-accent;
+  color: var(--color-accent);
   text-decoration: none;
   transition: color $transition-fast;
 
   &:hover {
-    color: $color-accent-hover;
+    color: var(--color-accent-hover);
   }
 }
 
