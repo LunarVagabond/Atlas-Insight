@@ -14,7 +14,104 @@ export interface RunResult {
   graph: GraphData
   dependencies: DepsData
   heuristics: HeuristicSignal[]
+  readme?: ReadmeData
+  structure?: StructureData
+  security?: SecurityData
+  github_meta?: GitHubMeta
+  classification?: Classification
   error?: string
+}
+
+export interface ReadmeData {
+  found: boolean
+  filename: string | null
+  description: string | null
+  sections: string[]
+  badge_count: number
+  word_count: number
+  has_installation: boolean
+  has_usage: boolean
+  has_contributing: boolean
+  has_changelog: boolean
+  has_license: boolean
+  has_api_docs: boolean
+}
+
+export interface LanguageInfo {
+  name: string
+  files: number
+  lines: number
+  pct: number
+}
+
+export interface StructureData {
+  total_files: number
+  total_lines: number
+  languages: LanguageInfo[]
+  test_files: number
+  test_ratio: number
+  has_ci: boolean
+  ci_systems: string[]
+  gh_workflow_count: number
+  has_docker: boolean
+  has_lint_config: boolean
+  has_contributing: boolean
+  contributing_file: string | null
+  license_file: string | null
+  license_type: string | null
+  has_coc: boolean
+  has_security_policy: boolean
+  has_changelog: boolean
+  releases: { name: string; date: string }[]
+  release_count: number
+  last_release: { name: string; date: string } | null
+  repo_age_days: number | null
+  bus_factor: number
+  top_contributors: { author: string; files_touched: number }[]
+}
+
+export interface SecurityData {
+  issues: { severity: string; type: string; detail: string }[]
+  issue_count: number
+  score: number
+  gitignore_exists: boolean
+  gitignore_gaps: string[]
+}
+
+export interface GitHubMeta {
+  stars: number
+  forks: number
+  open_issues: number
+  open_prs: number | null
+  watchers: number
+  primary_language: string | null
+  topics: string[]
+  license_spdx: string | null
+  license_name: string | null
+  github_description: string | null
+  size_kb: number
+  default_branch: string
+  has_wiki: boolean
+  has_discussions: boolean
+  archived: boolean
+  is_fork: boolean
+  created_at: string | null
+  pushed_at: string | null
+  homepage: string | null
+}
+
+export interface ClassificationLevel {
+  key: string
+  label: string
+  score: number
+}
+
+export interface Classification {
+  contribution_difficulty: ClassificationLevel
+  project_health: ClassificationLevel
+  code_complexity: ClassificationLevel
+  documentation_grade: ClassificationLevel
+  tags: string[]
 }
 
 export interface CommitData {

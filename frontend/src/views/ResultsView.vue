@@ -11,13 +11,14 @@ import ArchitecturePanel from '../components/analysis/ArchitecturePanel.vue'
 import DependencyGraphView from '../components/analysis/DependencyGraphView.vue'
 import DependenciesPanel from '../components/analysis/DependenciesPanel.vue'
 import HeuristicsPanel from '../components/analysis/HeuristicsPanel.vue'
+import ProjectPanel from '../components/analysis/ProjectPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
 const store = useAnalysisStore()
 const runId = route.params.runId as string
 
-const TABS = ['Overview', 'Architecture', 'Dependencies', 'Timeline', 'Heuristics']
+const TABS = ['Overview', 'Project', 'Architecture', 'Dependencies', 'Timeline', 'Heuristics']
 const activeTab = ref('Overview')
 
 onMounted(async () => {
@@ -58,6 +59,7 @@ const isPolling = computed(() => ['pending', 'running'].includes(store.run?.stat
       <AppTabs :tabs="TABS" v-model="activeTab" />
       <div style="margin-top: 1.5rem">
         <OverviewPanel v-if="activeTab === 'Overview'" :result="result" />
+        <ProjectPanel v-if="activeTab === 'Project'" :result="result" />
         <template v-if="activeTab === 'Architecture'">
           <ArchitecturePanel :graph="result.graph" />
           <div style="margin-top: 1.5rem">
