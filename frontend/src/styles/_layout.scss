@@ -129,6 +129,13 @@
     color: var(--color-text);
   }
 
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    flex-wrap: wrap;
+  }
+
   &__repo-link {
     font-size: 0.9375rem;
     font-weight: 500;

@@ -3,6 +3,7 @@ import { ref, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAnalysisStore } from '../stores/analysis'
 import AppTabs from '../components/ui/AppTabs.vue'
+import AppButton from '../components/ui/AppButton.vue'
 import LoadingSpinner from '../components/ui/LoadingSpinner.vue'
 import AnalysisStatusCard from '../components/analysis/AnalysisStatusCard.vue'
 import OverviewPanel from '../components/analysis/OverviewPanel.vue'
@@ -19,6 +20,8 @@ const route = useRoute()
 const router = useRouter()
 const store = useAnalysisStore()
 const runId = computed(() => route.params.runId as string)
+const result = computed(() => store.run?.result)
+const isPolling = computed(() => ['pending', 'running'].includes(store.run?.status ?? ''))
 
 const hasRoadmap = computed(() => (result.value?.structure?.roadmap_parsed?.milestones?.length ?? 0) > 0)
 const TABS = computed(() => {
@@ -26,19 +29,61 @@ const TABS = computed(() => {
   if (hasRoadmap.value) base.push('Roadmap')
   return base
 })
-const activeTab = ref('Overview')
+
+const activeTab = ref((route.query.tab as string) || 'Overview')
+
+watch(activeTab, (tab) => {
+  router.replace({ query: { ...route.query, tab } })
+})
+
+watch(TABS, (tabs) => {
+  if (!tabs.includes(activeTab.value)) activeTab.value = 'Overview'
+})
 
 watch(runId, async (id) => {
   if (!id) { router.push('/'); return }
+  activeTab.value = (route.query.tab as string) || 'Overview'
   store._stopPolling()
   await store.pollRun(id)
 }, { immediate: true })
 
-
 onUnmounted(() => store._stopPolling())
 
-const result = computed(() => store.run?.result)
-const isPolling = computed(() => ['pending', 'running'].includes(store.run?.status ?? ''))
+// Re-analyze
+const reanalyzing = ref(false)
+async function reanalyze() {
+  if (!runId.value) return
+  reanalyzing.value = true
+  try {
+    const newId = await store.retryRun(runId.value)
+    router.push(`/results/${newId}`)
+  } finally {
+    reanalyzing.value = false
+  }
+}
+
+// Export JSON
+function exportJson() {
+  if (!result.value || !store.run) return
+  const blob = new Blob([JSON.stringify(result.value, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${store.run.repo_owner}-${store.run.repo_name}-analysis.json`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+// Copy permalink
+const copied = ref(false)
+function copyLink() {
+  const url = `${window.location.origin}/r/${store.run?.repo_owner}/${store.run?.repo_name}`
+  navigator.clipboard.writeText(url)
+  copied.value = true
+  setTimeout(() => { copied.value = false }, 2000)
+}
 </script>
 
 <template>
@@ -51,7 +96,18 @@ const isPolling = computed(() => ['pending', 'running'].includes(store.run?.stat
             {{ store.run.repo_owner }}/{{ store.run.repo_name }} ↗
           </a>
         </div>
-        <a href="/" class="btn btn--secondary" style="font-size:0.875rem">← New Analysis</a>
+        <div class="results-header__actions">
+          <AppButton v-if="result" variant="secondary" @click="copyLink" style="font-size:0.8125rem;padding:4px 12px">
+            {{ copied ? '✓ Copied' : '🔗 Share' }}
+          </AppButton>
+          <AppButton v-if="result" variant="secondary" @click="exportJson" style="font-size:0.8125rem;padding:4px 12px">
+            ↓ Export JSON
+          </AppButton>
+          <AppButton v-if="store.run?.status === 'completed'" variant="secondary" :disabled="reanalyzing" @click="reanalyze" style="font-size:0.8125rem;padding:4px 12px">
+            {{ reanalyzing ? 'Queuing…' : '↻ Re-analyze' }}
+          </AppButton>
+          <a href="/" class="btn btn--secondary" style="font-size:0.875rem">← New Analysis</a>
+        </div>
       </div>
       <div v-if="store.run" style="margin-top: 1rem">
         <AnalysisStatusCard :run="store.run" />

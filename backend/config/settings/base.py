@@ -103,7 +103,13 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.analysis.tasks.check_stale_repos',
         'schedule': crontab(minute=0, hour='*/6'),
     },
+    'cleanup-old-runs': {
+        'task': 'apps.analysis.tasks.cleanup_old_runs',
+        'schedule': crontab(minute=30, hour=2),  # daily at 02:30 UTC
+    },
 }
+
+RUNS_TO_KEEP_PER_REPO = config('RUNS_TO_KEEP_PER_REPO', default=10, cast=int)
 
 # Logging
 LOG_DIR = REPO_ROOT / '_running' / 'logs'

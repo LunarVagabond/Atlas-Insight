@@ -20,6 +20,11 @@ const router = createRouter({
       name: 'compare',
       component: () => import('../views/CompareView.vue'),
     },
+    {
+      path: '/r/:owner/:name',
+      name: 'repo-permalink',
+      component: () => import('../views/RepoView.vue'),
+    },
   ],
 })
 

@@ -201,3 +201,21 @@ def get_timeline(request, run_id: uuid.UUID):
         'contributor_churn': commits.get('contributor_churn', []),
         'dependency_count': deps.get('dependency_count', 0),
     }
+
+
+class SlugRunSchema(Schema):
+    run_id: uuid.UUID
+    status: str
+
+
+@router.get('/by-slug/{owner}/{name}', response=SlugRunSchema)
+def get_by_slug(request, owner: str, name: str):
+    """Return the latest run for owner/name — used by permalink routes."""
+    try:
+        repo = Repository.objects.get(owner__iexact=owner, name__iexact=name)
+    except Repository.DoesNotExist:
+        raise HttpError(404, 'Repository not found')
+    run = repo.runs.order_by('-triggered_at').first()
+    if not run:
+        raise HttpError(404, 'No runs found for this repository')
+    return SlugRunSchema(run_id=run.id, status=run.status)

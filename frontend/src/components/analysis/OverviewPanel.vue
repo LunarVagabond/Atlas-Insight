@@ -121,6 +121,11 @@ const langBarColors = ['#0969da', '#2da44e', '#e36209', '#8250df']
       </template>
     </div>
 
+    <!-- Topics -->
+    <div v-if="gh?.topics?.length" class="overview-topics">
+      <span v-for="topic in gh.topics" :key="topic" class="overview-topics__tag">{{ topic }}</span>
+    </div>
+
     <!-- Language mini-bars -->
     <div v-if="topLanguages.length" class="overview-langs">
       <div

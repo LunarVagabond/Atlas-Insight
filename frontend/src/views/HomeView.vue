@@ -81,6 +81,29 @@ function goToCompare() {
   router.push(`/compare?a=${a}&b=${b}`)
 }
 
+// ── Watchlist ────────────────────────────────────────────────────────────────
+const WATCHLIST_KEY = 'atlas_watchlist'
+
+function loadWatchlist(): Set<string> {
+  try { return new Set(JSON.parse(localStorage.getItem(WATCHLIST_KEY) || '[]')) }
+  catch { return new Set() }
+}
+
+const watchlist = ref<Set<string>>(loadWatchlist())
+
+function isPinned(repoUrl: string) { return watchlist.value.has(repoUrl) }
+
+function togglePin(repoUrl: string) {
+  const w = new Set(watchlist.value)
+  if (w.has(repoUrl)) w.delete(repoUrl)
+  else w.add(repoUrl)
+  watchlist.value = w
+  localStorage.setItem(WATCHLIST_KEY, JSON.stringify([...w]))
+}
+
+const pinnedItems = computed(() => items.value.filter(r => watchlist.value.has(r.repo_url)))
+const unpinnedItems = computed(() => items.value.filter(r => !watchlist.value.has(r.repo_url)))
+
 </script>
 
 <template>
@@ -129,6 +152,7 @@ function goToCompare() {
           <thead>
             <tr>
               <th style="width:2rem"></th>
+              <th style="width:2rem"></th>
               <th>Author</th>
               <th>Repository</th>
               <th class="runs-table__sortable" @click="setSort('status')">
@@ -141,8 +165,52 @@ function goToCompare() {
             </tr>
           </thead>
           <tbody>
+            <!-- Pinned repos -->
+            <template v-if="pinnedItems.length && !q">
+              <tr
+                v-for="run in pinnedItems"
+                :key="'pin-' + run.id"
+                class="runs-table__row runs-table__row--pinned"
+                @click="goToRun(run.id)"
+              >
+                <td @click.stop>
+                  <input
+                    type="checkbox"
+                    :checked="selectedIds.has(run.id)"
+                    :disabled="!selectedIds.has(run.id) && selectedIds.size >= 2"
+                    @change="toggleSelect(run.id)"
+                    style="cursor:pointer"
+                  />
+                </td>
+                <td @click.stop>
+                  <button class="runs-table__pin runs-table__pin--active" @click="togglePin(run.repo_url)" title="Unpin">★</button>
+                </td>
+                <td><span class="runs-table__author">{{ run.repo_owner }}</span></td>
+                <td>
+                  <div class="runs-table__repo">
+                    <span class="runs-table__project">{{ run.repo_name }}</span>
+                    <span class="runs-table__url">{{ run.repo_url }}</span>
+                  </div>
+                </td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:0.5rem">
+                    <AppBadge :variant="run.status">{{ run.status }}</AppBadge>
+                    <AppBadge v-if="run.is_stale" variant="warning">Stale</AppBadge>
+                  </div>
+                </td>
+                <td>{{ formatDate(run.triggered_at) }}</td>
+                <td>
+                  <AppButton variant="secondary" @click.stop="goToRun(run.id)" style="font-size:0.8125rem;padding:4px 12px">View</AppButton>
+                </td>
+              </tr>
+              <tr v-if="unpinnedItems.length" class="runs-table__divider">
+                <td colspan="7"><span>Other repos</span></td>
+              </tr>
+            </template>
+
+            <!-- Regular (unpinned) repos -->
             <tr
-              v-for="run in items"
+              v-for="run in (q ? items : unpinnedItems)"
               :key="run.id"
               class="runs-table__row"
               @click="goToRun(run.id)"
@@ -155,6 +223,13 @@ function goToCompare() {
                   @change="toggleSelect(run.id)"
                   style="cursor:pointer"
                 />
+              </td>
+              <td @click.stop>
+                <button
+                  :class="['runs-table__pin', { 'runs-table__pin--active': isPinned(run.repo_url) }]"
+                  @click="togglePin(run.repo_url)"
+                  :title="isPinned(run.repo_url) ? 'Unpin' : 'Pin to top'"
+                >{{ isPinned(run.repo_url) ? '★' : '☆' }}</button>
               </td>
               <td><span class="runs-table__author">{{ run.repo_owner }}</span></td>
               <td>
@@ -171,9 +246,7 @@ function goToCompare() {
               </td>
               <td>{{ formatDate(run.triggered_at) }}</td>
               <td>
-                <AppButton variant="secondary" @click.stop="goToRun(run.id)" style="font-size:0.8125rem;padding:4px 12px">
-                  View
-                </AppButton>
+                <AppButton variant="secondary" @click.stop="goToRun(run.id)" style="font-size:0.8125rem;padding:4px 12px">View</AppButton>
               </td>
             </tr>
           </tbody>

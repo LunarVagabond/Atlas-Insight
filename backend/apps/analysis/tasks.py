@@ -116,3 +116,37 @@ def check_stale_repos():
             repo.save(update_fields=['is_stale'])
             updated += 1
     logger.info('Stale check complete: %d repos marked stale', updated)
+
+
+@shared_task
+def cleanup_old_runs():
+    """For each repo, delete runs beyond RUNS_TO_KEEP_PER_REPO (oldest first).
+    Never deletes pending/running runs."""
+    from django.conf import settings
+
+    from apps.repositories.models import AnalysisRun, Repository
+
+    keep = getattr(settings, 'RUNS_TO_KEEP_PER_REPO', 10)
+    deleted_total = 0
+
+    for repo in Repository.objects.all():
+        # IDs to keep: latest `keep` runs regardless of status
+        keep_ids = (
+            AnalysisRun.objects.filter(repo=repo)
+            .order_by('-triggered_at')
+            .values_list('id', flat=True)[:keep]
+        )
+        # Also always keep any in-flight runs
+        inflight_ids = (
+            AnalysisRun.objects.filter(repo=repo, status__in=['pending', 'running'])
+            .values_list('id', flat=True)
+        )
+        safe_ids = set(keep_ids) | set(inflight_ids)
+        deleted, _ = (
+            AnalysisRun.objects.filter(repo=repo)
+            .exclude(id__in=safe_ids)
+            .delete()
+        )
+        deleted_total += deleted
+
+    logger.info('Run cleanup complete: %d old runs deleted (keeping %d per repo)', deleted_total, keep)
