@@ -97,7 +97,91 @@ CHANGELOG_PATHS = [
 ]
 
 
-def analyze_structure(repo_obj: Repo, repo_dir: str) -> dict:
+FRAMEWORK_SIGNALS: dict[str, str] = {
+    # Python
+    'django': 'Django', 'flask': 'Flask', 'fastapi': 'FastAPI',
+    'celery': 'Celery', 'sqlalchemy': 'SQLAlchemy', 'tortoise-orm': 'Tortoise ORM',
+    'starlette': 'Starlette',
+    # Ruby
+    'rails': 'Rails', 'sinatra': 'Sinatra',
+    # Go (partial module path matching)
+    'gin-gonic/gin': 'Gin', 'labstack/echo': 'Echo', 'gofiber/fiber': 'Fiber',
+    'gorilla/mux': 'Gorilla Mux',
+    # Rust
+    'actix-web': 'Actix', 'rocket': 'Rocket', 'axum': 'Axum', 'warp': 'Warp',
+    # Java/Kotlin
+    'spring-boot': 'Spring Boot', 'spring': 'Spring', 'ktor': 'Ktor',
+    'micronaut': 'Micronaut', 'quarkus': 'Quarkus',
+    # JS/TS frontend
+    'vue': 'Vue', 'react': 'React', 'svelte': 'Svelte',
+    'solid-js': 'Solid', 'astro': 'Astro',
+    '@angular/core': 'Angular',
+    'preact': 'Preact', 'lit': 'Lit',
+    # JS/TS meta-frameworks
+    'next': 'Next.js', 'nuxt': 'Nuxt', 'remix': 'Remix',
+    '@sveltejs/kit': 'SvelteKit', 'gatsby': 'Gatsby',
+    '@nuxt/core': 'Nuxt',
+    # JS/TS backend
+    'express': 'Express', 'fastify': 'Fastify', 'koa': 'Koa',
+    'hono': 'Hono', 'nestjs': 'NestJS', '@nestjs/core': 'NestJS',
+    # ORMs / DB
+    'prisma': 'Prisma', 'typeorm': 'TypeORM', 'sequelize': 'Sequelize',
+    'mongoose': 'Mongoose', 'drizzle-orm': 'Drizzle',
+    # API / infra
+    'graphql': 'GraphQL', 'trpc': 'tRPC', '@trpc/server': 'tRPC',
+    'grpc': 'gRPC',
+    # Testing (major)
+    'pytest': 'pytest', 'jest': 'Jest', 'vitest': 'Vitest', 'cypress': 'Cypress',
+    # Build/bundlers worth noting
+    'vite': 'Vite', 'webpack': 'Webpack', 'turbopack': 'Turbopack',
+    # State / UI libs
+    'pinia': 'Pinia', 'redux': 'Redux', 'zustand': 'Zustand',
+    'tailwindcss': 'Tailwind', '@mui/material': 'MUI',
+    'antd': 'Ant Design', 'chakra-ui': 'Chakra UI',
+}
+
+# Used by graph_analysis to filter framework imports from god modules
+FRAMEWORK_PACKAGES: frozenset[str] = frozenset(FRAMEWORK_SIGNALS.keys())
+
+_FRAMEWORK_FILE_PATTERNS: dict[str, str] = {
+    'nuxt.config.ts': 'Nuxt', 'nuxt.config.js': 'Nuxt',
+    'next.config.ts': 'Next.js', 'next.config.js': 'Next.js', 'next.config.mjs': 'Next.js',
+    'angular.json': 'Angular',
+    'svelte.config.js': 'Svelte', 'svelte.config.ts': 'Svelte',
+    'astro.config.mjs': 'Astro', 'astro.config.ts': 'Astro',
+    'remix.config.js': 'Remix',
+    'gatsby-config.js': 'Gatsby', 'gatsby-config.ts': 'Gatsby',
+    'vite.config.ts': 'Vite', 'vite.config.js': 'Vite',
+    'webpack.config.js': 'Webpack',
+    'tailwind.config.js': 'Tailwind', 'tailwind.config.ts': 'Tailwind',
+}
+
+
+def _detect_tech_stack(repo_dir: str, dep_list: list[dict]) -> list[str]:
+    detected: set[str] = set()
+    base = Path(repo_dir)
+
+    # From dependencies
+    for dep in dep_list:
+        name = dep.get('name', '').lower()
+        if name in FRAMEWORK_SIGNALS:
+            detected.add(FRAMEWORK_SIGNALS[name])
+        else:
+            # Partial match for scoped packages and module paths
+            for key, label in FRAMEWORK_SIGNALS.items():
+                if name == key or name.endswith('/' + key) or name.startswith(key + '/'):
+                    detected.add(label)
+                    break
+
+    # From config files
+    for filename, label in _FRAMEWORK_FILE_PATTERNS.items():
+        if (base / filename).exists():
+            detected.add(label)
+
+    return sorted(detected)
+
+
+def analyze_structure(repo_obj: Repo, repo_dir: str, deps: dict | None = None) -> dict:
     base = Path(repo_dir)
 
     # Language breakdown and file stats
@@ -192,13 +276,20 @@ def analyze_structure(repo_obj: Repo, repo_dir: str) -> dict:
     )
 
     # Releases / tags
-    releases = _get_releases(repo_obj)
+    release_count, releases = _get_releases(repo_obj)
 
     # Repo age from first commit
     repo_age_days = _get_repo_age(repo_obj)
 
     # Bus factor
     bus_factor, top_contributors = _compute_bus_factor(repo_obj)
+
+    # Hot files (most-changed in last 300 commits)
+    hot_files = _get_hot_files(repo_obj)
+
+    # Tech stack detection from dependencies + config files
+    dep_list = deps.get('dependencies', []) if deps else []
+    tech_stack = _detect_tech_stack(repo_dir, dep_list)
 
     source_files = sum(
         v for lang, v in lang_files.items() if lang not in NON_SOURCE_LANGS
@@ -228,11 +319,13 @@ def analyze_structure(repo_obj: Repo, repo_dir: str) -> dict:
         'changelog_file': changelog_file,
         'community_files_content': community_files_content,
         'releases': releases,
-        'release_count': len(releases),
+        'release_count': release_count,
         'last_release': releases[0] if releases else None,
         'repo_age_days': repo_age_days,
         'bus_factor': bus_factor,
         'top_contributors': top_contributors,
+        'hot_files': hot_files,
+        'tech_stack': tech_stack,
     }
 
 
@@ -302,10 +395,11 @@ def _detect_license_type(path: Path) -> str | None:
     return 'Other'
 
 
-def _get_releases(repo_obj: Repo) -> list[dict]:
+def _get_releases(repo_obj: Repo) -> tuple[int, list[dict]]:
     try:
         tags = sorted(repo_obj.tags, key=lambda t: t.commit.committed_date, reverse=True)
-        return [
+        total_count = len(tags)
+        recent = [
             {
                 'name': t.name,
                 'date': datetime.fromtimestamp(
@@ -314,8 +408,9 @@ def _get_releases(repo_obj: Repo) -> list[dict]:
             }
             for t in tags[:20]
         ]
+        return total_count, recent
     except Exception:
-        return []
+        return 0, []
 
 
 def _get_repo_age(repo_obj: Repo) -> int | None:
@@ -370,6 +465,19 @@ def _compute_bus_factor(repo_obj: Repo) -> tuple[int, list[dict]]:
             break
 
     return max(1, bus_factor), top_contributors
+
+
+def _get_hot_files(repo_obj: Repo) -> list[dict]:
+    file_counts: dict[str, int] = collections.Counter()
+    try:
+        output = repo_obj.git.log('--format=', '--name-only', '-300', 'HEAD')
+        for line in output.splitlines():
+            line = line.strip()
+            if line:
+                file_counts[line] += 1
+    except Exception:
+        return []
+    return [{'file': f, 'commit_count': c} for f, c in file_counts.most_common(20)]
 
 
 def _read_community_files(

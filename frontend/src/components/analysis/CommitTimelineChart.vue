@@ -14,6 +14,7 @@ import {
 } from 'chart.js'
 import type { CommitData } from '../../stores/analysis'
 import TimelineFilter, { type FilterSelection } from './TimelineFilter.vue'
+import { useTableFilter } from '../../composables/useTableFilter'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 
@@ -36,6 +37,13 @@ const filteredChurn = computed(() => {
   }
   return rows
 })
+
+const churnFilter = useTableFilter(
+  filteredChurn as unknown as import('vue').Ref<Record<string, unknown>[]>,
+  ['month'],
+  'month',
+  'desc',
+)
 
 const chartData = computed(() => ({
   labels: filteredMonthly.value.map(d => d.month),
@@ -85,12 +93,30 @@ const chartOptions = {
 
     <div v-if="commits.contributor_churn.length" style="margin-top: 2rem">
       <h3 class="panel__title">Contributor Activity</h3>
+      <input
+        v-model="churnFilter.query.value"
+        class="table-search"
+        placeholder="Search by month…"
+      />
       <table class="data-table">
         <thead>
-          <tr><th>Month</th><th>Active</th><th>New</th><th>Lost</th></tr>
+          <tr>
+            <th class="runs-table__sortable" @click="churnFilter.setSort('month')">
+              Month {{ churnFilter.sortIcon('month') }}
+            </th>
+            <th class="runs-table__sortable" @click="churnFilter.setSort('active')">
+              Active {{ churnFilter.sortIcon('active') }}
+            </th>
+            <th class="runs-table__sortable" @click="churnFilter.setSort('new')">
+              New {{ churnFilter.sortIcon('new') }}
+            </th>
+            <th class="runs-table__sortable" @click="churnFilter.setSort('lost')">
+              Lost {{ churnFilter.sortIcon('lost') }}
+            </th>
+          </tr>
         </thead>
         <tbody>
-          <tr v-for="row in filteredChurn" :key="row.month">
+          <tr v-for="row in (churnFilter.filtered.value as any[])" :key="row.month">
             <td>{{ row.month }}</td>
             <td>{{ row.active }}</td>
             <td style="color: var(--color-success)">+{{ row.new }}</td>
@@ -98,7 +124,7 @@ const chartOptions = {
           </tr>
         </tbody>
       </table>
-      <div v-if="!filteredChurn.length" class="empty-state" style="margin-top:1rem">No contributor data for selected range</div>
+      <div v-if="!churnFilter.filtered.value.length" class="empty-state" style="margin-top:1rem">No contributor data for selected range</div>
     </div>
   </div>
 </template>

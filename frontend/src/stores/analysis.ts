@@ -10,6 +10,8 @@ export interface AnalysisRun {
   repo_url: string
   repo_owner: string
   repo_name: string
+  is_stale: boolean
+  last_fetched_at: string | null
 }
 
 export interface RunResult {
@@ -28,6 +30,7 @@ export interface RunResult {
 export interface ReadmeData {
   found: boolean
   filename: string | null
+  content: string | null
   description: string | null
   sections: string[]
   badge_count: number
@@ -83,6 +86,8 @@ export interface StructureData {
   repo_age_days: number | null
   bus_factor: number
   top_contributors: { author: string; files_touched: number }[]
+  hot_files: { file: string; commit_count: number }[]
+  tech_stack?: string[]
 }
 
 export interface SecurityData {
@@ -183,6 +188,8 @@ export interface RunListItem {
   repo_url: string
   repo_owner: string
   repo_name: string
+  is_stale: boolean
+  last_fetched_at: string | null
 }
 
 export const useAnalysisStore = defineStore('analysis', {
@@ -196,13 +203,15 @@ export const useAnalysisStore = defineStore('analysis', {
   }),
 
   actions: {
-    async submitUrl(url: string) {
+    async submitUrl(url: string, pat?: string) {
       this.url = url
       this.status = 'submitting'
       this.error = null
       this.run = null
       try {
-        const { data } = await axios.post('/api/v1/repositories/analyze', { url })
+        const body: { url: string; pat?: string } = { url }
+        if (pat) body.pat = pat
+        const { data } = await axios.post('/api/v1/repositories/analyze', body)
         this.currentRunId = data.run_id
         this.status = 'polling'
         this._startPolling(data.run_id)

@@ -3,12 +3,11 @@ import re
 import uuid
 from typing import Optional
 
-import requests
-from django.conf import settings
 from django.db.models import Q
 from ninja import Router, Schema
 from ninja.errors import HttpError
 
+from apps.analysis.github_meta import fetch_latest_sha
 from apps.analysis.tasks import analyze_repository
 
 from .models import AnalysisRun, Repository
@@ -23,6 +22,7 @@ GITHUB_URL_RE = re.compile(
 
 class AnalyzeRequest(Schema):
     url: str
+    pat: Optional[str] = None
 
 
 class RunStatusSchema(Schema):
@@ -34,6 +34,8 @@ class RunStatusSchema(Schema):
     repo_url: str
     repo_owner: str
     repo_name: str
+    is_stale: bool
+    last_fetched_at: Optional[str]
 
 
 class AnalyzeResponse(Schema):
@@ -50,6 +52,8 @@ class RunListItemSchema(Schema):
     repo_url: str
     repo_owner: str
     repo_name: str
+    is_stale: bool
+    last_fetched_at: Optional[str]
 
 
 class RunListSchema(Schema):
@@ -57,26 +61,6 @@ class RunListSchema(Schema):
     total: int
     page: int
     per_page: int
-
-
-def _fetch_latest_sha(owner: str, name: str) -> Optional[str]:
-    headers = {'Accept': 'application/vnd.github.v3+json'}
-    if settings.GITHUB_TOKEN:
-        headers['Authorization'] = f'Bearer {settings.GITHUB_TOKEN}'
-    try:
-        resp = requests.get(
-            f'https://api.github.com/repos/{owner}/{name}/commits',
-            params={'per_page': 1},
-            headers=headers,
-            timeout=10,
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            if data:
-                return data[0]['sha']
-    except Exception:
-        logger.warning('Failed to fetch latest SHA for %s/%s', owner, name)
-    return None
 
 
 @router.post('/analyze', response=AnalyzeResponse)
@@ -95,7 +79,7 @@ def analyze(request, payload: AnalyzeRequest):
         repo.name = name
         repo.save(update_fields=['owner', 'name'])
 
-    latest_sha = _fetch_latest_sha(owner, name)
+    latest_sha = fetch_latest_sha(owner, name, token=payload.pat)
 
     if latest_sha and latest_sha == repo.last_commit_sha:
         latest_run = repo.runs.filter(status='completed').order_by('-triggered_at').first()
@@ -103,7 +87,7 @@ def analyze(request, payload: AnalyzeRequest):
             return AnalyzeResponse(run_id=latest_run.id, status='completed', cached=True)
 
     run = AnalysisRun.objects.create(repo=repo, status='pending')
-    task = analyze_repository.delay(str(run.id))
+    task = analyze_repository.delay(str(run.id), pat=payload.pat)
     run.celery_task_id = task.id
     run.save(update_fields=['celery_task_id'])
 
@@ -157,6 +141,8 @@ def list_runs(
                 repo_url=r.repo.url,
                 repo_owner=r.repo.owner,
                 repo_name=r.repo.name,
+                is_stale=r.repo.is_stale,
+                last_fetched_at=r.repo.last_fetched_at.isoformat() if r.repo.last_fetched_at else None,
             )
             for r in runs
         ],
@@ -181,6 +167,8 @@ def get_run(request, run_id: uuid.UUID):
         repo_url=run.repo.url,
         repo_owner=run.repo.owner,
         repo_name=run.repo.name,
+        is_stale=run.repo.is_stale,
+        last_fetched_at=run.repo.last_fetched_at.isoformat() if run.repo.last_fetched_at else None,
     )
 
 

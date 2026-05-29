@@ -21,6 +21,7 @@ def parse_readme(repo_dir: str) -> dict:
         return {
             'found': False,
             'filename': None,
+            'content': None,
             'description': None,
             'sections': [],
             'badge_count': 0,
@@ -49,6 +50,7 @@ def parse_readme(repo_dir: str) -> dict:
     return {
         'found': True,
         'filename': readme_path.name,
+        'content': content[:50_000] if content else None,
         'description': description,
         'sections': sections[:30],
         'badge_count': badge_count,

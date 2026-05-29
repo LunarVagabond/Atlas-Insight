@@ -15,6 +15,11 @@ const router = createRouter({
       name: 'runs',
       component: () => import('../views/RunsView.vue'),
     },
+    {
+      path: '/compare',
+      name: 'compare',
+      component: () => import('../views/CompareView.vue'),
+    },
   ],
 })
 

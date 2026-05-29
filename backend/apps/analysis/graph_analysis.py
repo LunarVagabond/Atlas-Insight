@@ -1,6 +1,22 @@
+from pathlib import Path
+
 import networkx as nx
 
+from .project_structure import FRAMEWORK_PACKAGES
+
 GOD_MODULE_THRESHOLD = 10
+
+
+def _is_framework_node(node: str) -> bool:
+    """Return True if node is a known framework package (not an internal file)."""
+    # Bare name check: 'vue', 'react', 'django'
+    if node in FRAMEWORK_PACKAGES:
+        return True
+    # Stem check: covers paths like 'node_modules/vue' or just the basename
+    stem = Path(node).stem.lower()
+    if stem in FRAMEWORK_PACKAGES:
+        return True
+    return False
 
 
 def analyze_graph(edges: list[dict]) -> dict:
@@ -18,12 +34,17 @@ def analyze_graph(edges: list[dict]) -> dict:
     god_modules = [
         {'module': node, 'in_degree': deg}
         for node, deg in sorted(in_degrees.items(), key=lambda x: -x[1])
-        if deg >= GOD_MODULE_THRESHOLD
+        if deg >= GOD_MODULE_THRESHOLD and not _is_framework_node(node)
     ][:20]
 
-    # Hotspots: top 20 by combined in+out degree
+    # Hotspots: top 20 by combined in+out degree, excluding god modules
+    god_module_set = {m['module'] for m in god_modules}
     hotspots = sorted(
-        [{'file': n, 'degree': graph.degree(n)} for n in graph.nodes()],
+        [
+            {'file': n, 'degree': graph.degree(n)}
+            for n in graph.nodes()
+            if n not in god_module_set
+        ],
         key=lambda x: -x['degree'],
     )[:20]
 

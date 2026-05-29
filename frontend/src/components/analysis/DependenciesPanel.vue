@@ -1,9 +1,44 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import AppBadge from '../ui/AppBadge.vue'
 import AppCard from '../ui/AppCard.vue'
 import type { DepsData } from '../../stores/analysis'
+import { useTableFilter } from '../../composables/useTableFilter'
+import { KNOWN_FRAMEWORKS } from '../../composables/frameworkSignals'
 
-defineProps<{ deps: DepsData }>()
+type DevFilter = 'all' | 'prod' | 'dev'
+
+const props = defineProps<{ deps: DepsData }>()
+
+const devFilter = ref<DevFilter>('all')
+const showAllDeps = ref(false)
+
+function isFramework(name: string): boolean {
+  return name in KNOWN_FRAMEWORKS
+}
+
+const regularDepsAll = computed(() =>
+  props.deps.dependencies.filter(d => !isFramework(d.name))
+)
+
+const depsSource = computed(() => {
+  const base = showAllDeps.value ? props.deps.dependencies : regularDepsAll.value
+  const all = base as Record<string, unknown>[]
+  if (devFilter.value === 'dev') return all.filter(d => d.dev === true)
+  if (devFilter.value === 'prod') return all.filter(d => d.dev !== true)
+  return all
+})
+const dockerSource = computed(() => props.deps.docker_issues as Record<string, unknown>[])
+
+const depsFilter = useTableFilter(depsSource, ['name', 'source'], 'name', 'asc')
+const dockerFilter = useTableFilter(dockerSource, ['file', 'issue'], 'file', 'asc')
+
+function versionDisplay(spec: unknown): string {
+  if (!spec) return '—'
+  const s = String(spec)
+  if (s === 'catalog:' || s.startsWith('catalog:')) return 'pnpm catalog'
+  return s
+}
 </script>
 
 <template>
@@ -34,12 +69,24 @@ defineProps<{ deps: DepsData }>()
 
     <div v-if="deps.docker_issues.length" style="margin-bottom: 1.5rem">
       <h3 class="panel__title">Docker Issues</h3>
+      <input
+        v-model="dockerFilter.query.value"
+        class="table-search"
+        placeholder="Search docker issues…"
+      />
       <table class="data-table">
         <thead>
-          <tr><th>File</th><th>Issue</th></tr>
+          <tr>
+            <th class="runs-table__sortable" @click="dockerFilter.setSort('file')">
+              File {{ dockerFilter.sortIcon('file') }}
+            </th>
+            <th class="runs-table__sortable" @click="dockerFilter.setSort('issue')">
+              Issue {{ dockerFilter.sortIcon('issue') }}
+            </th>
+          </tr>
         </thead>
         <tbody>
-          <tr v-for="(issue, i) in deps.docker_issues" :key="i">
+          <tr v-for="(issue, i) in dockerFilter.filtered.value" :key="i">
             <td>{{ issue.file }}</td>
             <td><AppBadge variant="warning">{{ issue.issue }}</AppBadge></td>
           </tr>
@@ -48,15 +95,54 @@ defineProps<{ deps: DepsData }>()
     </div>
 
     <div v-if="deps.dependencies.length">
-      <h3 class="panel__title">All Dependencies</h3>
+      <h3 class="panel__title">
+        {{ showAllDeps ? 'All Dependencies' : 'Project Dependencies' }}
+        <button class="deps-show-toggle" @click="showAllDeps = !showAllDeps">
+          {{ showAllDeps ? 'Hide tech stack' : 'Show all' }}
+        </button>
+      </h3>
+      <div class="table-filter-bar">
+        <input
+          v-model="depsFilter.query.value"
+          class="table-search"
+          placeholder="Search packages…"
+          style="flex:1"
+        />
+        <div class="table-filter-bar__group">
+          <button
+            class="table-filter-bar__btn"
+            :class="{ 'table-filter-bar__btn--active': devFilter === 'all' }"
+            @click="devFilter = 'all'"
+          >All</button>
+          <button
+            class="table-filter-bar__btn"
+            :class="{ 'table-filter-bar__btn--active': devFilter === 'prod' }"
+            @click="devFilter = 'prod'"
+          >Prod</button>
+          <button
+            class="table-filter-bar__btn"
+            :class="{ 'table-filter-bar__btn--active': devFilter === 'dev' }"
+            @click="devFilter = 'dev'"
+          >Dev</button>
+        </div>
+      </div>
       <table class="data-table">
         <thead>
-          <tr><th>Package</th><th>Version</th><th>Source</th><th>Type</th></tr>
+          <tr>
+            <th class="runs-table__sortable" @click="depsFilter.setSort('name')">
+              Package {{ depsFilter.sortIcon('name') }}
+            </th>
+            <th>Version</th>
+            <th class="runs-table__sortable" @click="depsFilter.setSort('source')">
+              Source {{ depsFilter.sortIcon('source') }}
+            </th>
+            <th>Type</th>
+          </tr>
         </thead>
         <tbody>
-          <tr v-for="(dep, i) in deps.dependencies" :key="i">
+          <tr v-for="(dep, i) in depsFilter.filtered.value" :key="i">
             <td>{{ dep.name }}</td>
-            <td>{{ dep.version_spec || '—' }}</td>
+            <td>{{ versionDisplay(dep.version_spec) }}</td>
             <td>{{ dep.source }}</td>
             <td>
               <AppBadge v-if="dep.dev" variant="info">dev</AppBadge>

@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { marked } from 'marked'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
 import type { RunResult } from '../../stores/analysis'
+import { useTableFilter } from '../../composables/useTableFilter'
 
 const props = defineProps<{ result: RunResult }>()
 
 const { readme, structure, security, github_meta: gh, classification: cls } = props.result
+
+const hotFilesSource = computed(() => (structure?.hot_files ?? []) as Record<string, unknown>[])
+const hotFilesFilter = useTableFilter(hotFilesSource, ['file'], 'commit_count', 'desc')
 
 // Community file viewer
 const expandedFile = ref<string | null>(null)
@@ -16,7 +21,16 @@ function toggleFile(key: string) {
 }
 
 function fileContent(key: string): string | null {
+  if (key === 'readme') return readme?.content ?? null
   return structure?.community_files_content?.[key as keyof typeof structure.community_files_content] ?? null
+}
+
+function isMarkdown(key: string): boolean {
+  return key === 'readme'
+}
+
+function renderMarkdown(md: string): string {
+  return marked.parse(md) as string
 }
 
 const description = computed(() =>
@@ -110,7 +124,7 @@ function langColor(idx: number): string {
 }
 
 const communityFiles = computed(() => [
-  { key: null, label: 'README', present: readme?.found ?? false, icon: '📄' },
+  { key: 'readme', label: 'README', present: readme?.found ?? false, icon: '📄' },
   {
     key: 'license',
     label: structure?.license_type ? `License (${structure.license_type})` : 'License',
@@ -321,7 +335,12 @@ const communityFiles = computed(() => [
               {{ item.icon }} {{ item.label }}
               <button class="file-viewer__close" @click="expandedFile = null">✕</button>
             </div>
-            <pre class="file-viewer__content">{{ fileContent(item.key) }}</pre>
+            <div
+              v-if="isMarkdown(item.key)"
+              class="file-viewer__markdown"
+              v-html="renderMarkdown(fileContent(item.key)!)"
+            />
+            <pre v-else class="file-viewer__content">{{ fileContent(item.key) }}</pre>
           </div>
         </template>
       </AppCard>
@@ -408,23 +427,32 @@ const communityFiles = computed(() => [
       </AppCard>
     </section>
 
-    <!-- Top Contributors -->
-    <section v-if="structure?.top_contributors?.length" class="project-panel__section">
-      <h2 class="panel__title">Top Contributors <span class="panel__title-sub">(by files touched, last 300 commits)</span></h2>
+    <!-- Hot Files -->
+    <section v-if="structure?.hot_files?.length" class="project-panel__section">
+      <h2 class="panel__title">Hot Files <span class="panel__title-sub">(most changed, last 300 commits)</span></h2>
       <AppCard>
+        <input
+          v-model="hotFilesFilter.query.value"
+          class="table-search"
+          placeholder="Search files…"
+        />
         <table class="data-table">
           <thead>
             <tr>
               <th>#</th>
-              <th>Author</th>
-              <th>Files Touched</th>
+              <th class="runs-table__sortable" @click="hotFilesFilter.setSort('file')">
+                File {{ hotFilesFilter.sortIcon('file') }}
+              </th>
+              <th class="runs-table__sortable" @click="hotFilesFilter.setSort('commit_count')">
+                Times Changed {{ hotFilesFilter.sortIcon('commit_count') }}
+              </th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(contrib, idx) in structure.top_contributors" :key="contrib.author">
+            <tr v-for="(hf, idx) in (hotFilesFilter.filtered.value as any[])" :key="hf.file">
               <td>{{ idx + 1 }}</td>
-              <td>{{ contrib.author }}</td>
-              <td>{{ contrib.files_touched.toLocaleString() }}</td>
+              <td>{{ hf.file }}</td>
+              <td>{{ hf.commit_count.toLocaleString() }}</td>
             </tr>
           </tbody>
         </table>

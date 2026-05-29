@@ -84,6 +84,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 GITHUB_TOKEN = config('GITHUB_TOKEN', default='')
 REPO_CACHE_DIR = BASE_DIR.parent / config('REPO_CACHE_DIR', default='_running/repo_cache')
+STALE_AFTER_DAYS = config('STALE_AFTER_DAYS', default=7, cast=int)
 LOG_LEVEL = config('LOG_LEVEL', default='INFO')
 
 # Celery
@@ -93,6 +94,16 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
+
+# Celery Beat — periodic tasks
+from celery.schedules import crontab  # noqa: E402
+
+CELERY_BEAT_SCHEDULE = {
+    'check-stale-repos': {
+        'task': 'apps.analysis.tasks.check_stale_repos',
+        'schedule': crontab(minute=0, hour='*/6'),
+    },
+}
 
 # Logging
 LOG_DIR = REPO_ROOT / '_running' / 'logs'

@@ -1,10 +1,32 @@
 import logging
 import re
+from typing import Optional
 
 import requests
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+
+def fetch_latest_sha(owner: str, name: str, token: Optional[str] = None) -> Optional[str]:
+    headers = {'Accept': 'application/vnd.github.v3+json'}
+    effective_token = token or getattr(settings, 'GITHUB_TOKEN', '')
+    if effective_token:
+        headers['Authorization'] = f'Bearer {effective_token}'
+    try:
+        resp = requests.get(
+            f'https://api.github.com/repos/{owner}/{name}/commits',
+            params={'per_page': 1},
+            headers=headers,
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            if data:
+                return data[0]['sha']
+    except Exception:
+        logger.warning('Failed to fetch latest SHA for %s/%s', owner, name)
+    return None
 
 
 def _fetch_contributors(owner: str, name: str, headers: dict) -> list[dict]:
@@ -31,11 +53,11 @@ def _fetch_contributors(owner: str, name: str, headers: dict) -> list[dict]:
         return []
 
 
-def fetch_github_meta(owner: str, name: str) -> dict:
+def fetch_github_meta(owner: str, name: str, token: Optional[str] = None) -> dict:
     headers: dict[str, str] = {'Accept': 'application/vnd.github+json'}
-    token = getattr(settings, 'GITHUB_TOKEN', '')
-    if token:
-        headers['Authorization'] = f'Bearer {token}'
+    effective_token = token or getattr(settings, 'GITHUB_TOKEN', '')
+    if effective_token:
+        headers['Authorization'] = f'Bearer {effective_token}'
 
     base_url = f'https://api.github.com/repos/{owner}/{name}'
 

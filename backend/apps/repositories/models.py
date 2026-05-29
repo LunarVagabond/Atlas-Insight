@@ -9,6 +9,8 @@ class Repository(models.Model):
     name = models.CharField(max_length=255)
     last_commit_sha = models.CharField(max_length=40, blank=True, default='')
     last_analyzed_at = models.DateTimeField(null=True, blank=True)
+    last_fetched_at = models.DateTimeField(null=True, blank=True)
+    is_stale = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
