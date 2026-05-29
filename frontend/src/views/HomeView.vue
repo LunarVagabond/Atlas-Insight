@@ -100,7 +100,7 @@ const unpinnedItems = computed(() => items.value.filter(r => !watchlist.value.ha
     <main class="hero hero--compact">
       <h1 class="hero__title">Atlas <span>Insight</span></h1>
       <p class="hero__subtitle">
-        Submit any public GitHub repository and get a deep analysis of its commit history,
+        Paste a repository URL and get a deep analysis of its commit history,
         architecture, dependencies, and health signals.
       </p>
       <URLInputForm

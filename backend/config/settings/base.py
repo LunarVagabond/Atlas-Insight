@@ -47,6 +47,8 @@ INSTALLED_APPS = [
     'apps.repositories.apps.RepositoriesConfig',
     'apps.analysis.apps.AnalysisConfig',
     'apps.api.apps.ApiConfig',
+    'django_celery_results',
+    'django_celery_beat',
 ]
 
 MIDDLEWARE = [
@@ -162,11 +164,13 @@ LOG_LEVEL = config('LOG_LEVEL', default='INFO')
 
 # Celery
 CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:4502/0')
-CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://localhost:4502/1')
+CELERY_RESULT_BACKEND = 'django-db'
+CELERY_CACHE_BACKEND = 'django-cache'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
 # Celery Beat — periodic tasks
 from celery.schedules import crontab  # noqa: E402

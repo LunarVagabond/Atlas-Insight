@@ -13,3 +13,5 @@ packaging>=24
 uuid7>=0.1.0  # imports as uuid_extensions
 django-allauth[socialaccount]>=65.0
 django-cors-headers>=4.0
+django-celery-results>=2.5
+django-celery-beat>=2.6
