@@ -84,6 +84,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 GITHUB_TOKEN = config('GITHUB_TOKEN', default='')
 REPO_CACHE_DIR = BASE_DIR.parent / config('REPO_CACHE_DIR', default='_running/repo_cache')
+LOG_LEVEL = config('LOG_LEVEL', default='INFO')
 
 # Celery
 CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:4502/0')
@@ -140,17 +141,17 @@ LOGGING = {
         },
         'celery': {
             'handlers': ['console', 'celery_file'],
-            'level': 'INFO',
+            'level': LOG_LEVEL,
             'propagate': False,
         },
         'apps': {
             'handlers': ['console', 'django_file'],
-            'level': 'INFO',
+            'level': LOG_LEVEL,
             'propagate': False,
         },
     },
     'root': {
         'handlers': ['console'],
-        'level': 'WARNING',
+        'level': LOG_LEVEL,
     },
 }
