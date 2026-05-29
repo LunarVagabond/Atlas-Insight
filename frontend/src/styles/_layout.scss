@@ -13,8 +13,14 @@
 
 .page {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: var(--color-bg);
   color: var(--color-text);
+
+  &__main {
+    flex: 1;
+  }
 }
 
 .navbar {
@@ -70,6 +76,10 @@
 .hero {
   text-align: center;
   padding: $space-20 $space-6 $space-16;
+
+  &--compact {
+    padding-bottom: $space-10;
+  }
 
   &__title {
     font-size: clamp(2rem, 5vw, 3.5rem);
@@ -227,4 +237,50 @@
     font-size: 0.875rem;
     color: var(--color-text-secondary);
   }
+}
+
+.home-runs {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 $space-6 $space-12;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: $space-4;
+    margin-bottom: $space-5;
+    padding-bottom: $space-4;
+    border-top: 1px solid var(--color-border);
+    padding-top: $space-8;
+  }
+
+  &__title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text);
+    white-space: nowrap;
+  }
+
+  &__controls {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    flex: 1;
+    flex-wrap: wrap;
+  }
+
+  &__compare-hint {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+  }
+}
+
+.app-footer {
+  text-align: center;
+  padding: $space-5 $space-6;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
 }

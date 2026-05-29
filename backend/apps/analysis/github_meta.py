@@ -125,51 +125,84 @@ _CONTRIBUTION_LABELS = frozenset({
 })
 
 
+_FEATURE_LABEL_CANDIDATES = [
+    'enhancement', 'feature', 'feature request', 'feature-request',
+    'type: enhancement', 'type: feature',
+]
+
+
+def _parse_issues(raw: list, seen: set[int]) -> list[dict]:
+    results = []
+    for issue in raw:
+        if 'pull_request' in issue or issue['number'] in seen:
+            continue
+        issue_labels = {lbl['name'].lower() for lbl in issue.get('labels', [])}
+        if not issue_labels & _CONTRIBUTION_LABELS:
+            continue
+        seen.add(issue['number'])
+        results.append({
+            'number': issue['number'],
+            'title': issue['title'],
+            'url': issue['html_url'],
+            'labels': sorted(issue_labels),
+            'body_excerpt': (issue.get('body') or '')[:300],
+        })
+    return results
+
+
 def fetch_contribution_data(owner: str, name: str, headers: dict) -> dict | None:
     """Fetch relevant issues + open PRs for contribution analysis.
-    Hard limit: 2 API calls. Returns None on rate limit or error."""
+    3 API calls max: contribution issues, feature/enhancement issues, open PRs.
+    Returns None on rate limit or error."""
     import re as _re
     base_url = f'https://api.github.com/repos/{owner}/{name}'
     try:
-        issues_r = requests.get(
+        seen: set[int] = set()
+        issues: list[dict] = []
+
+        # Call 1: recently-updated issues (catches good first issue, help wanted)
+        r1 = requests.get(
             f'{base_url}/issues',
             params={'state': 'open', 'per_page': 100, 'sort': 'updated'},
             headers=headers,
             timeout=10,
         )
-        if issues_r.status_code == 403:
+        if r1.status_code == 403:
             logger.warning('GitHub rate limit hit fetching contribution data for %s/%s', owner, name)
             return None
-        issues = []
-        if issues_r.status_code == 200:
-            for issue in issues_r.json():
-                if 'pull_request' in issue:
-                    continue
-                issue_labels = {lbl['name'].lower() for lbl in issue.get('labels', [])}
-                if not issue_labels & _CONTRIBUTION_LABELS:
-                    continue
-                issues.append({
-                    'number': issue['number'],
-                    'title': issue['title'],
-                    'url': issue['html_url'],
-                    'labels': sorted(issue_labels),
-                    'body_excerpt': (issue.get('body') or '')[:300],
-                })
+        if r1.status_code == 200:
+            issues.extend(_parse_issues(r1.json(), seen))
 
-        pr_issue_refs: list[int] = []
-        prs_r = requests.get(
+        # Call 2: enhancement/feature labeled issues specifically
+        # Try each candidate label until we find one that returns results
+        for feature_label in _FEATURE_LABEL_CANDIDATES:
+            r2 = requests.get(
+                f'{base_url}/issues',
+                params={'state': 'open', 'labels': feature_label, 'per_page': 50, 'sort': 'updated'},
+                headers=headers,
+                timeout=10,
+            )
+            if r2.status_code == 403:
+                break
+            if r2.status_code == 200 and r2.json():
+                issues.extend(_parse_issues(r2.json(), seen))
+                break  # found a working label, stop trying
+
+        # Call 3: open PRs for cross-referencing
+        pr_issue_refs: set[int] = set()
+        r3 = requests.get(
             f'{base_url}/pulls',
             params={'state': 'open', 'per_page': 100},
             headers=headers,
             timeout=10,
         )
-        if prs_r.status_code == 200:
-            for pr in prs_r.json():
+        if r3.status_code == 200:
+            for pr in r3.json():
                 text = f"{pr.get('title', '')} {pr.get('body') or ''}"
                 for m in _re.finditer(r'#(\d+)', text):
-                    pr_issue_refs.append(int(m.group(1)))
+                    pr_issue_refs.add(int(m.group(1)))
 
-        return {'issues': issues, 'pr_issue_refs': list(set(pr_issue_refs))}
+        return {'issues': issues, 'pr_issue_refs': list(pr_issue_refs)}
     except Exception as exc:
         logger.warning('fetch_contribution_data failed for %s/%s: %s', owner, name, exc)
         return None
