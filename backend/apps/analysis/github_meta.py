@@ -91,6 +91,8 @@ def fetch_github_meta(owner: str, name: str, token: Optional[str] = None) -> dic
 
     contributors = _fetch_contributors(owner, name, headers)
 
+    contribution_data = fetch_contribution_data(owner, name, headers)
+
     return {
         'stars': data.get('stargazers_count', 0),
         'forks': data.get('forks_count', 0),
@@ -112,4 +114,62 @@ def fetch_github_meta(owner: str, name: str, token: Optional[str] = None) -> dic
         'pushed_at': data.get('pushed_at'),
         'homepage': data.get('homepage') or None,
         'contributors': contributors,
+        'contribution_data': contribution_data,
     }
+
+
+_CONTRIBUTION_LABELS = frozenset({
+    'good first issue', 'help wanted', 'hacktoberfest', 'up for grabs',
+    'enhancement', 'feature', 'feature request', 'feature-request',
+    'type: enhancement', 'type: feature', 'type:enhancement', 'type:feature',
+})
+
+
+def fetch_contribution_data(owner: str, name: str, headers: dict) -> dict | None:
+    """Fetch relevant issues + open PRs for contribution analysis.
+    Hard limit: 2 API calls. Returns None on rate limit or error."""
+    import re as _re
+    base_url = f'https://api.github.com/repos/{owner}/{name}'
+    try:
+        issues_r = requests.get(
+            f'{base_url}/issues',
+            params={'state': 'open', 'per_page': 100, 'sort': 'updated'},
+            headers=headers,
+            timeout=10,
+        )
+        if issues_r.status_code == 403:
+            logger.warning('GitHub rate limit hit fetching contribution data for %s/%s', owner, name)
+            return None
+        issues = []
+        if issues_r.status_code == 200:
+            for issue in issues_r.json():
+                if 'pull_request' in issue:
+                    continue
+                issue_labels = {lbl['name'].lower() for lbl in issue.get('labels', [])}
+                if not issue_labels & _CONTRIBUTION_LABELS:
+                    continue
+                issues.append({
+                    'number': issue['number'],
+                    'title': issue['title'],
+                    'url': issue['html_url'],
+                    'labels': sorted(issue_labels),
+                    'body_excerpt': (issue.get('body') or '')[:300],
+                })
+
+        pr_issue_refs: list[int] = []
+        prs_r = requests.get(
+            f'{base_url}/pulls',
+            params={'state': 'open', 'per_page': 100},
+            headers=headers,
+            timeout=10,
+        )
+        if prs_r.status_code == 200:
+            for pr in prs_r.json():
+                text = f"{pr.get('title', '')} {pr.get('body') or ''}"
+                for m in _re.finditer(r'#(\d+)', text):
+                    pr_issue_refs.append(int(m.group(1)))
+
+        return {'issues': issues, 'pr_issue_refs': list(set(pr_issue_refs))}
+    except Exception as exc:
+        logger.warning('fetch_contribution_data failed for %s/%s: %s', owner, name, exc)
+        return None

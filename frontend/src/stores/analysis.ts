@@ -14,6 +14,19 @@ export interface AnalysisRun {
   last_fetched_at: string | null
 }
 
+export interface ContributionOpportunity {
+  id: string
+  title: string
+  description: string
+  difficulty: 'beginner' | 'intermediate' | 'advanced'
+  risk: 'low' | 'medium' | 'high'
+  category: 'documentation' | 'testing' | 'ci' | 'community' | 'refactoring' | 'security' | 'dependencies' | 'github-issue' | 'feature'
+  issue_url?: string
+  issue_number?: number
+  has_open_pr?: boolean
+  labels?: string[]
+}
+
 export interface RunResult {
   commits: CommitData
   graph: GraphData
@@ -24,6 +37,7 @@ export interface RunResult {
   security?: SecurityData
   github_meta?: GitHubMeta
   classification?: Classification
+  contribution_opportunities?: ContributionOpportunity[]
   error?: string
 }
 
@@ -172,12 +186,26 @@ export interface DepsData {
   missing_lockfile_warnings: string[]
 }
 
+export type HeuristicSignalKey =
+  | 'burnout'
+  | 'abandonment_risk'
+  | 'monolith_growth'
+  | 'dependency_health'
+  | 'documentation_quality'
+  | 'ci_health'
+  | 'bus_factor_risk'
+  | 'security_hygiene'
+  | 'release_cadence'
+  | 'community_health'
+  | 'commit_velocity'
+
 export interface HeuristicSignal {
-  signal: string
+  signal: HeuristicSignalKey
   label: string
   score: number
   confidence: 'low' | 'medium' | 'high'
   description: string
+  items?: string[]
 }
 
 export interface RunListItem {

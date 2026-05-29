@@ -39,10 +39,24 @@ def scan_security(repo_obj: Repo, repo_dir: str) -> dict:
                 continue
             for pattern, severity, label in SENSITIVE_GIT_PATTERNS:
                 if re.search(pattern, tf_lower, re.IGNORECASE) and label not in seen:
+                    commit_sha = None
+                    commit_author = None
+                    try:
+                        log_line = repo_obj.git.log(
+                            '-1', '--pretty=format:%h|||%an', '--', tracked_file
+                        )
+                        if log_line and '|||' in log_line:
+                            sha_part, author_part = log_line.split('|||', 1)
+                            commit_sha = sha_part.strip() or None
+                            commit_author = author_part.strip() or None
+                    except Exception:
+                        pass
                     issues.append({
                         'severity': severity,
                         'type': 'sensitive_file_committed',
                         'detail': f'{label}: {tracked_file}',
+                        'commit_sha': commit_sha,
+                        'commit_author': commit_author,
                     })
                     seen.add(label)
                     break

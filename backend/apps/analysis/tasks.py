@@ -6,6 +6,7 @@ from django.utils import timezone
 from apps.repositories.models import AnalysisRun
 
 from .classifications import classify_repo
+from .contribution_analysis import analyze_contributions
 from .commit_analysis import analyze_commits
 from .dep_report import analyze_dependencies
 from .git_ops import clone_or_fetch
@@ -44,6 +45,7 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
         structure = analyze_structure(repo_obj, repo_dir, deps=deps)
         security = scan_security(repo_obj, repo_dir)
         github_meta = fetch_github_meta(run.repo.owner, run.repo.name, token=pat)
+        contribution_data = github_meta.pop('contribution_data', None)
 
         signals = compute_heuristics(commits, graph, deps, readme, structure, security)
         classification = classify_repo(
@@ -60,6 +62,7 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
             'security': security,
             'github_meta': github_meta,
             'classification': classification,
+            'contribution_opportunities': analyze_contributions(commits, graph, deps, readme, structure, security, contribution_data),
         }
         run.status = 'completed'
 

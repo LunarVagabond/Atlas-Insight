@@ -12,13 +12,14 @@ import DependencyGraphView from '../components/analysis/DependencyGraphView.vue'
 import DependenciesPanel from '../components/analysis/DependenciesPanel.vue'
 import HeuristicsPanel from '../components/analysis/HeuristicsPanel.vue'
 import ProjectPanel from '../components/analysis/ProjectPanel.vue'
+import ContributingPanel from '../components/analysis/ContributingPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
 const store = useAnalysisStore()
 const runId = route.params.runId as string
 
-const TABS = ['Overview', 'Project', 'Architecture', 'Dependencies', 'Timeline', 'Heuristics']
+const TABS = ['Overview', 'Project', 'Architecture', 'Dependencies', 'Timeline', 'Heuristics', 'Contributing']
 const activeTab = ref('Overview')
 
 onMounted(async () => {
@@ -74,6 +75,7 @@ const isPolling = computed(() => ['pending', 'running'].includes(store.run?.stat
         <DependenciesPanel v-if="activeTab === 'Dependencies'" :deps="result.dependencies" />
         <CommitTimelineChart v-if="activeTab === 'Timeline'" :commits="result.commits" />
         <HeuristicsPanel v-if="activeTab === 'Heuristics'" :signals="result.heuristics" />
+        <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" />
       </div>
     </div>
   </div>

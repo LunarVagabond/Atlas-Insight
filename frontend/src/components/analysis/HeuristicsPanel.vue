@@ -1,8 +1,30 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import AppCard from '../ui/AppCard.vue'
-import type { HeuristicSignal } from '../../stores/analysis'
+import HeuristicDrawer from './HeuristicDrawer.vue'
+import type { HeuristicSignal, HeuristicSignalKey } from '../../stores/analysis'
 
 defineProps<{ signals: HeuristicSignal[] }>()
+
+const active = ref<HeuristicSignal | null>(null)
+
+const SIGNAL_ICONS: Record<HeuristicSignalKey, string> = {
+  burnout:               '🔥',
+  abandonment_risk:      '💤',
+  monolith_growth:       '🏗️',
+  dependency_health:     '📦',
+  documentation_quality: '📝',
+  ci_health:             '⚙️',
+  bus_factor_risk:       '🚌',
+  security_hygiene:      '🔒',
+  release_cadence:       '🏷️',
+  community_health:      '🤝',
+  commit_velocity:       '📈',
+}
+
+function icon(signal: HeuristicSignalKey): string {
+  return SIGNAL_ICONS[signal] ?? '📊'
+}
 
 function level(score: number): 'low' | 'medium' | 'high' {
   if (score < 30) return 'low'
@@ -25,12 +47,16 @@ function riskLabel(score: number): string {
         v-for="signal in signals"
         :key="signal.signal"
         elevated
-        :class="['heuristic-card', `heuristic-card--${level(signal.score)}`]"
+        :class="['heuristic-card', `heuristic-card--${level(signal.score)}`, 'heuristic-card--clickable']"
+        @click="active = signal"
       >
         <div class="heuristic">
           <div class="heuristic__top">
             <div class="heuristic__title-group">
-              <span class="heuristic__label">{{ signal.label }}</span>
+              <div class="heuristic__icon-label">
+                <span class="heuristic__icon">{{ icon(signal.signal) }}</span>
+                <span class="heuristic__label">{{ signal.label }}</span>
+              </div>
               <span :class="['heuristic__risk', `heuristic__risk--${level(signal.score)}`]">
                 {{ riskLabel(signal.score) }}
               </span>
@@ -39,7 +65,7 @@ function riskLabel(score: number): string {
               <span :class="['heuristic__score-number', `heuristic__score-number--${level(signal.score)}`]">
                 {{ signal.score }}
               </span>
-              <span class="heuristic__score-label">out of 100</span>
+              <span class="heuristic__score-label">/ 100</span>
             </div>
           </div>
 
@@ -50,14 +76,15 @@ function riskLabel(score: number): string {
             />
           </div>
 
-          <p class="heuristic__description">{{ signal.description }}</p>
-
           <div class="heuristic__footer">
             <span :class="['heuristic__confidence-dot', `heuristic__confidence-dot--${signal.confidence}`]" />
             <span class="heuristic__confidence-text">{{ signal.confidence }} confidence</span>
+            <span class="heuristic__details-hint">Details →</span>
           </div>
         </div>
       </AppCard>
     </div>
+
+    <HeuristicDrawer :signal="active" @close="active = null" />
   </div>
 </template>
