@@ -36,6 +36,7 @@ class RunStatusSchema(Schema):
     repo_name: str
     is_stale: bool
     last_fetched_at: Optional[str]
+    auth_token_warning: str
 
 
 class AnalyzeResponse(Schema):
@@ -123,7 +124,7 @@ def analyze(request, payload: AnalyzeRequest):
         repo.name = name
         repo.save(update_fields=['owner', 'name'])
 
-    token = _resolve_token(request, payload.pat)
+    token = _resolve_token(request, payload.pat) or repo.auth_token or None
     latest_sha = fetch_latest_sha(owner, name, token=token)
 
     if latest_sha and latest_sha == repo.last_commit_sha:
@@ -227,6 +228,7 @@ def get_run(request, run_id: uuid.UUID):
         repo_name=run.repo.name,
         is_stale=run.repo.is_stale,
         last_fetched_at=run.repo.last_fetched_at.isoformat() if run.repo.last_fetched_at else None,
+        auth_token_warning=run.repo.auth_token_warning,
     )
 
 
@@ -237,7 +239,7 @@ def retry_run(request, run_id: uuid.UUID):
         original = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
         raise HttpError(404, 'Run not found')
-    token = _resolve_token(request, None)
+    token = _resolve_token(request, None) or original.repo.auth_token or None
     user = request.user if request.user.is_authenticated else None
     run = AnalysisRun.objects.create(repo=original.repo, status='pending', user=user)
     task = analyze_repository.delay(str(run.id), pat=token)

@@ -115,7 +115,12 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
         repo.last_fetched_at = fetched_at
         repo.is_stale = False
         repo.is_private = github_meta.get('is_private', False)
-        repo.save(update_fields=['last_commit_sha', 'last_analyzed_at', 'last_fetched_at', 'is_stale', 'is_private'])
+        update_fields = ['last_commit_sha', 'last_analyzed_at', 'last_fetched_at', 'is_stale', 'is_private']
+        if pat and pat != repo.auth_token:
+            repo.auth_token = pat
+            repo.auth_token_warning = ''
+            update_fields += ['auth_token', 'auth_token_warning']
+        repo.save(update_fields=update_fields)
         logger.info('Analysis completed for run %s', run_id)
 
     except Exception as exc:
@@ -124,6 +129,19 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
         import git as _git
         if isinstance(exc, PermissionError):
             friendly = str(exc)
+            # Stored token caused an auth failure — remove it and warn the user.
+            try:
+                _repo = run.repo
+                if _repo.auth_token:
+                    _repo.auth_token = ''
+                    _repo.auth_token_warning = (
+                        'A stored access token for this repository is no longer valid '
+                        'and has been removed. Re-submit with a new Personal Access Token '
+                        'to re-analyze private repositories.'
+                    )
+                    _repo.save(update_fields=['auth_token', 'auth_token_warning'])
+            except Exception:
+                pass
         elif isinstance(exc, _git.GitCommandError):
             friendly = (
                 'Failed to clone or fetch the repository. '

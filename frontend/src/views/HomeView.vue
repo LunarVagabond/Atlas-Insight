@@ -13,6 +13,8 @@ import type { RunListItem } from '../stores/analysis'
 const router = useRouter()
 const store = useAnalysisStore()
 
+onMounted(() => { store.error = null })
+
 async function handleSubmit(url: string, pat?: string) {
   try {
     const runId = await store.submitUrl(url, pat)

@@ -13,6 +13,8 @@ class Repository(models.Model):
     last_fetched_at = models.DateTimeField(null=True, blank=True)
     is_stale = models.BooleanField(default=False)
     is_private = models.BooleanField(default=False)
+    auth_token = models.CharField(max_length=255, blank=True, default='')
+    auth_token_warning = models.CharField(max_length=500, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

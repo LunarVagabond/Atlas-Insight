@@ -151,6 +151,12 @@
   animation: spin 0.7s linear infinite;
   flex-shrink: 0;
 
+  &--sm {
+    width: 14px;
+    height: 14px;
+    border-width: 2px;
+  }
+
   &--lg {
     width: 40px;
     height: 40px;

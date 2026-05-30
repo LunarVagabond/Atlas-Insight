@@ -12,6 +12,7 @@ export interface AnalysisRun {
   repo_name: string
   is_stale: boolean
   last_fetched_at: string | null
+  auth_token_warning: string
 }
 
 export interface RoadmapMilestone {
@@ -248,6 +249,7 @@ export const useAnalysisStore = defineStore('analysis', {
     currentRunId: null as string | null,
     status: 'idle' as 'idle' | 'submitting' | 'polling' | 'done' | 'error',
     run: null as AnalysisRun | null,
+    staleRun: null as AnalysisRun | null,
     error: null as string | null,
     _pollInterval: null as ReturnType<typeof setInterval> | null,
   }),
@@ -274,6 +276,9 @@ export const useAnalysisStore = defineStore('analysis', {
 
     async pollRun(runId: string) {
       this.currentRunId = runId
+      if (this.run?.status === 'completed') {
+        this.staleRun = this.run
+      }
       this.run = null
       this.error = null
       this.status = 'polling'
@@ -295,6 +300,7 @@ export const useAnalysisStore = defineStore('analysis', {
         await this._fetchRun(runId)
         if (this.run?.status === 'completed') {
           this.status = 'done'
+          this.staleRun = null
           this._stopPolling()
         } else if (this.run?.status === 'failed') {
           this.status = 'error'
@@ -334,6 +340,7 @@ export const useAnalysisStore = defineStore('analysis', {
       this.currentRunId = null
       this.status = 'idle'
       this.run = null
+      this.staleRun = null
       this.error = null
     },
   },

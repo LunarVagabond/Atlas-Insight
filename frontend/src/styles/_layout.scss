@@ -594,6 +594,48 @@
   }
 }
 
+.analysis-inline-error {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  padding: $space-3 $space-4;
+  margin-bottom: $space-4;
+  background: rgba(var(--color-danger-rgb, 239, 68, 68), 0.08);
+  border: 1px solid rgba(var(--color-danger-rgb, 239, 68, 68), 0.3);
+  border-radius: $radius-md;
+  font-size: 0.875rem;
+  color: var(--color-text);
+
+  &__icon {
+    flex-shrink: 0;
+    color: #ef4444;
+    font-weight: 700;
+  }
+}
+
+.analysis-stale-banner {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  padding: $space-3 $space-4;
+  margin-bottom: $space-4;
+  background: rgba(var(--color-accent-rgb, 99, 102, 241), 0.07);
+  border: 1px solid rgba(var(--color-accent-rgb, 99, 102, 241), 0.25);
+  border-radius: $radius-md;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.analysis-token-warning {
+  padding: $space-3 $space-4;
+  margin-bottom: $space-4;
+  background: rgba(234, 179, 8, 0.08);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  border-radius: $radius-md;
+  font-size: 0.875rem;
+  color: var(--color-text);
+}
+
 // ===== SECURITY PANEL =====
 .security-panel {
   &__signal-row {

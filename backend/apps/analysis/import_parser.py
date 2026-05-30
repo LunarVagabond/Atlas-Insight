@@ -119,7 +119,7 @@ def parse_imports(repo_dir: str) -> list[dict]:
                     if dep:
                         for d in dep.split(','):
                             parts = d.strip().split()
-                            if parts and not _is_external_python(parts[0]):
+                            if parts and not parts[0].startswith('.') and not _is_external_python(parts[0]):
                                 edges.append(
                                     {'source': source, 'target': parts[0], 'lang': 'python'}
                                 )

@@ -53,6 +53,10 @@ def _is_auth_error(exc: git.GitCommandError) -> bool:
         'repository not found',
         'write access to repository not granted',
         'remote: write access',
+        'returned error: 401',
+        'returned error: 403',
+        'returned error: 404',
+        'http error',
     ))
 
 

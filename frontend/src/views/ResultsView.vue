@@ -20,10 +20,11 @@ const route = useRoute()
 const router = useRouter()
 const store = useAnalysisStore()
 const runId = computed(() => route.params.runId as string)
-const result = computed(() => store.run?.result)
+const result = computed(() => store.run?.result ?? store.staleRun?.result)
+const isStaleResult = computed(() => !store.run?.result && !!store.staleRun?.result)
 const isPolling = computed(() => ['pending', 'running'].includes(store.run?.status ?? ''))
 const isInitialLoading = computed(() => store.status === 'polling' && !store.run)
-const showProgress = computed(() => isInitialLoading.value || isPolling.value)
+const showProgress = computed(() => (isInitialLoading.value || isPolling.value) && !isStaleResult.value)
 
 const ANALYSIS_STEPS = [
   'Connecting to GitHub…',
@@ -156,7 +157,7 @@ function copyLink() {
       </div>
     </div>
 
-    <div v-if="!showProgress && store.status === 'error'" class="results-layout__content">
+    <div v-if="store.status === 'error' && !result" class="results-layout__content">
       <div class="analysis-error-card">
         <div class="analysis-error-card__icon">✕</div>
         <h2 class="analysis-error-card__title">Analysis Failed</h2>
@@ -171,7 +172,18 @@ function copyLink() {
     </div>
 
     <Transition name="fade">
-    <div v-if="!showProgress && result" class="results-layout__content">
+    <div v-if="result" class="results-layout__content">
+      <div v-if="store.status === 'error'" class="analysis-inline-error">
+        <span class="analysis-inline-error__icon">✕</span>
+        {{ store.error || 'Re-analysis failed.' }}
+        <span> Showing last successful results.</span>
+      </div>
+      <div v-else-if="isStaleResult || (isPolling || isInitialLoading)" class="analysis-stale-banner">
+        <span class="spinner spinner--sm" /> New analysis in progress — showing previous results.
+      </div>
+      <div v-if="store.run?.auth_token_warning" class="analysis-token-warning">
+        {{ store.run.auth_token_warning }}
+      </div>
       <AppTabs :tabs="TABS" v-model="activeTab" />
       <div style="margin-top: 1.5rem">
         <OverviewPanel v-if="activeTab === 'Overview'" :result="result" />
