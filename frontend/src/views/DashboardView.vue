@@ -190,6 +190,7 @@ async function handleDelete(run: RunListItem) {
                     ↻
                   </AppButton>
                   <button
+                    v-if="run.is_private"
                     class="btn btn--danger"
                     @click.stop="handleDelete(run)"
                     title="Delete run"

@@ -126,23 +126,25 @@ const langBarColors = ['#0969da', '#2da44e', '#e36209', '#8250df']
       <span v-for="topic in gh.topics" :key="topic" class="overview-topics__tag">{{ topic }}</span>
     </div>
 
-    <!-- Language mini-bars -->
+    <!-- Language bar + legend -->
     <div v-if="topLanguages.length" class="overview-langs">
-      <div
-        v-for="(lang, idx) in topLanguages"
-        :key="lang.name"
-        class="overview-langs__segment"
-        :style="{ width: `${lang.pct}%` }"
-      >
+      <div class="overview-langs__bar-row">
         <div
-          class="overview-langs__bar"
-          :style="{ background: langBarColors[idx] }"
+          v-for="(lang, idx) in topLanguages"
+          :key="lang.name"
+          class="overview-langs__segment"
+          :style="{ width: `${lang.pct}%` }"
           :title="`${lang.name}: ${lang.pct}%`"
-        />
-        <div class="overview-langs__label">
+        >
+          <div class="overview-langs__bar" :style="{ background: langBarColors[idx] }" />
+        </div>
+      </div>
+      <div class="overview-langs__legend">
+        <span v-for="(lang, idx) in topLanguages" :key="lang.name" class="overview-langs__legend-item">
+          <span class="overview-langs__dot" :style="{ background: langBarColors[idx] }" />
           <span class="overview-langs__name">{{ lang.name }}</span>
           <span class="overview-langs__pct">{{ lang.pct }}%</span>
-        </div>
+        </span>
       </div>
     </div>
   </div>

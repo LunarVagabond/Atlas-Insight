@@ -156,6 +156,27 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
     run.completed_at = timezone.now()
     run.save(update_fields=['status', 'result', 'completed_at'])
 
+    # Fire webhook if configured
+    if run.webhook_url:
+        try:
+            import requests as _requests
+            _requests.post(
+                run.webhook_url,
+                json={
+                    'run_id': str(run.id),
+                    'status': run.status,
+                    'repo_url': run.repo.url,
+                    'repo_owner': run.repo.owner,
+                    'repo_name': run.repo.name,
+                    'completed_at': run.completed_at.isoformat() if run.completed_at else None,
+                    'error': run.result.get('error') if run.result else None,
+                },
+                timeout=10,
+                headers={'Content-Type': 'application/json', 'User-Agent': 'AtlasInsight/1.0'},
+            )
+        except Exception:
+            logger.warning('Webhook POST failed for run %s → %s', run.id, run.webhook_url)
+
 
 @shared_task
 def check_stale_repos():

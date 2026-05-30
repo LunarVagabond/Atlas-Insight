@@ -50,6 +50,26 @@
     flex: 1;
   }
 
+  &__nav-links {
+    display: flex;
+    align-items: center;
+    gap: $space-1;
+    margin-right: $space-4;
+  }
+
+  &__nav-link {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    padding: 4px 10px;
+    border-radius: $radius-md;
+    transition: color $transition-fast, background $transition-fast;
+
+    &:hover { color: var(--color-text); background: var(--color-surface-hover); }
+    &.router-link-active { color: var(--color-accent); }
+  }
+
   &__actions {
     display: flex;
     align-items: center;

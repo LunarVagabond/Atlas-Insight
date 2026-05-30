@@ -25,6 +25,7 @@ GITHUB_URL_RE = re.compile(
 class AnalyzeRequest(Schema):
     url: str
     pat: Optional[str] = None
+    webhook_url: Optional[str] = None
 
 
 class RunStatusSchema(Schema):
@@ -56,6 +57,7 @@ class RunListItemSchema(Schema):
     repo_owner: str
     repo_name: str
     is_stale: bool
+    is_private: bool
     last_fetched_at: Optional[str]
     tags: list[str] = []
 
@@ -140,7 +142,7 @@ def analyze(request, payload: AnalyzeRequest):
         # latest run is failed/pending/running — fall through and re-queue
 
     user = request.user if request.user.is_authenticated else None
-    run = AnalysisRun.objects.create(repo=repo, status='pending', user=user)
+    run = AnalysisRun.objects.create(repo=repo, status='pending', user=user, webhook_url=payload.webhook_url or '')
     task = analyze_repository.delay(str(run.id), pat=token)
     run.celery_task_id = task.id
     run.save(update_fields=['celery_task_id'])
@@ -209,6 +211,7 @@ def list_runs(
                 repo_owner=r.repo.owner,
                 repo_name=r.repo.name,
                 is_stale=r.repo.is_stale,
+                is_private=r.repo.is_private,
                 last_fetched_at=r.repo.last_fetched_at.isoformat() if r.repo.last_fetched_at else None,
                 tags=r.result.get('classification', {}).get('tags', []) if r.result else [],
             )
@@ -290,6 +293,8 @@ def delete_run(request, run_id: uuid.UUID):
         run = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
         raise HttpError(404, 'Run not found')
+    if not run.repo.is_private:
+        raise HttpError(403, 'Only private repository runs can be deleted')
     if run.user != request.user:
         raise HttpError(403, 'Access denied')
     repo = run.repo
@@ -357,6 +362,43 @@ def _make_svg(label: str, value: str, color: str) -> str:
         f'<text x="{vx}" y="14">{value}</text>'
         f'</g></svg>'
     )
+
+
+@router.get('/admin/stats')
+def admin_stats(request):
+    import os
+    from django.conf import settings as django_settings
+    if not request.user.is_staff:
+        raise HttpError(403, 'Staff only')
+
+    cache_dir = django_settings.REPO_CACHE_DIR
+    cache_size_bytes = 0
+    repo_clone_count = 0
+    if os.path.isdir(cache_dir):
+        for entry in os.scandir(cache_dir):
+            if entry.is_dir():
+                repo_clone_count += 1
+                for root, dirs, files in os.walk(entry.path):
+                    for f in files:
+                        try:
+                            cache_size_bytes += os.path.getsize(os.path.join(root, f))
+                        except OSError:
+                            pass
+
+    from django.db.models import Count
+    status_counts = dict(
+        AnalysisRun.objects.values_list('status').annotate(c=Count('id')).values_list('status', 'c')
+    )
+
+    return {
+        'total_repos': Repository.objects.count(),
+        'total_runs': AnalysisRun.objects.count(),
+        'queue_depth': status_counts.get('pending', 0) + status_counts.get('running', 0),
+        'failed_runs': status_counts.get('failed', 0),
+        'completed_runs': status_counts.get('completed', 0),
+        'repo_clone_count': repo_clone_count,
+        'cache_size_gb': round(cache_size_bytes / (1024 ** 3), 2),
+    }
 
 
 @router.get('/badge/{owner}/{name}.svg')

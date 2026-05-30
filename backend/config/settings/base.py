@@ -52,6 +52,8 @@ INSTALLED_APPS = [
     'django_ratelimit',
 ]
 
+SILENCED_SYSTEM_CHECKS = ['django_ratelimit.W001']
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',

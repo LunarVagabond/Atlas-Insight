@@ -39,6 +39,10 @@ const menuOpen = ref(false)
         Atlas <span>Insight</span>
       </RouterLink>
       <div class="navbar__spacer" />
+      <div class="navbar__nav-links">
+        <RouterLink to="/runs" class="navbar__nav-link">Browse</RouterLink>
+        <RouterLink v-if="authStore.isAuthenticated" to="/dashboard" class="navbar__nav-link">My Analyses</RouterLink>
+      </div>
       <div class="navbar__actions">
         <button class="theme-toggle" @click="toggleTheme" :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'">
           {{ isDark ? '☀️' : '🌙' }}

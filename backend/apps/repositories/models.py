@@ -44,6 +44,7 @@ class AnalysisRun(models.Model):
     completed_at = models.DateTimeField(null=True, blank=True)
     result = models.JSONField(null=True, blank=True)
     celery_task_id = models.CharField(max_length=255, blank=True, default='')
+    webhook_url = models.URLField(blank=True, default='')
 
     def __str__(self):
         return f'{self.repo} run {self.pk} ({self.status})'
