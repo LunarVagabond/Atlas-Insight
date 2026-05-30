@@ -275,6 +275,7 @@ export const useAnalysisStore = defineStore('analysis', {
       this.status = 'submitting'
       this.error = null
       this.run = null
+      this.staleRun = null
       try {
         const { data } = await axios.post('/api/v1/repositories/analyze', { url, pat: pat || undefined })
         this.currentRunId = data.run_id
@@ -291,9 +292,7 @@ export const useAnalysisStore = defineStore('analysis', {
 
     async pollRun(runId: string) {
       this.currentRunId = runId
-      if (this.run?.status === 'completed') {
-        this.staleRun = this.run
-      }
+      this.staleRun = null
       this.run = null
       this.error = null
       this.status = 'polling'

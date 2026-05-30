@@ -227,7 +227,7 @@ const langBarColors = ['#0969da', '#2da44e', '#e36209', '#8250df']
       </div>
     </div>
 
-    <div class="overview-readme">
+    <div v-if="availableCommunityTabs.length" class="overview-readme">
       <h3 class="overview-readme__title">Community Files</h3>
       <AppCard>
         <div class="overview-readme__tabs">
@@ -247,9 +247,6 @@ const langBarColors = ['#0969da', '#2da44e', '#e36209', '#8250df']
           class="file-viewer__markdown overview-readme__content"
           v-html="renderMarkdown(selectedTabData.content.slice(0, 24_000))"
         />
-        <div v-else class="overview-readme__empty">
-          <AppBadge variant="warning">Not Found</AppBadge>
-        </div>
       </AppCard>
     </div>
   </div>
