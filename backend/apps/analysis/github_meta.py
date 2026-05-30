@@ -91,6 +91,7 @@ def fetch_github_meta(owner: str, name: str, token: Optional[str] = None) -> dic
     contributors = _fetch_contributors(owner, name, headers)
     contribution_data = fetch_contribution_data(owner, name, headers)
     releases_meta = _fetch_releases_meta(owner, name, headers)
+    github_languages = _fetch_languages(owner, name, headers)
 
     return {
         'stars': data.get('stargazers_count', 0),
@@ -116,7 +117,36 @@ def fetch_github_meta(owner: str, name: str, token: Optional[str] = None) -> dic
         'contributors': contributors,
         'contribution_data': contribution_data,
         'releases_meta': releases_meta,
+        'github_languages': github_languages,
     }
+
+
+def _fetch_languages(owner: str, name: str, headers: dict) -> list[dict]:
+    """Fetch language breakdown from GitHub Linguist (byte counts, same as GitHub UI)."""
+    try:
+        r = requests.get(
+            f'https://api.github.com/repos/{owner}/{name}/languages',
+            headers=headers,
+            timeout=10,
+        )
+        if r.status_code != 200:
+            return []
+        raw = r.json()  # {"TypeScript": 123456, "Vue": 23456, ...}
+        total_bytes = sum(raw.values()) or 1
+        return sorted(
+            [
+                {
+                    'name': lang,
+                    'bytes': b,
+                    'pct': round(b / total_bytes * 100, 1),
+                }
+                for lang, b in raw.items()
+            ],
+            key=lambda x: -x['bytes'],
+        )
+    except Exception:
+        logger.warning('Failed to fetch languages for %s/%s', owner, name)
+        return []
 
 
 def _fetch_releases_meta(owner: str, name: str, headers: dict) -> dict | None:

@@ -285,7 +285,7 @@ const communityFiles = computed(() => [
               <span class="lang-item__dot" :style="{ background: langColor(idx) }" />
               <span class="lang-item__name">{{ lang.name }}</span>
               <span class="lang-item__pct">{{ lang.pct }}%</span>
-              <span class="lang-item__files">{{ lang.files.toLocaleString() }} files</span>
+              <span v-if="lang.files != null" class="lang-item__files">{{ lang.files.toLocaleString() }} files</span>
             </div>
             <div class="lang-bar">
               <div

@@ -74,8 +74,35 @@ def _resolve_token(request, pat: Optional[str]) -> Optional[str]:
             account__provider='github',
         ).first()
         if social:
-            return social.token
+            token = social.token
+            if not _token_has_repo_scope(token):
+                raise HttpError(
+                    403,
+                    'Your GitHub authorization is missing the "repo" scope required to '
+                    'access private repositories. Please disconnect and reconnect your '
+                    'GitHub account to re-authorize with the correct permissions.',
+                )
+            return token
     return None
+
+
+def _token_has_repo_scope(token: str) -> bool:
+    """Check GitHub API headers to confirm token has 'repo' scope."""
+    try:
+        import requests as _requests
+        r = _requests.get(
+            'https://api.github.com/user',
+            headers={
+                'Authorization': f'Bearer {token}',
+                'Accept': 'application/vnd.github+json',
+            },
+            timeout=5,
+        )
+        scopes = r.headers.get('X-OAuth-Scopes', '')
+        return 'repo' in [s.strip() for s in scopes.split(',')]
+    except Exception:
+        # Network error — don't block the request; let clone fail naturally
+        return True
 
 
 @router.post('/analyze', response=AnalyzeResponse)

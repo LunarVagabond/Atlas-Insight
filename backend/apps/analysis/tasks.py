@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime, timezone as _tz
 
 from celery import shared_task
 from django.utils import timezone
@@ -66,6 +67,28 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
         security = scan_security(repo_obj, repo_dir)
         github_meta = fetch_github_meta(run.repo.owner, run.repo.name, token=pat)
         contribution_data = github_meta.pop('contribution_data', None)
+        github_languages = github_meta.pop('github_languages', None)
+
+        # GitHub is authoritative for anything it provides — replace locally-computed values
+        if github_languages:
+            structure['languages'] = github_languages
+
+        releases_meta = github_meta.get('releases_meta')
+        if releases_meta:
+            structure['release_count'] = releases_meta.get('stable_count', structure['release_count'])
+            if releases_meta.get('latest_stable'):
+                structure['last_release'] = {
+                    'name': releases_meta['latest_stable']['name'],
+                    'date': releases_meta['latest_stable']['date'],
+                }
+
+        created_at = github_meta.get('created_at')
+        if created_at:
+            try:
+                created_dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                structure['repo_age_days'] = (datetime.now(_tz.utc) - created_dt).days
+            except Exception:
+                pass
 
         signals = compute_heuristics(commits, graph, deps, readme, structure, security)
         classification = classify_repo(

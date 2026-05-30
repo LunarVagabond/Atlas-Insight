@@ -69,9 +69,10 @@ export interface ReadmeData {
 
 export interface LanguageInfo {
   name: string
-  files: number
-  lines: number
   pct: number
+  files?: number
+  lines?: number
+  bytes?: number
 }
 
 export interface CommunityFilesContent {

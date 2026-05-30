@@ -37,7 +37,15 @@ def _inject_pat(url: str, pat: str) -> str:
 
 def _is_auth_error(exc: git.GitCommandError) -> bool:
     msg = str(exc).lower()
-    return any(p in msg for p in ('terminal prompts disabled', 'authentication failed', 'could not read username', 'access denied', 'repository not found'))
+    return any(p in msg for p in (
+        'terminal prompts disabled',
+        'authentication failed',
+        'could not read username',
+        'access denied',
+        'repository not found',
+        'write access to repository not granted',
+        'remote: write access',
+    ))
 
 
 def clone_or_fetch(url: str, pat: Optional[str] = None) -> tuple:

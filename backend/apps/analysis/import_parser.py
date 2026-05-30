@@ -126,7 +126,8 @@ def parse_imports(repo_dir: str) -> list[dict]:
             elif ext in {'.js', '.ts', '.jsx', '.tsx', '.mjs'}:
                 for m in JS_IMPORT.finditer(content):
                     dep = m.group(1) or m.group(2)
-                    if dep and not _is_external_js(dep):
+                    # "." / ".." are directory-index imports, not graph nodes
+                    if dep and dep not in {'.', '..'} and not _is_external_js(dep):
                         edges.append({'source': source, 'target': dep, 'lang': 'js'})
             elif ext == '.go':
                 in_block = False
