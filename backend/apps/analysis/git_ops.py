@@ -60,6 +60,22 @@ def _is_auth_error(exc: git.GitCommandError) -> bool:
     ))
 
 
+def _sync_to_origin_head(repo: git.Repo) -> str:
+    """Make cached clone match origin's default branch and return checked-out SHA."""
+    # Resolve origin/HEAD -> refs/remotes/origin/<default-branch>
+    origin_head = repo.git.symbolic_ref('refs/remotes/origin/HEAD').strip()
+    branch = origin_head.rsplit('/', 1)[-1]
+
+    # Ensure local branch points at origin/<branch>, then clean stale files.
+    if branch in repo.heads:
+        repo.git.checkout(branch)
+    else:
+        repo.git.checkout('-B', branch, f'origin/{branch}')
+    repo.git.reset('--hard', f'origin/{branch}')
+    repo.git.clean('-fdx')
+    return repo.head.commit.hexsha
+
+
 def clone_or_fetch(url: str, pat: Optional[str] = None) -> tuple:
     cache_path = get_cache_path(url)
     clone_url = _inject_pat(url, pat) if pat else url
@@ -88,7 +104,7 @@ def clone_or_fetch(url: str, pat: Optional[str] = None) -> tuple:
                 raise
             if pat:
                 repo.remotes.origin.set_url(url)
-            sha = repo.head.commit.hexsha
+            sha = _sync_to_origin_head(repo)
             return repo, sha, timezone.now()
 
     # Fresh clone (or after wipe above)

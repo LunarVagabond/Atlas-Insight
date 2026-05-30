@@ -9,6 +9,13 @@ const props = defineProps<{ result: RunResult }>()
 
 const { readme, structure, github_meta: gh, classification: cls } = props.result
 
+interface DisplayLink {
+  label: string
+  url: string
+  description: string
+  badge: string
+}
+
 // Community file viewer
 const expandedFile = ref<string | null>(null)
 
@@ -132,6 +139,104 @@ const communityFiles = computed(() => [
   { key: 'coc', label: 'Code of Conduct', present: !!structure?.has_coc, icon: '🌐' },
   { key: 'security', label: 'Security Policy', present: !!structure?.has_security_policy, icon: '🔒' },
 ])
+
+function isDocsLikeUrl(url: string): boolean {
+  const low = url.toLowerCase()
+  return low.includes('docs.') || low.includes('/docs') || low.includes('/documentation') || low.includes('/wiki') || low.includes('readthedocs') || low.includes('confluence.') || low.includes('notion.so')
+}
+
+function pushUniqueLink(target: DisplayLink[], link: DisplayLink): void {
+  if (target.some((it) => it.url === link.url)) return
+  target.push(link)
+}
+
+function hostLabel(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
+}
+
+const docsLinks = computed<DisplayLink[]>(() => {
+  const links: DisplayLink[] = []
+
+  for (const link of readme?.docs_links ?? []) {
+    pushUniqueLink(links, {
+      label: link.label || hostLabel(link.url),
+      url: link.url,
+      description: link.description || 'Documentation reference found in README',
+      badge: 'Docs',
+    })
+  }
+
+  if (gh?.homepage && isDocsLikeUrl(gh.homepage)) {
+    pushUniqueLink(links, {
+      label: 'Project Docs',
+      url: gh.homepage,
+      description: 'Repository homepage appears to be documentation',
+      badge: 'Homepage',
+    })
+  }
+
+  if (gh?.has_wiki && gh?.html_url) {
+    pushUniqueLink(links, {
+      label: 'GitHub Wiki',
+      url: `${gh.html_url}/wiki`,
+      description: 'Built-in wiki pages for setup and guides',
+      badge: 'Wiki',
+    })
+  }
+
+  return links
+})
+
+const interactionLinks = computed<DisplayLink[]>(() => {
+  const links: DisplayLink[] = []
+
+  for (const link of readme?.social_links ?? []) {
+    pushUniqueLink(links, {
+      label: link.label || link.platform || hostLabel(link.url),
+      url: link.url,
+      description: link.description || 'Community channel found in README',
+      badge: link.platform || 'Social',
+    })
+  }
+
+  if (gh?.html_url) {
+    pushUniqueLink(links, {
+      label: 'Issues',
+      url: `${gh.html_url}/issues`,
+      description: 'Report bugs and request features',
+      badge: 'GitHub',
+    })
+    pushUniqueLink(links, {
+      label: 'Pull Requests',
+      url: `${gh.html_url}/pulls`,
+      description: 'Review active contribution work',
+      badge: 'GitHub',
+    })
+    if (gh.has_discussions) {
+      pushUniqueLink(links, {
+        label: 'Discussions',
+        url: `${gh.html_url}/discussions`,
+        description: 'Ask questions and discuss ideas',
+        badge: 'Forum',
+      })
+    }
+  }
+
+  if (gh?.homepage && !isDocsLikeUrl(gh.homepage)) {
+    pushUniqueLink(links, {
+      label: 'Project Website',
+      url: gh.homepage,
+      description: 'Official project website',
+      badge: 'Website',
+    })
+  }
+
+  return links
+})
 </script>
 
 <template>
@@ -151,6 +256,62 @@ const communityFiles = computed(() => [
         >
           🔗 {{ gh.homepage }}
         </a>
+      </AppCard>
+    </section>
+
+    <!-- Documentation -->
+    <section class="project-panel__section">
+      <h2 class="panel__title">Documentation</h2>
+      <AppCard>
+        <div v-if="docsLinks.length" class="project-links">
+          <a
+            v-for="link in docsLinks"
+            :key="link.url"
+            :href="link.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="project-links__item"
+          >
+            <div class="project-links__top">
+              <AppBadge variant="info">{{ link.badge }}</AppBadge>
+              <span class="project-links__label">{{ link.label }}</span>
+            </div>
+            <div class="project-links__desc">{{ link.description }}</div>
+            <div class="project-links__url">{{ link.url }}</div>
+          </a>
+        </div>
+        <div v-else class="project-empty">
+          <AppBadge variant="failed">Not Found</AppBadge>
+          <p class="project-empty__text">No documentation links were detected in repository metadata or README.</p>
+        </div>
+      </AppCard>
+    </section>
+
+    <!-- How to Interact -->
+    <section class="project-panel__section">
+      <h2 class="panel__title">How To Interact</h2>
+      <AppCard>
+        <div v-if="interactionLinks.length" class="project-links">
+          <a
+            v-for="link in interactionLinks"
+            :key="link.url"
+            :href="link.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="project-links__item"
+          >
+            <div class="project-links__top">
+              <AppBadge variant="completed">{{ link.badge }}</AppBadge>
+              <span class="project-links__label">{{ link.label }}</span>
+            </div>
+            <div class="project-links__desc">{{ link.description }}</div>
+            <div class="project-links__url">{{ link.url }}</div>
+          </a>
+        </div>
+        <div v-else class="project-empty">
+          <AppBadge variant="warning">Not Found</AppBadge>
+          <p class="project-empty__text">No social or community links were detected from this repository.</p>
+        </div>
       </AppCard>
     </section>
 

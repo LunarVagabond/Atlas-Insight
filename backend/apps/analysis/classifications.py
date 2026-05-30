@@ -31,7 +31,7 @@ DOC_THRESHOLDS = [
     (30, 'good', 'Good'),
     (50, 'fair', 'Fair'),
     (75, 'poor', 'Poor'),
-    (101, 'missing', 'Missing'),
+    (101, 'missing', 'Not Found'),
 ]
 
 

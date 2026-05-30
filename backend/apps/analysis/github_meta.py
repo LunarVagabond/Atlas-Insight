@@ -94,6 +94,7 @@ def fetch_github_meta(owner: str, name: str, token: Optional[str] = None) -> dic
     github_languages = _fetch_languages(owner, name, headers)
 
     return {
+        'html_url': data.get('html_url'),
         'stars': data.get('stargazers_count', 0),
         'forks': data.get('forks_count', 0),
         'open_issues': data.get('open_issues_count', 0),

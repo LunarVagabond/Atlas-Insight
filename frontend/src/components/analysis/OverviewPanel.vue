@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { marked } from 'marked'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
 import type { RunResult } from '../../stores/analysis'
 
 const props = defineProps<{ result: RunResult }>()
 
-const { commits, heuristics, github_meta: gh, structure, classification: cls } = props.result
+const { commits, heuristics, github_meta: gh, structure, classification: cls, readme } = props.result
 
 const overallScore = Math.round(
   heuristics.reduce((acc, h) => acc + h.score, 0) / (heuristics.length || 1)
@@ -25,6 +26,71 @@ function formatStat(n: number): string {
 }
 
 const topLanguages = computed(() => structure?.languages?.slice(0, 4) ?? [])
+
+interface QuickLink {
+  label: string
+  url: string
+  variant: 'info' | 'completed'
+}
+
+function pushQuickLink(target: QuickLink[], link: QuickLink): void {
+  if (target.some((it) => it.url === link.url)) return
+  target.push(link)
+}
+
+const overviewInteractionLinks = computed<QuickLink[]>(() => {
+  const links: QuickLink[] = []
+
+  for (const link of readme?.social_links ?? []) {
+    pushQuickLink(links, {
+      label: link.platform || link.label,
+      url: link.url,
+      variant: 'completed',
+    })
+  }
+
+  if (gh?.html_url) {
+    pushQuickLink(links, { label: 'Issues', url: `${gh.html_url}/issues`, variant: 'info' })
+    if (gh.has_discussions) {
+      pushQuickLink(links, { label: 'Discussions', url: `${gh.html_url}/discussions`, variant: 'info' })
+    }
+    if (gh.has_wiki) {
+      pushQuickLink(links, { label: 'Wiki', url: `${gh.html_url}/wiki`, variant: 'info' })
+    }
+  }
+
+  return links.slice(0, 6)
+})
+
+interface CommunityTab {
+  key: 'readme' | 'contributing' | 'license' | 'changelog' | 'coc' | 'security'
+  label: string
+  content: string | null
+}
+
+const selectedTab = ref<CommunityTab['key']>('readme')
+
+const communityTabs = computed<CommunityTab[]>(() => [
+  { key: 'readme', label: 'README', content: readme?.content ?? null },
+  { key: 'contributing', label: 'Contributing', content: structure?.community_files_content?.contributing ?? null },
+  { key: 'license', label: 'License', content: structure?.community_files_content?.license ?? null },
+  { key: 'changelog', label: 'Changelog', content: structure?.community_files_content?.changelog ?? null },
+  { key: 'coc', label: 'Code of Conduct', content: structure?.community_files_content?.coc ?? null },
+  { key: 'security', label: 'Security Policy', content: structure?.community_files_content?.security ?? null },
+])
+
+const availableCommunityTabs = computed<CommunityTab[]>(() =>
+  communityTabs.value.filter((tab) => !!tab.content?.trim())
+)
+
+const selectedTabData = computed(() => {
+  const current = availableCommunityTabs.value.find((tab) => tab.key === selectedTab.value)
+  return current ?? availableCommunityTabs.value[0]
+})
+
+function renderMarkdown(md: string): string {
+  return marked.parse(md, { async: false }) as string
+}
 
 const langBarColors = ['#0969da', '#2da44e', '#e36209', '#8250df']
 </script>
@@ -126,6 +192,19 @@ const langBarColors = ['#0969da', '#2da44e', '#e36209', '#8250df']
       <span v-for="topic in gh.topics" :key="topic" class="overview-topics__tag">{{ topic }}</span>
     </div>
 
+    <div v-if="overviewInteractionLinks.length" class="overview-links">
+      <a
+        v-for="link in overviewInteractionLinks"
+        :key="link.url"
+        :href="link.url"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="overview-links__item"
+      >
+        <AppBadge :variant="link.variant">{{ link.label }}</AppBadge>
+      </a>
+    </div>
+
     <!-- Language bar + legend -->
     <div v-if="topLanguages.length" class="overview-langs">
       <div class="overview-langs__bar-row">
@@ -146,6 +225,32 @@ const langBarColors = ['#0969da', '#2da44e', '#e36209', '#8250df']
           <span class="overview-langs__pct">{{ lang.pct }}%</span>
         </span>
       </div>
+    </div>
+
+    <div class="overview-readme">
+      <h3 class="overview-readme__title">Community Files</h3>
+      <AppCard>
+        <div class="overview-readme__tabs">
+          <button
+            v-for="tab in availableCommunityTabs"
+            :key="tab.key"
+            type="button"
+            :class="['overview-readme__tab', selectedTab === tab.key ? 'overview-readme__tab--active' : '']"
+            @click="selectedTab = tab.key"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
+
+        <div
+          v-if="selectedTabData?.content"
+          class="file-viewer__markdown overview-readme__content"
+          v-html="renderMarkdown(selectedTabData.content.slice(0, 24_000))"
+        />
+        <div v-else class="overview-readme__empty">
+          <AppBadge variant="warning">Not Found</AppBadge>
+        </div>
+      </AppCard>
     </div>
   </div>
 </template>

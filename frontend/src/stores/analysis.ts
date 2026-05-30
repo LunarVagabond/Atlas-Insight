@@ -67,6 +67,16 @@ export interface ReadmeData {
   has_changelog: boolean
   has_license: boolean
   has_api_docs: boolean
+  docs_links: LinkSignal[]
+  social_links: LinkSignal[]
+}
+
+export interface LinkSignal {
+  label: string
+  url: string
+  source: string
+  description?: string
+  platform?: string
 }
 
 export interface LanguageInfo {
@@ -138,6 +148,7 @@ export interface GitHubContributor {
 }
 
 export interface GitHubMeta {
+  html_url: string | null
   stars: number
   forks: number
   open_issues: number

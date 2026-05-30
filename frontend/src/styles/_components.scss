@@ -971,6 +971,69 @@
   }
 }
 
+.overview-links {
+  margin-top: $space-4;
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-2;
+
+  &__item {
+    text-decoration: none;
+  }
+}
+
+.overview-readme {
+  margin-top: $space-5;
+
+  &__title {
+    margin: 0 0 $space-3;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  &__content {
+    max-height: 440px;
+    overflow-y: auto;
+  }
+
+  &__tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-2;
+    margin-bottom: $space-3;
+  }
+
+  &__tab {
+    padding: 6px 10px;
+    border-radius: $radius-sm;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: background $transition-fast, border-color $transition-fast, color $transition-fast;
+
+    &:hover {
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+    }
+
+    &--active {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: #fff;
+    }
+  }
+
+  &__empty {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 80px;
+  }
+}
+
 // ===== ARCHITECTURE PANEL =====
 .arch-panel {
   position: relative;
@@ -1416,6 +1479,69 @@
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: $space-3;
   margin-bottom: $space-2;
+}
+
+.project-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: $space-3;
+
+  &__item {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+    padding: $space-3;
+    border: 1px solid var(--color-border);
+    border-radius: $radius-md;
+    text-decoration: none;
+    color: inherit;
+    background: var(--color-bg);
+    transition: border-color $transition-fast, box-shadow $transition-fast;
+
+    &:hover {
+      border-color: var(--color-accent);
+      box-shadow: 0 3px 10px var(--color-shadow);
+    }
+  }
+
+  &__top {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+  }
+
+  &__label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  &__desc {
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+  }
+
+  &__url {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.project-empty {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+  align-items: flex-start;
+
+  &__text {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+  }
 }
 
 .health-item {

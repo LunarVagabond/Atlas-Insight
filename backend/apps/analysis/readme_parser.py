@@ -7,6 +7,29 @@ README_CANDIDATES = [
     'Readme.md', 'Readme.rst',
 ]
 
+DOC_LINK_PATTERNS = [
+    (r'(^|\.)docs\.', 'Docs Site', 'Documentation website'),
+    (r'readthedocs\.io', 'Read the Docs', 'Read the Docs hosted documentation'),
+    (r'confluence\.', 'Confluence', 'Confluence knowledge base'),
+    (r'notion\.so', 'Notion', 'Notion docs workspace'),
+    (r'/wiki(/|$)', 'Wiki', 'Project wiki'),
+    (r'/docs(/|$)', 'Docs', 'Documentation section'),
+    (r'/documentation(/|$)', 'Documentation', 'Documentation section'),
+]
+
+SOCIAL_LINK_PATTERNS = [
+    (r'discord\.gg|discord\.com/invite', 'Discord', 'Community chat'),
+    (r'slack\.com|slack\.com/invite', 'Slack', 'Team and community chat'),
+    (r'twitter\.com|x\.com', 'X', 'Project updates and announcements'),
+    (r'linkedin\.com', 'LinkedIn', 'Organization profile'),
+    (r'reddit\.com/r/', 'Reddit', 'Community forum'),
+    (r'youtube\.com|youtu\.be', 'YouTube', 'Video content and demos'),
+    (r't\.me|telegram\.me|telegram\.org', 'Telegram', 'Community channel'),
+    (r'matrix\.to|matrix\.org', 'Matrix', 'Open chat network'),
+    (r'gitter\.im', 'Gitter', 'Developer chat room'),
+    (r'mastodon\.', 'Mastodon', 'Decentralized social profile'),
+]
+
 
 def parse_readme(repo_dir: str) -> dict:
     base = Path(repo_dir)
@@ -32,6 +55,8 @@ def parse_readme(repo_dir: str) -> dict:
             'has_changelog': False,
             'has_license': False,
             'has_api_docs': False,
+            'docs_links': [],
+            'social_links': [],
         }
 
     try:
@@ -46,6 +71,7 @@ def parse_readme(repo_dir: str) -> dict:
     ]
     badge_count = len(re.findall(r'\[!\[', content))
     lower = content.lower()
+    links = _extract_links(content)
 
     return {
         'found': True,
@@ -61,6 +87,8 @@ def parse_readme(repo_dir: str) -> dict:
         'has_changelog': bool(re.search(r'\bchangelog\b|\bhistory\b|\brelease.notes\b', lower)),
         'has_license': bool(re.search(r'\blicen[sc]e\b', lower)),
         'has_api_docs': bool(re.search(r'\bapi\b|\bapi.reference\b|\bendpoints\b', lower)),
+        'docs_links': _detect_docs_links(links),
+        'social_links': _detect_social_links(links),
     }
 
 
@@ -100,3 +128,68 @@ def _extract_description(content: str) -> str | None:
         else:
             result = truncated.rstrip() + '…'
     return result
+
+
+def _extract_links(content: str) -> list[str]:
+    links: list[str] = []
+    seen: set[str] = set()
+
+    def _add(url: str) -> None:
+        clean = url.strip().rstrip(').,;!\"\'')
+        if clean.startswith('http://') or clean.startswith('https://'):
+            if clean not in seen:
+                seen.add(clean)
+                links.append(clean)
+
+    for match in re.finditer(r'\[[^\]]+\]\((https?://[^)\s]+)\)', content):
+        _add(match.group(1))
+
+    for match in re.finditer(r'https?://[^\s<>)\]]+', content):
+        _add(match.group(0))
+
+    return links[:150]
+
+
+def _detect_docs_links(links: list[str]) -> list[dict]:
+    results: list[dict] = []
+    for url in links:
+        low = url.lower()
+        for pattern, label, description in DOC_LINK_PATTERNS:
+            if re.search(pattern, low):
+                results.append({
+                    'label': label,
+                    'url': url,
+                    'source': 'readme',
+                    'description': description,
+                })
+                break
+    return _dedupe_link_dicts(results)
+
+
+def _detect_social_links(links: list[str]) -> list[dict]:
+    results: list[dict] = []
+    for url in links:
+        low = url.lower()
+        for pattern, platform, description in SOCIAL_LINK_PATTERNS:
+            if re.search(pattern, low):
+                results.append({
+                    'platform': platform,
+                    'label': platform,
+                    'url': url,
+                    'source': 'readme',
+                    'description': description,
+                })
+                break
+    return _dedupe_link_dicts(results)
+
+
+def _dedupe_link_dicts(items: list[dict]) -> list[dict]:
+    seen: set[str] = set()
+    deduped: list[dict] = []
+    for item in items:
+        url = item.get('url')
+        if not isinstance(url, str) or url in seen:
+            continue
+        seen.add(url)
+        deduped.append(item)
+    return deduped
