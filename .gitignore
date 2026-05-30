@@ -39,3 +39,8 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+*.pem
+*.key
+id_rsa
+*.log
