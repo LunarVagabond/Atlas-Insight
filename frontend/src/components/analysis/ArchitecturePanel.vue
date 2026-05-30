@@ -5,7 +5,10 @@ import AppBadge from '../ui/AppBadge.vue'
 import type { GraphData } from '../../stores/analysis'
 import { useTableFilter } from '../../composables/useTableFilter'
 
-const props = defineProps<{ graph: GraphData }>()
+const props = defineProps<{ graph: GraphData; hotFiles?: { file: string; commit_count: number }[] }>()
+
+const hotFilesSource = computed(() => (props.hotFiles ?? []) as Record<string, unknown>[])
+const hotFilesFilter = useTableFilter(hotFilesSource, ['file'], 'commit_count', 'desc')
 
 const godModuleSource = computed(() => props.graph.god_modules)
 const hotspotSource = computed(() => props.graph.hotspots)
@@ -180,6 +183,27 @@ const explorerResults = computed(() => {
           >
             <td>{{ h.file }}</td>
             <td>{{ h.degree }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div v-if="hotFiles?.length" style="margin-top: 1.5rem">
+      <h3 class="panel__title">Hot Files <span style="font-size:0.75rem;font-weight:400;color:var(--color-text-muted)">(most changed, last 300 commits)</span></h3>
+      <input v-model="hotFilesFilter.query.value" class="table-search" placeholder="Search files…" />
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th class="runs-table__sortable" @click="hotFilesFilter.setSort('file')">File {{ hotFilesFilter.sortIcon('file') }}</th>
+            <th class="runs-table__sortable" @click="hotFilesFilter.setSort('commit_count')">Times Changed {{ hotFilesFilter.sortIcon('commit_count') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(hf, idx) in (hotFilesFilter.filtered.value as any[])" :key="hf.file">
+            <td>{{ idx + 1 }}</td>
+            <td>{{ hf.file }}</td>
+            <td>{{ hf.commit_count.toLocaleString() }}</td>
           </tr>
         </tbody>
       </table>

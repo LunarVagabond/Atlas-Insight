@@ -121,7 +121,19 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
     except Exception as exc:
         logger.exception('Analysis failed for run %s', run_id)
         run.status = 'failed'
-        run.result = {'error': str(exc)}
+        import git as _git
+        if isinstance(exc, PermissionError):
+            friendly = str(exc)
+        elif isinstance(exc, _git.GitCommandError):
+            friendly = (
+                'Failed to clone or fetch the repository. '
+                'It may be private, deleted, or temporarily unavailable.'
+            )
+        elif isinstance(exc, ValueError):
+            friendly = str(exc)
+        else:
+            friendly = 'An unexpected error occurred during analysis. Please try again.'
+        run.result = {'error': friendly}
 
     run.completed_at = timezone.now()
     run.save(update_fields=['status', 'result', 'completed_at'])

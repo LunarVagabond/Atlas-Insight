@@ -4,14 +4,10 @@ import { marked } from 'marked'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
 import type { RunResult } from '../../stores/analysis'
-import { useTableFilter } from '../../composables/useTableFilter'
 
 const props = defineProps<{ result: RunResult }>()
 
-const { readme, structure, security, github_meta: gh, classification: cls } = props.result
-
-const hotFilesSource = computed(() => (structure?.hot_files ?? []) as Record<string, unknown>[])
-const hotFilesFilter = useTableFilter(hotFilesSource, ['file'], 'commit_count', 'desc')
+const { readme, structure, github_meta: gh, classification: cls } = props.result
 
 // Community file viewer
 const expandedFile = ref<string | null>(null)
@@ -450,56 +446,5 @@ const communityFiles = computed(() => [
       </AppCard>
     </section>
 
-    <!-- Hot Files -->
-    <section v-if="structure?.hot_files?.length" class="project-panel__section">
-      <h2 class="panel__title">Hot Files <span class="panel__title-sub">(most changed, last 300 commits)</span></h2>
-      <AppCard>
-        <input
-          v-model="hotFilesFilter.query.value"
-          class="table-search"
-          placeholder="Search files…"
-        />
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th class="runs-table__sortable" @click="hotFilesFilter.setSort('file')">
-                File {{ hotFilesFilter.sortIcon('file') }}
-              </th>
-              <th class="runs-table__sortable" @click="hotFilesFilter.setSort('commit_count')">
-                Times Changed {{ hotFilesFilter.sortIcon('commit_count') }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(hf, idx) in (hotFilesFilter.filtered.value as any[])" :key="hf.file">
-              <td>{{ idx + 1 }}</td>
-              <td>{{ hf.file }}</td>
-              <td>{{ hf.commit_count.toLocaleString() }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </AppCard>
-    </section>
-
-    <!-- Security Issues -->
-    <section v-if="security?.issues?.length" class="project-panel__section">
-      <h2 class="panel__title">Security Concerns</h2>
-      <AppCard>
-        <div
-          v-for="issue in security.issues"
-          :key="issue.detail"
-          class="security-issue"
-          :class="`security-issue--${issue.severity}`"
-        >
-          <AppBadge
-            :variant="issue.severity === 'high' ? 'failed' : issue.severity === 'medium' ? 'warning' : 'info'"
-          >
-            {{ issue.severity }}
-          </AppBadge>
-          <span class="security-issue__detail">{{ issue.detail }}</span>
-        </div>
-      </AppCard>
-    </section>
   </div>
 </template>

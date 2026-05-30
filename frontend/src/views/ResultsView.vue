@@ -14,6 +14,7 @@ import HeuristicsPanel from '../components/analysis/HeuristicsPanel.vue'
 import ProjectPanel from '../components/analysis/ProjectPanel.vue'
 import ContributingPanel from '../components/analysis/ContributingPanel.vue'
 import RoadmapTimeline from '../components/analysis/RoadmapTimeline.vue'
+import SecurityPanel from '../components/analysis/SecurityPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -49,11 +50,7 @@ watch(isPolling, (polling) => {
 }, { immediate: true })
 
 const hasRoadmap = computed(() => (result.value?.structure?.roadmap_parsed?.milestones?.length ?? 0) > 0)
-const TABS = computed(() => {
-  const base = ['Overview', 'Project', 'Architecture', 'Dependencies', 'Timeline', 'Heuristics', 'Contributing']
-  if (hasRoadmap.value) base.push('Roadmap')
-  return base
-})
+const TABS = computed(() => ['Overview', 'Project', 'Architecture', 'Dependencies', 'Security', 'History', 'Heuristics', 'Contributing'])
 
 const activeTab = ref((route.query.tab as string) || 'Overview')
 
@@ -160,12 +157,16 @@ function copyLink() {
     </div>
 
     <div v-if="!showProgress && store.status === 'error'" class="results-layout__content">
-      <div class="empty-state">
-        <p>Analysis failed. {{ store.error }}</p>
-        <p v-if="store.error && /private|access|403|permission|inaccessible|denied/i.test(store.error)" class="results-error-pat">
-          This repository may require a Personal Access Token.
-          <a href="/" class="results-error-pat__link">Go back and use the PAT option</a> when submitting.
-        </p>
+      <div class="analysis-error-card">
+        <div class="analysis-error-card__icon">✕</div>
+        <h2 class="analysis-error-card__title">Analysis Failed</h2>
+        <p class="analysis-error-card__message">{{ store.error }}</p>
+        <div class="analysis-error-card__pat-hint">
+          <p>This repository may require a Personal Access Token. Go back and use the PAT option when submitting.</p>
+        </div>
+        <div class="analysis-error-card__actions">
+          <a href="/" class="btn btn--primary">← New Analysis</a>
+        </div>
       </div>
     </div>
 
@@ -176,21 +177,24 @@ function copyLink() {
         <OverviewPanel v-if="activeTab === 'Overview'" :result="result" />
         <ProjectPanel v-if="activeTab === 'Project'" :result="result" />
         <template v-if="activeTab === 'Architecture'">
-          <ArchitecturePanel :graph="result.graph" />
+          <ArchitecturePanel :graph="result.graph" :hot-files="result.structure?.hot_files" />
           <div style="margin-top: 1.5rem">
             <DependencyGraphView :graph="result.graph" />
           </div>
         </template>
         <DependenciesPanel v-if="activeTab === 'Dependencies'" :deps="result.dependencies" />
-        <CommitTimelineChart v-if="activeTab === 'Timeline'" :commits="result.commits" />
+        <SecurityPanel v-if="activeTab === 'Security'" :security="result.security" :heuristics="result.heuristics" :structure="result.structure" />
+        <template v-if="activeTab === 'History'">
+          <CommitTimelineChart :commits="result.commits" />
+          <div v-if="hasRoadmap && result.structure?.roadmap_parsed" style="margin-top: 1.5rem" class="panel">
+            <RoadmapTimeline
+              :milestones="result.structure.roadmap_parsed.milestones"
+              :roadmap-file="result.structure.roadmap_file ?? 'ROADMAP.md'"
+            />
+          </div>
+        </template>
         <HeuristicsPanel v-if="activeTab === 'Heuristics'" :signals="result.heuristics" />
         <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" :structure="result.structure" />
-        <div v-if="activeTab === 'Roadmap' && result.structure?.roadmap_parsed" class="panel">
-          <RoadmapTimeline
-            :milestones="result.structure.roadmap_parsed.milestones"
-            :roadmap-file="result.structure.roadmap_file ?? 'ROADMAP.md'"
-          />
-        </div>
       </div>
     </div>
     </Transition>

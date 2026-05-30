@@ -19,6 +19,14 @@ _GIT_ENV = {
     'DISPLAY': '',                     # no X11 GUI dialogs from Celery worker
     'WAYLAND_DISPLAY': '',             # no Wayland GUI dialogs
     'DBUS_SESSION_BUS_ADDRESS': '',    # no desktop session bus (keyring, VSCode)
+    # GitPython merges os.environ then updates with this dict, so inherited
+    # VS Code credential-helper vars must be explicitly cleared here.
+    'GIT_ASKPASS': '',
+    'SSH_ASKPASS': '',
+    'SSH_ASKPASS_REQUIRE': 'never',
+    'VSCODE_GIT_ASKPASS_NODE': '',
+    'VSCODE_GIT_ASKPASS_MAIN': '',
+    'VSCODE_GIT_ASKPASS_PIPE': '',
 }
 
 
