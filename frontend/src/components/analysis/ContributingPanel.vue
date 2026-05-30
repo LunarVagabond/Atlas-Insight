@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
+import ContributionDrawer from './ContributionDrawer.vue'
 import type { ContributionOpportunity, StructureData } from '../../stores/analysis'
 
 const props = defineProps<{
@@ -75,6 +76,8 @@ const availableFilters = computed(() =>
   })
 )
 
+const activeOpp = ref<ContributionOpportunity | null>(null)
+
 const githubCount = computed(() => props.opportunities.filter(o => o.category === 'github-issue' || o.category === 'feature').length)
 const heuristicCount = computed(() => props.opportunities.filter(o => o.category !== 'github-issue' && o.category !== 'feature').length)
 
@@ -128,6 +131,8 @@ const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
           v-for="opp in beginner"
           :key="opp.id"
           class="contrib-card"
+          style="cursor:pointer"
+          @click="activeOpp = opp"
         >
           <div class="contrib-card__body">
             <div class="contrib-card__header">
@@ -180,6 +185,8 @@ const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
           v-for="opp in intermediate"
           :key="opp.id"
           class="contrib-card"
+          style="cursor:pointer"
+          @click="activeOpp = opp"
         >
           <div class="contrib-card__body">
             <div class="contrib-card__header">
@@ -228,6 +235,8 @@ const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
           v-for="opp in advanced"
           :key="opp.id"
           class="contrib-card"
+          style="cursor:pointer"
+          @click="activeOpp = opp"
         >
           <div class="contrib-card__body">
             <div class="contrib-card__header">
@@ -248,5 +257,7 @@ const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
     <div v-if="!filtered.length" class="empty-state">
       No opportunities found for this filter.
     </div>
+
+    <ContributionDrawer :opportunity="activeOpp" @close="activeOpp = null" />
   </div>
 </template>

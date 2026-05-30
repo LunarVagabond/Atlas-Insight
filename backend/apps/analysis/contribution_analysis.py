@@ -19,6 +19,11 @@ def _heuristic_opportunities(
                 'title': 'Add a LICENSE file',
                 'description': 'No license detected. Without one the code is legally "all rights reserved" — contributors and users cannot safely rely on it.',
                 'difficulty': 'beginner', 'risk': 'low', 'category': 'community',
+                'hints': [
+                    'Create a file named `LICENSE` in the root directory of the project',
+                    'Visit choosealicense.com to pick one — MIT is a popular permissive choice for open-source',
+                    'Paste the full license text into the file and update any placeholder year or name',
+                ],
             })
         if not structure.get('has_contributing'):
             opps.append({
@@ -26,6 +31,11 @@ def _heuristic_opportunities(
                 'title': 'Add CONTRIBUTING.md',
                 'description': 'No contributing guide. New contributors need to know how to set up the project, run tests, and open a PR.',
                 'difficulty': 'beginner', 'risk': 'low', 'category': 'documentation',
+                'hints': [
+                    'Create a file named `CONTRIBUTING.md` in the root directory',
+                    'Include: how to fork and clone the repo, how to install dependencies, how to run tests, and how to open a pull request',
+                    'Look at github.com/firstcontributions/first-contributions for a great example',
+                ],
             })
         if not structure.get('has_changelog'):
             opps.append({
@@ -33,6 +43,11 @@ def _heuristic_opportunities(
                 'title': 'Create a CHANGELOG',
                 'description': 'No changelog exists. Maintainers and users have no structured way to track what changed between releases.',
                 'difficulty': 'beginner', 'risk': 'low', 'category': 'documentation',
+                'hints': [
+                    'Create a file named `CHANGELOG.md` in the root directory',
+                    'Use the "Keep a Changelog" format: group changes under Added, Changed, Fixed, Removed per version',
+                    'Start with an `[Unreleased]` section at the top for changes not yet in a release',
+                ],
             })
         if not structure.get('has_coc'):
             opps.append({
@@ -40,6 +55,11 @@ def _heuristic_opportunities(
                 'title': 'Add a Code of Conduct',
                 'description': 'No Code of Conduct. Signals community standards and protects contributors from harassment.',
                 'difficulty': 'beginner', 'risk': 'low', 'category': 'community',
+                'hints': [
+                    'Create a file named `CODE_OF_CONDUCT.md` in the root directory',
+                    'The Contributor Covenant (contributor-covenant.org) provides a ready-to-use template trusted by thousands of projects',
+                    'Update the contact email placeholder in the template before committing',
+                ],
             })
         if not structure.get('has_security_policy'):
             opps.append({
@@ -47,6 +67,11 @@ def _heuristic_opportunities(
                 'title': 'Add a SECURITY.md',
                 'description': 'No security disclosure policy. Researchers and contributors have no clear channel to report vulnerabilities.',
                 'difficulty': 'beginner', 'risk': 'low', 'category': 'security',
+                'hints': [
+                    'Create a file named `SECURITY.md` in the root directory',
+                    'Explain how users should report a vulnerability — an email address or private GitHub issue works fine',
+                    'Include which versions of the project are currently supported and receiving security fixes',
+                ],
             })
 
     if readme:
@@ -56,6 +81,11 @@ def _heuristic_opportunities(
                 'title': 'Create a README',
                 'description': 'No README found. Every project needs one to explain what it does and how to get started.',
                 'difficulty': 'beginner', 'risk': 'low', 'category': 'documentation',
+                'hints': [
+                    'Create a file named `README.md` in the root directory',
+                    'A good README includes: project name and description, installation steps, a usage example, and a link to contributing guidelines',
+                    'Use Markdown formatting — GitHub renders it automatically as the project homepage',
+                ],
             })
         else:
             if not readme.get('has_installation'):
@@ -64,6 +94,11 @@ def _heuristic_opportunities(
                     'title': 'Add installation instructions to README',
                     'description': 'README has no installation section — newcomers cannot get the project running without it.',
                     'difficulty': 'beginner', 'risk': 'low', 'category': 'documentation',
+                    'hints': [
+                        'Open `README.md` in the root directory and add a `## Installation` section',
+                        'List every step a new user needs to get the project running from scratch (dependencies, environment setup, build commands)',
+                        'Wrap terminal commands in code fences (```bash ... ```) so they are easy to copy and paste',
+                    ],
                 })
             if not readme.get('has_usage'):
                 opps.append({
@@ -71,6 +106,11 @@ def _heuristic_opportunities(
                     'title': 'Add usage examples to README',
                     'description': 'README has no usage section. Code examples are the fastest way to show what the project does.',
                     'difficulty': 'beginner', 'risk': 'low', 'category': 'documentation',
+                    'hints': [
+                        'Open `README.md` and add a `## Usage` section after Installation',
+                        'Show a minimal working example — a code snippet or terminal command that demonstrates the core feature',
+                        'If it is a CLI tool, show common flags; if it is a library, show an import and a function call example',
+                    ],
                 })
 
     if security:
@@ -80,22 +120,39 @@ def _heuristic_opportunities(
                 'title': 'Add a .gitignore file',
                 'description': 'No .gitignore found. Build artifacts, secrets, and editor files could be accidentally committed.',
                 'difficulty': 'beginner', 'risk': 'low', 'category': 'security',
+                'hints': [
+                    'Create a file named `.gitignore` in the root directory (the dot at the start is important)',
+                    'Visit gitignore.io and select your language or framework to auto-generate a solid starting template',
+                    'Files listed in `.gitignore` will never be tracked by git — always ignore secrets, build output, and editor config',
+                ],
             })
         elif security.get('gitignore_gaps'):
             gaps = security['gitignore_gaps']
+            gap_str = ', '.join(f'`{g}`' for g in gaps[:5])
             opps.append({
                 'id': 'gitignore_gaps',
                 'title': f'Fix .gitignore — {len(gaps)} missing pattern{"s" if len(gaps) != 1 else ""}',
                 'description': f'Patterns not covered: {", ".join(gaps[:5])}. Risk of accidentally committing sensitive files or noise.',
                 'difficulty': 'beginner', 'risk': 'low', 'category': 'security',
+                'hints': [
+                    'Open `.gitignore` in the root directory',
+                    f'Add these missing patterns: {gap_str}',
+                    'Each line is a pattern — `*.log` ignores all log files, `build/` ignores the whole build folder',
+                ],
             })
 
     if structure and structure.get('roadmap_file'):
+        roadmap_file = structure['roadmap_file']
         opps.append({
             'id': 'roadmap',
-            'title': f'Review the project roadmap ({structure["roadmap_file"]})',
+            'title': f'Review the project roadmap ({roadmap_file})',
             'description': 'A roadmap file exists — it likely lists planned features and known gaps. Good starting point for finding impactful work that aligns with maintainer intent.',
             'difficulty': 'beginner', 'risk': 'low', 'category': 'feature',
+            'hints': [
+                f'Open `{roadmap_file}` to see what the maintainers have planned',
+                'Look for items marked TODO, [ ], or "planned" — these are features the project wants but has not built yet',
+                'Before starting work on a roadmap item, open a GitHub issue to let maintainers know you are working on it',
+            ],
         })
 
     for i, warning in enumerate(deps.get('missing_lockfile_warnings', [])[:2]):
@@ -104,6 +161,11 @@ def _heuristic_opportunities(
             'title': 'Add a package lockfile',
             'description': f'{warning}. Lockfiles ensure reproducible installs across machines and CI.',
             'difficulty': 'beginner', 'risk': 'low', 'category': 'dependencies',
+            'hints': [
+                'Run your package manager\'s install command to generate the lockfile (e.g., `npm install`, `yarn install`, `pip freeze > requirements.txt`)',
+                'Commit the generated lockfile — it pins exact dependency versions so every contributor gets identical packages',
+                'Do not edit the lockfile by hand; let the package manager manage it',
+            ],
         })
 
     # ── Intermediate / Medium risk ────────────────────────────────────────────
@@ -114,6 +176,11 @@ def _heuristic_opportunities(
                 'title': 'Set up a CI pipeline',
                 'description': 'No CI configuration found. Automated testing on PRs prevents regressions and speeds up code review.',
                 'difficulty': 'intermediate', 'risk': 'low', 'category': 'ci',
+                'hints': [
+                    'Create the directory `.github/workflows/` and add a file called `ci.yml` inside it',
+                    'GitHub Actions will automatically run this workflow on every push and pull request — no extra setup needed',
+                    'Start simple: check out the code, install dependencies, then run your project\'s test command',
+                ],
             })
         if not structure.get('has_lint_config'):
             opps.append({
@@ -121,6 +188,11 @@ def _heuristic_opportunities(
                 'title': 'Add a linting configuration',
                 'description': 'No linter config found. Consistent code style reduces review friction and catches simple errors automatically.',
                 'difficulty': 'intermediate', 'risk': 'low', 'category': 'ci',
+                'hints': [
+                    'Add a linter config file to the root — `.eslintrc.js` for JavaScript, `pyproject.toml` for Python (with ruff or flake8), `.rubocop.yml` for Ruby',
+                    'Linters check your code for style mistakes and common bugs before you even run it',
+                    'Run the linter locally before committing so CI does not surprise you with failures',
+                ],
             })
         test_ratio = structure.get('test_ratio', 0)
         if test_ratio < 0.05:
@@ -129,6 +201,11 @@ def _heuristic_opportunities(
                 'title': f'Add test coverage ({test_ratio:.0%} test file ratio)',
                 'description': 'Very few test files relative to source. Even basic unit tests for core modules substantially improve confidence in changes.',
                 'difficulty': 'intermediate', 'risk': 'medium', 'category': 'testing',
+                'hints': [
+                    'Look for an existing `tests/` or `test/` directory to see how current tests are structured',
+                    'Start by writing a test for the simplest function you can find — just check that it returns the expected output for a known input',
+                    'Run the test suite with the project\'s test command (often `pytest`, `npm test`, or `cargo test`) to confirm your test passes',
+                ],
             })
         elif test_ratio < 0.15:
             opps.append({
@@ -136,6 +213,11 @@ def _heuristic_opportunities(
                 'title': f'Improve test coverage ({test_ratio:.0%} test file ratio)',
                 'description': 'Below-average test file ratio. Adding tests for core functionality reduces regression risk on future contributions.',
                 'difficulty': 'intermediate', 'risk': 'medium', 'category': 'testing',
+                'hints': [
+                    'Open the `tests/` directory and look for source files that have no corresponding test file',
+                    'Pick a small, self-contained function and write a few test cases covering normal and edge-case inputs',
+                    'Run the full test suite after adding tests to make sure nothing is broken',
+                ],
             })
 
     for i, di in enumerate(deps.get('docker_issues', [])[:3]):
@@ -144,6 +226,11 @@ def _heuristic_opportunities(
             'title': f'Update Dockerfile: {di["file"]}',
             'description': di['issue'],
             'difficulty': 'intermediate', 'risk': 'medium', 'category': 'dependencies',
+            'hints': [
+                f'Open `{di["file"]}` in the project',
+                f'The specific issue is: {di["issue"]}',
+                'The Docker documentation at docs.docker.com/develop/develop-images/dockerfile_best-practices/ has guidance on common Dockerfile improvements',
+            ],
         })
 
     # ── Advanced / High risk ──────────────────────────────────────────────────
@@ -153,15 +240,30 @@ def _heuristic_opportunities(
             'title': f'Refactor god module: {gm["module"]}',
             'description': f'Imported by {gm["in_degree"]} other modules. Splitting it reduces coupling and makes isolated testing possible.',
             'difficulty': 'advanced', 'risk': 'high', 'category': 'refactoring',
+            'hints': [
+                f'Open `{gm["module"]}` — it is imported by {gm["in_degree"]} other files, which makes changes here risky',
+                'Read through the file and identify two or three distinct responsibilities that could live in separate files',
+                'Start small: extract one clearly separate piece of logic into a new file, update all the imports, then run the tests before touching anything else',
+            ],
         })
 
     cycle_count = graph.get('cycle_count', 0)
     if cycle_count > 0:
+        cycles_sample = graph.get('cycles', [])[:2]
+        cycle_hint = ''
+        if cycles_sample:
+            cycle_hint = f'For example: {" → ".join(cycles_sample[0][:3])}{"…" if len(cycles_sample[0]) > 3 else ""}'
         opps.append({
             'id': 'break_cycles',
             'title': f'Break {cycle_count} circular dependenc{"ies" if cycle_count > 1 else "y"}',
             'description': 'Circular imports prevent tree-shaking, complicate testing, and can hide initialization order bugs.',
             'difficulty': 'advanced', 'risk': 'high', 'category': 'refactoring',
+            'hints': [
+                'Open the Architecture tab in this tool to see which files form circular import chains',
+                *([f'Example cycle: {cycle_hint}'] if cycle_hint else []),
+                'The fix is usually to extract the shared code both modules need into a third module that neither end imports from',
+                'Start with the shortest cycle — they are the easiest to untangle',
+            ],
         })
 
     if structure:
@@ -174,6 +276,11 @@ def _heuristic_opportunities(
                 'title': 'Spread knowledge across contributors',
                 'description': f'{contributor} touches the vast majority of the codebase. Pair programming, documented onboarding, and mentoring reduce single-point-of-failure risk.',
                 'difficulty': 'advanced', 'risk': 'medium', 'category': 'community',
+                'hints': [
+                    'Check the Architecture tab\'s Hot Files section to find the most frequently changed files',
+                    'Look at the git log for files that only one or two people have ever touched — those are the knowledge gaps',
+                    'Great first steps: add inline comments explaining tricky sections, document the setup process, or pair with the main contributor on a small change',
+                ],
             })
 
     return opps
@@ -217,6 +324,11 @@ def _issue_opportunities(contribution_data: dict) -> list[dict]:
             'issue_number': issue['number'],
             'has_open_pr': issue['number'] in pr_refs,
             'labels': issue['labels'],
+            'hints': [
+                'Read the full issue description and all comments on GitHub to understand exactly what is being asked for',
+                'Search the codebase for the function, file, or keyword mentioned in the issue before writing any code',
+                'Leave a comment on the issue saying you would like to work on it — maintainers appreciate knowing someone is on it',
+            ],
         })
     return opps
 

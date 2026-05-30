@@ -55,6 +55,7 @@ class RunListItemSchema(Schema):
     repo_name: str
     is_stale: bool
     last_fetched_at: Optional[str]
+    tags: list[str] = []
 
 
 class RunListSchema(Schema):
@@ -199,6 +200,7 @@ def list_runs(
                 repo_name=r.repo.name,
                 is_stale=r.repo.is_stale,
                 last_fetched_at=r.repo.last_fetched_at.isoformat() if r.repo.last_fetched_at else None,
+                tags=r.result.get('classification', {}).get('tags', []) if r.result else [],
             )
             for r in runs
         ],

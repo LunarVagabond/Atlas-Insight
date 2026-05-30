@@ -37,6 +37,10 @@ async function reanalyze() {
         <span class="status-card__label">Author</span>
         <span class="status-card__value">{{ run.repo_owner }}</span>
       </div>
+      <div v-if="run.result?.github_meta?.license_spdx ?? run.result?.structure?.license_type" class="status-card__row">
+        <span class="status-card__label">License</span>
+        <span class="status-card__value">{{ run.result?.github_meta?.license_spdx ?? run.result?.structure?.license_type }}</span>
+      </div>
       <div class="status-card__row">
         <span class="status-card__label">Status</span>
         <div style="display:flex;align-items:center;gap:6px">

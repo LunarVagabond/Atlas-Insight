@@ -44,6 +44,18 @@ watch(page, fetchRuns)
 
 const totalPages = computed(() => Math.ceil(total.value / perPage))
 
+const activeTag = ref<string | null>(null)
+
+const allTags = computed(() => {
+  const tags = new Set<string>()
+  items.value.forEach(r => r.tags?.forEach(t => tags.add(t)))
+  return [...tags].sort()
+})
+
+const filteredItems = computed(() =>
+  activeTag.value ? items.value.filter(r => r.tags?.includes(activeTag.value!)) : items.value
+)
+
 function setSort(field: typeof sort.value) {
   if (sort.value === field) {
     order.value = order.value === 'desc' ? 'asc' : 'desc'
@@ -91,6 +103,21 @@ function goToRun(id: string) {
           Compare
         </AppButton>
       </div>
+
+      <div v-if="allTags.length" class="table-filter-bar" style="margin-top:0.75rem">
+        <div class="table-filter-bar__group">
+          <button
+            :class="['table-filter-bar__btn', !activeTag && 'table-filter-bar__btn--active']"
+            @click="activeTag = null"
+          >All</button>
+          <button
+            v-for="tag in allTags"
+            :key="tag"
+            :class="['table-filter-bar__btn', activeTag === tag && 'table-filter-bar__btn--active']"
+            @click="activeTag = tag"
+          >{{ tag }}</button>
+        </div>
+      </div>
     </div>
 
     <div class="results-layout__content">
@@ -116,7 +143,7 @@ function goToRun(id: string) {
           </thead>
           <tbody>
             <tr
-              v-for="run in items"
+              v-for="run in filteredItems"
               :key="run.id"
               class="runs-table__row"
               @click="goToRun(run.id)"

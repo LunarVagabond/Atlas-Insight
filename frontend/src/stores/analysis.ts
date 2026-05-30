@@ -36,6 +36,7 @@ export interface ContributionOpportunity {
   issue_number?: number
   has_open_pr?: boolean
   labels?: string[]
+  hints?: string[]
 }
 
 export interface RunResult {
@@ -241,6 +242,7 @@ export interface RunListItem {
   repo_name: string
   is_stale: boolean
   last_fetched_at: string | null
+  tags: string[]
 }
 
 export const useAnalysisStore = defineStore('analysis', {
