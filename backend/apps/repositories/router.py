@@ -75,7 +75,10 @@ def _resolve_token(request, pat: Optional[str]) -> Optional[str]:
         ).first()
         if social:
             token = social.token
-            if not _token_has_repo_scope(token):
+            # GitHub App user tokens (ghu_) use repository permission grants, not OAuth
+            # scopes — skip scope check and let the clone surface any access errors.
+            # Only classic OAuth tokens (gho_) carry X-OAuth-Scopes.
+            if not token.startswith('ghu_') and not _token_has_repo_scope(token):
                 raise HttpError(
                     403,
                     'Your GitHub authorization is missing the "repo" scope required to '
@@ -87,7 +90,7 @@ def _resolve_token(request, pat: Optional[str]) -> Optional[str]:
 
 
 def _token_has_repo_scope(token: str) -> bool:
-    """Check GitHub API headers to confirm token has 'repo' scope."""
+    """Check X-OAuth-Scopes header for classic OAuth tokens (gho_ prefix only)."""
     try:
         import requests as _requests
         r = _requests.get(
@@ -101,7 +104,6 @@ def _token_has_repo_scope(token: str) -> bool:
         scopes = r.headers.get('X-OAuth-Scopes', '')
         return 'repo' in [s.strip() for s in scopes.split(',')]
     except Exception:
-        # Network error — don't block the request; let clone fail naturally
         return True
 
 
