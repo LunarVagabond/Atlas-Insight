@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'apps.api.apps.ApiConfig',
     'django_celery_results',
     'django_celery_beat',
+    'django_ratelimit',
 ]
 
 MIDDLEWARE = [
@@ -162,6 +163,14 @@ GITHUB_TOKEN = config('GITHUB_TOKEN', default='')
 REPO_CACHE_DIR = BASE_DIR.parent / config('REPO_CACHE_DIR', default='_running/repo_cache')
 STALE_AFTER_DAYS = config('STALE_AFTER_DAYS', default=7, cast=int)
 LOG_LEVEL = config('LOG_LEVEL', default='INFO')
+
+# Cache — Redis db 1 (Celery uses db 0)
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': config('REDIS_URL', default='redis://localhost:4502/1'),
+    }
+}
 
 # Celery
 CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:4502/0')

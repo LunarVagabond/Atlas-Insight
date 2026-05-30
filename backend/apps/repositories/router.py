@@ -4,6 +4,8 @@ import uuid
 from typing import Optional
 
 from django.db.models import Q
+from django.http import HttpResponse
+from django_ratelimit.decorators import ratelimit
 from ninja import Router, Schema
 from ninja.errors import HttpError
 
@@ -110,7 +112,10 @@ def _token_has_repo_scope(token: str) -> bool:
 
 
 @router.post('/analyze', response=AnalyzeResponse)
+@ratelimit(key='user_or_ip', rate='10/h', method='POST', block=False)
 def analyze(request, payload: AnalyzeRequest):
+    if getattr(request, 'limited', False):
+        raise HttpError(429, 'Rate limit exceeded — max 10 analyses per hour. Please wait before submitting another.')
     match = GITHUB_URL_RE.match(payload.url.strip())
     if not match:
         raise HttpError(422, 'Invalid GitHub repository URL')
@@ -129,9 +134,10 @@ def analyze(request, payload: AnalyzeRequest):
     latest_sha = fetch_latest_sha(owner, name, token=token)
 
     if latest_sha and latest_sha == repo.last_commit_sha:
-        latest_run = repo.runs.filter(status='completed').order_by('-triggered_at').first()
-        if latest_run:
+        latest_run = repo.runs.order_by('-triggered_at').first()
+        if latest_run and latest_run.status == 'completed':
             return AnalyzeResponse(run_id=latest_run.id, status='completed', cached=True)
+        # latest run is failed/pending/running — fall through and re-queue
 
     user = request.user if request.user.is_authenticated else None
     run = AnalysisRun.objects.create(repo=repo, status='pending', user=user)
@@ -150,6 +156,7 @@ def list_runs(
     order: str = 'desc',
     page: int = 1,
     per_page: int = 25,
+    mine: bool = False,
 ):
     from django.db.models import OuterRef, Subquery
 
@@ -171,6 +178,9 @@ def list_runs(
         )
     else:
         qs = qs.filter(repo__is_private=False)
+
+    if mine and request.user.is_authenticated:
+        qs = qs.filter(user=request.user)
 
     if q:
         qs = qs.filter(
@@ -272,6 +282,23 @@ class SlugRunSchema(Schema):
     status: str
 
 
+@router.delete('/runs/{run_id}', response={204: None})
+def delete_run(request, run_id: uuid.UUID):
+    if not request.user.is_authenticated:
+        raise HttpError(403, 'Authentication required')
+    try:
+        run = AnalysisRun.objects.select_related('repo').get(id=run_id)
+    except AnalysisRun.DoesNotExist:
+        raise HttpError(404, 'Run not found')
+    if run.user != request.user:
+        raise HttpError(403, 'Access denied')
+    repo = run.repo
+    run.delete()
+    if not repo.runs.exists():
+        repo.delete()
+    return None
+
+
 @router.get('/by-slug/{owner}/{name}', response=SlugRunSchema)
 def get_by_slug(request, owner: str, name: str):
     """Return the latest run for owner/name — used by permalink routes."""
@@ -288,3 +315,76 @@ def get_by_slug(request, owner: str, name: str):
     if repo.is_private and run.user != request.user:
         raise HttpError(403, 'Access denied')
     return SlugRunSchema(run_id=run.id, status=run.status)
+
+
+_BADGE_COLORS = {
+    # project_health keys
+    'thriving': '#4c1',
+    'active': '#97ca00',
+    'stable': '#dfb317',
+    'declining': '#fe7d37',
+    'abandoned': '#e05d44',
+    # contribution_difficulty keys
+    'very_easy': '#4c1',
+    'easy': '#97ca00',
+    'moderate': '#dfb317',
+    'hard': '#fe7d37',
+    'very_hard': '#e05d44',
+}
+
+_BADGE_NOT_ANALYZED = '#9f9f9f'
+
+
+def _make_svg(label: str, value: str, color: str) -> str:
+    lw = max(len(label) * 6 + 10, 90)
+    vw = max(len(value) * 6 + 10, 60)
+    tw = lw + vw
+    lx = lw // 2
+    vx = lw + vw // 2
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{tw}" height="20">'
+        f'<linearGradient id="s" x2="0" y2="100%">'
+        f'<stop offset="0" stop-color="#bbb" stop-opacity=".1"/>'
+        f'<stop offset="1" stop-opacity=".1"/></linearGradient>'
+        f'<rect rx="3" width="{tw}" height="20" fill="#555"/>'
+        f'<rect rx="3" x="{lw}" width="{vw}" height="20" fill="{color}"/>'
+        f'<rect x="{lw}" width="4" height="20" fill="{color}"/>'
+        f'<rect rx="3" width="{tw}" height="20" fill="url(#s)"/>'
+        f'<g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="11">'
+        f'<text x="{lx}" y="15" fill="#010101" fill-opacity=".3">{label}</text>'
+        f'<text x="{lx}" y="14">{label}</text>'
+        f'<text x="{vx}" y="15" fill="#010101" fill-opacity=".3">{value}</text>'
+        f'<text x="{vx}" y="14">{value}</text>'
+        f'</g></svg>'
+    )
+
+
+@router.get('/badge/{owner}/{name}.svg')
+def repo_badge(request, owner: str, name: str):
+    try:
+        repo = Repository.objects.get(owner__iexact=owner, name__iexact=name)
+    except Repository.DoesNotExist:
+        svg = _make_svg('atlas insight', 'not found', _BADGE_NOT_ANALYZED)
+        return HttpResponse(svg, content_type='image/svg+xml', status=404)
+
+    if repo.is_private:
+        svg = _make_svg('atlas insight', 'private', _BADGE_NOT_ANALYZED)
+        return HttpResponse(svg, content_type='image/svg+xml', status=403)
+
+    run = repo.runs.filter(status='completed').order_by('-triggered_at').first()
+    if not run or not run.result:
+        svg = _make_svg('atlas insight', 'not analyzed', _BADGE_NOT_ANALYZED)
+        resp = HttpResponse(svg, content_type='image/svg+xml')
+        resp['Cache-Control'] = 'max-age=300'
+        return resp
+
+    cls = run.result.get('classification', {})
+    health = cls.get('project_health', {})
+    label = 'atlas insight'
+    value = health.get('label', 'analyzed')
+    color = _BADGE_COLORS.get(health.get('key', ''), '#555')
+
+    svg = _make_svg(label, value, color)
+    resp = HttpResponse(svg, content_type='image/svg+xml')
+    resp['Cache-Control'] = 'max-age=3600'
+    return resp

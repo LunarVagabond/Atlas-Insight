@@ -119,6 +119,7 @@ export interface StructureData {
   top_contributors: { author: string; files_touched: number }[]
   hot_files: { file: string; commit_count: number }[]
   tech_stack?: string[]
+  all_files?: string[]
 }
 
 export interface SecurityData {
@@ -334,6 +335,10 @@ export const useAnalysisStore = defineStore('analysis', {
     async retryRun(runId: string): Promise<string> {
       const { data } = await axios.post(`/api/v1/repositories/runs/${runId}/retry`)
       return data.run_id as string
+    },
+
+    async deleteRun(runId: string) {
+      await axios.delete(`/api/v1/repositories/runs/${runId}`)
     },
 
     clearRun() {

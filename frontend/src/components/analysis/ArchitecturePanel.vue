@@ -2,10 +2,10 @@
 import { ref, computed } from 'vue'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
-import type { GraphData } from '../../stores/analysis'
+import type { GraphData, StructureData } from '../../stores/analysis'
 import { useTableFilter } from '../../composables/useTableFilter'
 
-const props = defineProps<{ graph: GraphData; hotFiles?: { file: string; commit_count: number }[] }>()
+const props = defineProps<{ graph: GraphData; hotFiles?: { file: string; commit_count: number }[]; structure?: StructureData }>()
 
 const hotFilesSource = computed(() => (props.hotFiles ?? []) as Record<string, unknown>[])
 const hotFilesFilter = useTableFilter(hotFilesSource, ['file'], 'commit_count', 'desc')
@@ -70,14 +70,23 @@ function closeDrawer() {
   drawerFile.value = null
 }
 
-// File explorer search across ALL graph nodes
+// File explorer search across ALL graph nodes + all_files (deduped)
 const explorerQuery = ref('')
 const explorerResults = computed(() => {
   const q = explorerQuery.value.trim().toLowerCase()
   if (!q) return []
-  return props.graph.nodes
-    .filter(n => n.id.toLowerCase().includes(q))
+
+  // Build unified search set: graph node IDs + all_files paths (deduped)
+  const graphIds = new Set(props.graph.nodes.map(n => n.id))
+  const allPaths: string[] = [
+    ...props.graph.nodes.map(n => n.id),
+    ...(props.structure?.all_files ?? []).filter(f => !graphIds.has(f)),
+  ]
+
+  return allPaths
+    .filter(id => id.toLowerCase().includes(q))
     .slice(0, 40)
+    .map(id => ({ id }))
 })
 </script>
 

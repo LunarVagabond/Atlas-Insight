@@ -191,8 +191,11 @@ def analyze_structure(repo_obj: Repo, repo_dir: str, deps: dict | None = None) -
     test_files = 0
     file_count_limit = 25000
 
+    all_file_paths: list[str] = []
     for path in _walk_files(base, file_count_limit):
         total_files += 1
+        if len(all_file_paths) < 5000:
+            all_file_paths.append(str(path.relative_to(base)))
         ext = path.suffix.lower()
         lang = EXT_LANG.get(ext)
         is_test = _is_test_file(path, base)
@@ -333,6 +336,7 @@ def analyze_structure(repo_obj: Repo, repo_dir: str, deps: dict | None = None) -
         'top_contributors': top_contributors,
         'hot_files': hot_files,
         'tech_stack': tech_stack,
+        'all_files': all_file_paths,
     }
 
 

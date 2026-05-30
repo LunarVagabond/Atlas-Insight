@@ -76,6 +76,9 @@ const menuOpen = ref(false)
           <span class="navbar__chevron">▾</span>
 
           <div v-if="menuOpen" class="navbar__dropdown">
+            <RouterLink to="/dashboard" class="navbar__dropdown-item" @click="menuOpen = false">
+              My Analyses
+            </RouterLink>
             <button class="navbar__dropdown-item" @click="authStore.logout(); menuOpen = false">
               Sign out
             </button>

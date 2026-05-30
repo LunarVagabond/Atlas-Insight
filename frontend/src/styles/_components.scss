@@ -3110,6 +3110,57 @@
   }
 }
 
+// ===== DASHBOARD VIEW =====
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  gap: $space-4;
+
+  &__avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 2px solid var(--color-border);
+    flex-shrink: 0;
+  }
+
+  &__info {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+  }
+
+  &__title {
+    font-size: 1.375rem;
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 0;
+  }
+
+  &__login {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+  }
+}
+
+.dashboard-actions {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+}
+
+// ===== DANGER BUTTON VARIANT =====
+.btn--danger {
+  background: var(--color-danger, #dc2626);
+  color: #ffffff;
+  border-color: var(--color-danger, #dc2626);
+
+  &:hover:not(:disabled) {
+    background: var(--color-danger-hover, #b91c1c);
+    border-color: var(--color-danger-hover, #b91c1c);
+  }
+}
+
 // ===== COMPARE VIEW =====
 .compare-view__purpose {
   font-size: 0.9375rem;

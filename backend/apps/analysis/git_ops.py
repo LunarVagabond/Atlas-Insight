@@ -84,6 +84,7 @@ def clone_or_fetch(url: str, pat: Optional[str] = None) -> tuple:
                         'Repository is private or inaccessible. '
                         'Connect your GitHub account to analyze private repositories.'
                     ) from None
+                shutil.rmtree(cache_path, ignore_errors=True)
                 raise
             if pat:
                 repo.remotes.origin.set_url(url)

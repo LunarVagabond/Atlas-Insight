@@ -189,7 +189,7 @@ function copyLink() {
         <OverviewPanel v-if="activeTab === 'Overview'" :result="result" />
         <ProjectPanel v-if="activeTab === 'Project'" :result="result" />
         <template v-if="activeTab === 'Architecture'">
-          <ArchitecturePanel :graph="result.graph" :hot-files="result.structure?.hot_files" />
+          <ArchitecturePanel :graph="result.graph" :hot-files="result.structure?.hot_files" :structure="result.structure" />
           <div style="margin-top: 1.5rem">
             <DependencyGraphView :graph="result.graph" />
           </div>

@@ -25,6 +25,11 @@ const router = createRouter({
       name: 'repo-permalink',
       component: () => import('../views/RepoView.vue'),
     },
+    {
+      path: '/dashboard',
+      name: 'dashboard',
+      component: () => import('../views/DashboardView.vue'),
+    },
   ],
 })
 
