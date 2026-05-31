@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { OwnershipData, OwnershipSubsystem, JitIssue } from '../../stores/analysis'
+import { computed, ref } from 'vue'
+import type { GitHubContributor, OwnershipData, OwnershipSubsystem, JitIssue } from '../../stores/analysis'
 
 const props = defineProps<{
   ownership: OwnershipData
   jitIssues: JitIssue[] | null
   jitLoading: boolean
   repoUrl?: string
+  githubContributors?: GitHubContributor[]
 }>()
 
 const SUBSYSTEM_ICONS: Record<string, string> = {
@@ -54,7 +55,17 @@ const sortedSubsystems = computed(() =>
   [...props.ownership.subsystems].sort((a, b) => b.activity_score - a.activity_score)
 )
 
-const topContributors = computed(() => props.ownership.top_contributors.slice(0, 6))
+const topContributors = computed(() =>
+  props.githubContributors?.length
+    ? props.githubContributors.slice(0, 8)
+    : null
+)
+
+const activeHint = ref<string | null>(null)
+function toggleHint(e: Event, key: string) {
+  e.stopPropagation()
+  activeHint.value = activeHint.value === key ? null : key
+}
 </script>
 
 <template>
@@ -69,9 +80,27 @@ const topContributors = computed(() => props.ownership.top_contributors.slice(0,
       </span>
     </p>
 
-    <!-- Global contributors -->
-    <div v-if="topContributors.length" class="ownership-contributors">
-      <div v-for="c in topContributors" :key="c.author" class="ownership-contributor" :title="c.author">
+    <!-- Global contributors (GitHub data) -->
+    <div v-if="topContributors?.length" class="ownership-contributors">
+      <a
+        v-for="c in topContributors"
+        :key="c.login"
+        :href="c.html_url"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="ownership-contributor ownership-contributor--link"
+        :title="`View ${c.login}'s GitHub profile`"
+      >
+        <img :src="c.avatar_url" :alt="c.login" class="ownership-contributor__avatar" />
+        <div class="ownership-contributor__info">
+          <span class="ownership-contributor__name">{{ c.login }}</span>
+          <span class="ownership-contributor__files">{{ c.contributions.toLocaleString() }} commits</span>
+        </div>
+      </a>
+    </div>
+    <!-- Fallback: git-based contributors (no GitHub data) -->
+    <div v-else-if="ownership.top_contributors.length" class="ownership-contributors">
+      <div v-for="c in ownership.top_contributors.slice(0, 8)" :key="c.author" class="ownership-contributor" :title="c.author">
         <div class="ownership-contributor__initials">{{ contributorInitials(c.author) }}</div>
         <div class="ownership-contributor__info">
           <span class="ownership-contributor__name">{{ c.author.split('@')[0] }}</span>
@@ -102,8 +131,13 @@ const topContributors = computed(() => props.ownership.top_contributors.slice(0,
 
         <!-- Most-changed files -->
         <div v-if="sub.hot_files.length" class="ownership-card__section">
-          <span class="ownership-card__section-title">Most-changed files</span>
-          <p class="ownership-card__section-hint">Files with the most git commits — often where active development or bugs live.</p>
+          <div class="ownership-card__section-row">
+            <span class="ownership-card__section-title">Most-changed files</span>
+            <button class="card-hint-btn" :class="{ 'card-hint-btn--active': activeHint === sub.id + '_hotfiles' }" @click="toggleHint($event, sub.id + '_hotfiles')">?</button>
+          </div>
+          <Transition name="hint-expand">
+            <p v-if="activeHint === sub.id + '_hotfiles'" class="card-hint-text">Files with the most git commits — often where active development or known bugs live. High commit counts mean lots of change, which can signal importance or instability.</p>
+          </Transition>
           <div v-for="hf in sub.hot_files.slice(0, 3)" :key="hf.file" class="ownership-hot-file">
             <a
               v-if="githubFileUrl(hf.file)"

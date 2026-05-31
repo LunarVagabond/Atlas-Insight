@@ -1925,7 +1925,7 @@
 
   &__icon-label {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: $space-2;
   }
 
@@ -1933,14 +1933,6 @@
     font-size: 1rem;
     line-height: 1;
     flex-shrink: 0;
-    margin-top: 2px;
-  }
-
-  &__label-group {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
   }
 
   &__label {
@@ -1948,14 +1940,9 @@
     font-size: 0.875rem;
     color: var(--color-text);
     line-height: 1.3;
-  }
-
-  &__description {
-    font-size: 0.75rem;
-    color: var(--color-text-muted);
-    line-height: 1.4;
-    font-weight: 400;
-    white-space: normal;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   &__risk {
@@ -4070,6 +4057,30 @@
   display: flex;
   align-items: center;
   gap: $space-2;
+  text-decoration: none;
+
+  &--link {
+    cursor: pointer;
+    border-radius: $radius-md;
+    padding: $space-1;
+    margin: -$space-1;
+    transition: background $transition-fast;
+
+    &:hover {
+      background: var(--color-surface-hover);
+
+      .ownership-contributor__name { color: var(--color-accent); }
+    }
+  }
+
+  &__avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 1px solid var(--color-border);
+  }
 
   &__initials {
     width: 32px;
@@ -4095,10 +4106,8 @@
     font-size: 0.8125rem;
     font-weight: 500;
     color: var(--color-text);
-    max-width: 100px;
-    overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
+    transition: color $transition-fast;
   }
 
   &__files {
@@ -4109,13 +4118,9 @@
 }
 
 .ownership-grid {
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
   gap: $space-3;
-
-  @media (min-width: 700px) {
-    grid-template-columns: 1fr 1fr;
-  }
 }
 
 .ownership-card {
@@ -4176,6 +4181,12 @@
   &__section {
     display: flex;
     flex-direction: column;
+    gap: $space-2;
+  }
+
+  &__section-row {
+    display: flex;
+    align-items: center;
     gap: $space-2;
   }
 
@@ -4297,6 +4308,60 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+}
+
+// ===== SHARED HINT BUTTON (card ?) =====
+.card-hint-btn {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: none;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: border-color $transition-fast, color $transition-fast, background $transition-fast;
+  line-height: 1;
+
+  &:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  &--active {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: #fff;
+  }
+}
+
+.card-hint-text {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+  padding: $space-2 $space-3;
+  background: var(--color-bg);
+  border-left: 2px solid var(--color-accent);
+  border-radius: 0 $radius-sm $radius-sm 0;
+}
+
+.hint-expand-enter-active,
+.hint-expand-leave-active {
+  transition: opacity 0.18s ease, max-height 0.18s ease;
+  max-height: 120px;
+  overflow: hidden;
+}
+
+.hint-expand-enter-from,
+.hint-expand-leave-to {
+  opacity: 0;
+  max-height: 0;
 }
 
 // ===== FEASIBILITY FIELDS (F68) =====

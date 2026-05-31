@@ -7,6 +7,12 @@ import type { HeuristicSignal, HeuristicSignalKey } from '../../stores/analysis'
 defineProps<{ signals: HeuristicSignal[] }>()
 
 const active = ref<HeuristicSignal | null>(null)
+const activeHint = ref<HeuristicSignalKey | null>(null)
+
+function toggleHint(e: Event, key: HeuristicSignalKey) {
+  e.stopPropagation()
+  activeHint.value = activeHint.value === key ? null : key
+}
 
 const SIGNAL_ICONS: Record<HeuristicSignalKey, string> = {
   burnout:               '🔥',
@@ -70,24 +76,34 @@ const SIGNAL_DESCRIPTIONS: Partial<Record<HeuristicSignalKey, string>> = {
             <div class="heuristic__title-group">
               <div class="heuristic__icon-label">
                 <span class="heuristic__icon">{{ icon(signal.signal) }}</span>
-                <div class="heuristic__label-group">
-                  <span class="heuristic__label">{{ signal.label }}</span>
-                  <span v-if="SIGNAL_DESCRIPTIONS[signal.signal]" class="heuristic__description">
-                    {{ SIGNAL_DESCRIPTIONS[signal.signal] }}
-                  </span>
-                </div>
+                <span class="heuristic__label">{{ signal.label }}</span>
               </div>
               <span :class="['heuristic__risk', `heuristic__risk--${level(signal.score)}`]">
                 {{ riskLabel(signal.score) }}
               </span>
             </div>
-            <div class="heuristic__score-display">
-              <span :class="['heuristic__score-number', `heuristic__score-number--${level(signal.score)}`]">
-                {{ signal.score }}
-              </span>
-              <span class="heuristic__score-label">/ 100</span>
+            <div style="display:flex;align-items:center;gap:0.5rem">
+              <div class="heuristic__score-display">
+                <span :class="['heuristic__score-number', `heuristic__score-number--${level(signal.score)}`]">
+                  {{ signal.score }}
+                </span>
+                <span class="heuristic__score-label">/ 100</span>
+              </div>
+              <button
+                v-if="SIGNAL_DESCRIPTIONS[signal.signal]"
+                class="card-hint-btn"
+                :class="{ 'card-hint-btn--active': activeHint === signal.signal }"
+                :aria-label="`What does ${signal.label} mean?`"
+                @click="toggleHint($event, signal.signal)"
+              >?</button>
             </div>
           </div>
+
+          <Transition name="hint-expand">
+            <p v-if="activeHint === signal.signal && SIGNAL_DESCRIPTIONS[signal.signal]" class="card-hint-text">
+              {{ SIGNAL_DESCRIPTIONS[signal.signal] }}
+            </p>
+          </Transition>
 
           <div class="heuristic__bar">
             <div

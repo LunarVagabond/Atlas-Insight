@@ -206,6 +206,7 @@ function copyLink() {
           :jit-issues="store.jitIssues"
           :jit-loading="store.jitLoading"
           :repo-url="store.run?.repo_url"
+          :github-contributors="result.github_meta?.contributors"
         />
         <DependenciesPanel v-if="activeTab === 'Dependencies'" :deps="result.dependencies" />
         <SecurityPanel v-if="activeTab === 'Security'" :security="result.security" :heuristics="result.heuristics" :structure="result.structure" />
