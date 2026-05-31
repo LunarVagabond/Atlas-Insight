@@ -333,33 +333,40 @@ def _issue_opportunities(contribution_data: dict) -> list[dict]:
     return opps
 
 
+_TODO_PRIORITY = {'BUG': 0, 'FIXME': 1, 'HACK': 2, 'XXX': 3, 'TODO': 4, 'OPTIMIZE': 5}
+_TODO_DIFFICULTY = {'BUG': 'beginner', 'FIXME': 'beginner', 'HACK': 'intermediate', 'XXX': 'intermediate', 'TODO': 'beginner', 'OPTIMIZE': 'beginner'}
+_TODO_RISK = {'BUG': 'medium', 'FIXME': 'medium', 'HACK': 'medium', 'XXX': 'medium', 'TODO': 'low', 'OPTIMIZE': 'low'}
+
+
 def _todo_opportunities(todos: dict) -> list[dict]:
-    """Generate refactoring opportunities from TODO/FIXME clusters."""
-    import collections as _coll
-    by_file: dict[str, list[dict]] = _coll.defaultdict(list)
-    for item in todos.get('items', []):
-        by_file[item['file']].append(item)
+    """One contribution card per code marker, prioritised by severity."""
+    items = todos.get('items', [])
+    sorted_items = sorted(items, key=lambda m: (_TODO_PRIORITY.get(m['type'].upper(), 9), m['file'], m['line']))
 
     opps = []
-    for file, markers in sorted(by_file.items(), key=lambda kv: -len(kv[1])):
-        if len(markers) < 5:
-            continue
+    for m in sorted_items[:20]:
+        mtype = m['type'].upper()
+        basename = m['file'].split('/')[-1]
+        text = m['text'].strip() if m['text'] else ''
+        title = f'{mtype}: {text[:60]}' if text else f'Resolve {mtype} in {basename}'
+        desc = (
+            f'`{m["file"]}` line {m["line"]} contains a {mtype} marker'
+            + (f': "{text}"' if text else '') + '.'
+        )
         hints = [
-            f'`{m["file"]}:{m["line"]}` — {m["type"]}: {m["text"]}' if m['text'] else f'`{m["file"]}:{m["line"]}` — {m["type"]}'
-            for m in markers[:5]
+            f'Open `{m["file"]}` at line {m["line"]}',
+            'Read the surrounding context to understand what was left unfinished',
+            'Fix, remove, or convert to a tracked issue if out of scope for a quick PR',
         ]
-        basename = file.split('/')[-1]
         opps.append({
-            'id': f'todo_cluster_{basename}',
-            'title': f'Resolve {len(markers)} code markers in {basename}',
-            'description': f'{file} contains {len(markers)} TODO/FIXME/HACK markers indicating unfinished work or known issues.',
-            'difficulty': 'beginner',
-            'risk': 'low',
+            'id': f'todo_{mtype}_{basename}_{m["line"]}',
+            'title': title,
+            'description': desc,
+            'difficulty': _TODO_DIFFICULTY.get(mtype, 'beginner'),
+            'risk': _TODO_RISK.get(mtype, 'low'),
             'category': 'refactoring',
             'hints': hints,
         })
-        if len(opps) >= 10:
-            break
     return opps
 
 
@@ -394,6 +401,77 @@ def _revert_opportunities(commits: dict) -> list[dict]:
     return opps
 
 
+_CATEGORY_DOMAINS: dict[str, list[str]] = {
+    'documentation': ['documentation'],
+    'community': ['community'],
+    'ci': ['devops', 'ci'],
+    'testing': ['testing'],
+    'security': ['security'],
+    'dependencies': ['dependencies'],
+}
+
+_FILE_SUBSYSTEM_PREFIXES: dict[str, list[str]] = {
+    'frontend': ['src/', 'frontend/', 'client/', 'ui/', 'app/', 'web/', 'pages/', 'components/'],
+    'api': ['api/', 'routes/', 'routers/', 'endpoints/', 'views/', 'handlers/', 'controllers/', 'server/'],
+    'data': ['models/', 'db/', 'database/', 'migrations/', 'schemas/', 'repositories/'],
+    'tests': ['tests/', '__tests__/', 'spec/', 'test/', 'e2e/', 'integration/'],
+    'config': ['config/', 'scripts/', '.github/', 'ci/', 'infra/', 'deploy/'],
+}
+
+
+def _domain_from_file(path: str) -> str:
+    lower = path.lower()
+    for domain, prefixes in _FILE_SUBSYSTEM_PREFIXES.items():
+        if any(lower.startswith(p) for p in prefixes):
+            return domain
+    return 'general'
+
+
+def _effort_estimate(difficulty: str, risk: str) -> str:
+    if difficulty == 'beginner' and risk == 'low':
+        return 'quick-win'
+    if (difficulty == 'beginner' and risk == 'medium') or (difficulty == 'intermediate' and risk == 'low'):
+        return 'small'
+    if difficulty == 'intermediate' and risk == 'medium':
+        return 'medium'
+    return 'large'
+
+
+def _annotate_feasibility(opps: list[dict]) -> None:
+    """Patch each opp dict in place with knowledge_domains, effort_estimate, affected_file_count."""
+    for opp in opps:
+        cat = opp.get('category', '')
+        diff = opp.get('difficulty', 'beginner')
+        risk = opp.get('risk', 'low')
+
+        # knowledge_domains
+        if cat in _CATEGORY_DOMAINS:
+            domains = _CATEGORY_DOMAINS[cat]
+        elif cat == 'refactoring':
+            # Derive from file path in id or hints
+            opp_id = opp.get('id', '')
+            # TODO cards have id like 'todo_FIXME_filename_42'
+            file_hint = ''
+            for hint in opp.get('hints', []):
+                if hint.startswith('Open `'):
+                    file_hint = hint[6:].split('`')[0]
+                    break
+            domains = [_domain_from_file(file_hint)] if file_hint else ['general']
+        else:
+            domains = []
+
+        opp['knowledge_domains'] = domains
+        opp['effort_estimate'] = _effort_estimate(diff, risk)
+
+        # affected_file_count
+        if opp.get('id', '').startswith('todo_'):
+            opp['affected_file_count'] = 1
+        elif opp.get('id', '').startswith('revert_hotspot_'):
+            opp['affected_file_count'] = 0  # unknown without git data
+        else:
+            opp['affected_file_count'] = 0
+
+
 def analyze_contributions(
     commits: dict,
     graph: dict,
@@ -410,4 +488,5 @@ def analyze_contributions(
     opps.extend(_revert_opportunities(commits))
     if contribution_data:
         opps.extend(_issue_opportunities(contribution_data))
+    _annotate_feasibility(opps)
     return opps

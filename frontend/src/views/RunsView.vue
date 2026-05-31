@@ -11,6 +11,7 @@ import type { RunListItem } from '../stores/analysis'
 const router = useRouter()
 
 const q = ref('')
+const tagQ = ref('')
 const sort = ref<'triggered_at' | 'completed_at' | 'status'>('triggered_at')
 const order = ref<'desc' | 'asc'>('desc')
 const page = ref(1)
@@ -45,12 +46,38 @@ watch(page, fetchRuns)
 const totalPages = computed(() => Math.ceil(total.value / perPage))
 
 const activeTag = ref<string | null>(null)
+const showTagDropdown = ref(false)
 
 const allTags = computed(() => {
   const tags = new Set<string>()
   items.value.forEach(r => r.tags?.forEach(t => tags.add(t)))
   return [...tags].sort()
 })
+
+const tagSuggestions = computed(() => {
+  const needle = tagQ.value.toLowerCase().trim()
+  if (!needle) return allTags.value
+  return allTags.value.filter(t => t.toLowerCase().includes(needle))
+})
+
+function selectTag(tag: string) {
+  activeTag.value = tag
+  tagQ.value = ''
+  showTagDropdown.value = false
+}
+
+function clearTag() {
+  activeTag.value = null
+  tagQ.value = ''
+}
+
+function onTagFocus() {
+  showTagDropdown.value = true
+}
+
+function onTagBlur() {
+  setTimeout(() => { showTagDropdown.value = false }, 150)
+}
 
 const filteredItems = computed(() =>
   activeTag.value ? items.value.filter(r => r.tags?.includes(activeTag.value!)) : items.value
@@ -77,8 +104,6 @@ function formatDate(iso: string) {
 function goToRun(id: string) {
   router.push(`/results/${id}`)
 }
-
-
 </script>
 
 <template>
@@ -94,29 +119,38 @@ function goToRun(id: string) {
       <div class="runs-search">
         <input
           v-model="q"
-          class="url-form__input"
-          placeholder="Search by URL, project name, or author…"
-          style="max-width:400px"
+          class="url-form__input runs-search__text-input"
+          placeholder="Search by URL, project, or author…"
         />
+
+        <div class="runs-search__tag-wrap">
+          <div class="runs-search__tag-field">
+            <span v-if="activeTag" class="runs-search__tag-chip">
+              {{ activeTag }}
+              <button class="runs-search__tag-chip-remove" @click="clearTag" aria-label="Remove tag filter">×</button>
+            </span>
+            <input
+              v-model="tagQ"
+              class="runs-search__tag-input"
+              placeholder="Filter by tag…"
+              @focus="onTagFocus"
+              @blur="onTagBlur"
+            />
+          </div>
+          <div v-if="showTagDropdown && tagSuggestions.length" class="runs-search__tag-dropdown">
+            <button
+              v-for="tag in tagSuggestions"
+              :key="tag"
+              class="runs-search__tag-option"
+              @mousedown.prevent="selectTag(tag)"
+            >{{ tag }}</button>
+          </div>
+        </div>
+
         <span class="runs-search__count">{{ total }} repo{{ total !== 1 ? 's' : '' }}</span>
         <AppButton variant="secondary" @click="showCompareModal = true" style="margin-left:1rem">
           Compare
         </AppButton>
-      </div>
-
-      <div v-if="allTags.length" class="table-filter-bar" style="margin-top:0.75rem">
-        <div class="table-filter-bar__group">
-          <button
-            :class="['table-filter-bar__btn', !activeTag && 'table-filter-bar__btn--active']"
-            @click="activeTag = null"
-          >All</button>
-          <button
-            v-for="tag in allTags"
-            :key="tag"
-            :class="['table-filter-bar__btn', activeTag === tag && 'table-filter-bar__btn--active']"
-            @click="activeTag = tag"
-          >{{ tag }}</button>
-        </div>
       </div>
     </div>
 

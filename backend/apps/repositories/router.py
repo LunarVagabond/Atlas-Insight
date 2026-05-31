@@ -9,10 +9,10 @@ from django_ratelimit.decorators import ratelimit
 from ninja import Router, Schema
 from ninja.errors import HttpError
 
-from apps.analysis.github_meta import fetch_latest_sha
+from apps.analysis.github_meta import fetch_contribution_data, fetch_latest_sha
 from apps.analysis.tasks import analyze_repository
 
-from .models import AnalysisRun, Repository
+from .models import AnalysisRun, Repository, UserFavorite
 
 logger = logging.getLogger(__name__)
 router = Router(tags=['repositories'])
@@ -26,6 +26,7 @@ class AnalyzeRequest(Schema):
     url: str
     pat: Optional[str] = None
     webhook_url: Optional[str] = None
+    notification_email: Optional[str] = None
 
 
 class RunStatusSchema(Schema):
@@ -50,6 +51,7 @@ class AnalyzeResponse(Schema):
 
 class RunListItemSchema(Schema):
     id: uuid.UUID
+    repo_id: uuid.UUID
     status: str
     triggered_at: str
     completed_at: Optional[str]
@@ -58,6 +60,7 @@ class RunListItemSchema(Schema):
     repo_name: str
     is_stale: bool
     is_private: bool
+    is_favorited: bool = False
     last_fetched_at: Optional[str]
     tags: list[str] = []
 
@@ -142,7 +145,11 @@ def analyze(request, payload: AnalyzeRequest):
         # latest run is failed/pending/running — fall through and re-queue
 
     user = request.user if request.user.is_authenticated else None
-    run = AnalysisRun.objects.create(repo=repo, status='pending', user=user, webhook_url=payload.webhook_url or '')
+    run = AnalysisRun.objects.create(
+        repo=repo, status='pending', user=user,
+        webhook_url=payload.webhook_url or '',
+        notification_email=payload.notification_email or '',
+    )
     task = analyze_repository.delay(str(run.id), pat=token)
     run.celery_task_id = task.id
     run.save(update_fields=['celery_task_id'])
@@ -198,12 +205,19 @@ def list_runs(
 
     total = qs.count()
     offset = (page - 1) * per_page
-    runs = qs[offset : offset + per_page]
+    runs = list(qs[offset : offset + per_page])
+
+    fav_repo_ids: set = set()
+    if request.user.is_authenticated:
+        fav_repo_ids = set(
+            UserFavorite.objects.filter(user=request.user).values_list('repo_id', flat=True)
+        )
 
     return RunListSchema(
         items=[
             RunListItemSchema(
                 id=r.id,
+                repo_id=r.repo_id,
                 status=r.status,
                 triggered_at=r.triggered_at.isoformat(),
                 completed_at=r.completed_at.isoformat() if r.completed_at else None,
@@ -212,6 +226,7 @@ def list_runs(
                 repo_name=r.repo.name,
                 is_stale=r.repo.is_stale,
                 is_private=r.repo.is_private,
+                is_favorited=r.repo_id in fav_repo_ids,
                 last_fetched_at=r.repo.last_fetched_at.isoformat() if r.repo.last_fetched_at else None,
                 tags=r.result.get('classification', {}).get('tags', []) if r.result else [],
             )
@@ -442,6 +457,86 @@ def get_featured(request):
         topics=meta.get('topics', []),
         github_description=meta.get('github_description'),
     )
+
+
+def _jit_token(run: AnalysisRun) -> str:
+    from django.conf import settings as _s
+    return run.repo.auth_token or getattr(_s, 'GITHUB_TOKEN', '') or ''
+
+
+def _jit_headers(token: str) -> dict:
+    h = {'Accept': 'application/vnd.github+json'}
+    if token:
+        h['Authorization'] = f'Bearer {token}'
+    return h
+
+
+@router.get('/runs/{run_id}/issues')
+def get_run_issues(request, run_id: uuid.UUID):
+    try:
+        run = AnalysisRun.objects.select_related('repo').get(id=run_id)
+    except AnalysisRun.DoesNotExist:
+        raise HttpError(404, 'Run not found')
+    if run.repo.is_private and not request.user.is_authenticated:
+        raise HttpError(403, 'Access denied')
+
+    from django.core.cache import cache
+    cache_key = f'jit_{run_id}_issues'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    token = _jit_token(run)
+    data = fetch_contribution_data(run.repo.owner, run.repo.name, _jit_headers(token))
+    issues = data['issues'] if data else []
+    cache.set(cache_key, issues, 900)
+    return issues
+
+
+@router.get('/runs/{run_id}/prs')
+def get_run_prs(request, run_id: uuid.UUID):
+    try:
+        run = AnalysisRun.objects.select_related('repo').get(id=run_id)
+    except AnalysisRun.DoesNotExist:
+        raise HttpError(404, 'Run not found')
+    if run.repo.is_private and not request.user.is_authenticated:
+        raise HttpError(403, 'Access denied')
+
+    from django.core.cache import cache
+    cache_key = f'jit_{run_id}_prs'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    token = _jit_token(run)
+    data = fetch_contribution_data(run.repo.owner, run.repo.name, _jit_headers(token))
+    pr_refs = data['pr_issue_refs'] if data else []
+    result = {
+        'pr_issue_refs': pr_refs,
+        'open_prs': run.result.get('github_meta', {}).get('open_prs', 0) if run.result else 0,
+    }
+    cache.set(cache_key, result, 900)
+    return result
+
+
+@router.post('/repos/{repo_id}/favorite', response={200: None})
+def add_favorite(request, repo_id: uuid.UUID):
+    if not request.user.is_authenticated:
+        raise HttpError(403, 'Authentication required')
+    try:
+        repo = Repository.objects.get(id=repo_id)
+    except Repository.DoesNotExist:
+        raise HttpError(404, 'Repository not found')
+    UserFavorite.objects.get_or_create(user=request.user, repo=repo)
+    return 200, None
+
+
+@router.delete('/repos/{repo_id}/favorite', response={204: None})
+def remove_favorite(request, repo_id: uuid.UUID):
+    if not request.user.is_authenticated:
+        raise HttpError(403, 'Authentication required')
+    UserFavorite.objects.filter(user=request.user, repo__id=repo_id).delete()
+    return 204, None
 
 
 @router.get('/admin/stats')

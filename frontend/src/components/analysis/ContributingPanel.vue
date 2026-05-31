@@ -101,9 +101,9 @@ const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
     </div>
 
     <div v-if="todos?.total" class="contrib-signals">
-      <div class="contrib-signals__item">
+      <div class="contrib-signals__item" title="TODO, FIXME, HACK and similar comments left by developers as reminders to fix or improve code">
         <span class="contrib-signals__count">{{ todos.total }}</span>
-        <span class="contrib-signals__label">code markers</span>
+        <span class="contrib-signals__label">TODO/FIXME comments found</span>
       </div>
       <template v-for="(count, type) in todos.by_type" :key="type">
         <div v-if="count > 0" class="contrib-signals__item">
@@ -137,7 +137,7 @@ const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
     <!-- Beginner -->
     <section v-if="beginner.length" class="contrib-section">
       <div class="contrib-section__header">
-        <span class="contrib-section__title">🟢 Beginner Friendly</span>
+        <span class="contrib-section__title">🟢 Good starting points for new contributors</span>
         <span class="contrib-section__count">{{ beginner.length }}</span>
       </div>
       <div class="contrib-grid">
@@ -191,7 +191,7 @@ const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
     <!-- Intermediate -->
     <section v-if="intermediate.length" class="contrib-section">
       <div class="contrib-section__header">
-        <span class="contrib-section__title">🟡 Intermediate</span>
+        <span class="contrib-section__title">🟡 Requires some codebase familiarity</span>
         <span class="contrib-section__count">{{ intermediate.length }}</span>
       </div>
       <div class="contrib-grid">
@@ -241,7 +241,7 @@ const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
     <!-- Advanced -->
     <section v-if="advanced.length" class="contrib-section">
       <div class="contrib-section__header">
-        <span class="contrib-section__title">🔴 Advanced</span>
+        <span class="contrib-section__title">🔴 Complex — best after you've contributed a few times</span>
         <span class="contrib-section__count">{{ advanced.length }}</span>
       </div>
       <div class="contrib-grid">

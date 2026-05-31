@@ -19,10 +19,20 @@ interface NodeInfo {
   importedBy: string[]
 }
 
+const SUBSYSTEM_PREFIXES: Record<string, string[]> = {
+  frontend: ['src/', 'frontend/', 'client/', 'ui/', 'app/', 'web/', 'pages/', 'components/'],
+  api:      ['api/', 'routes/', 'routers/', 'endpoints/', 'views/', 'handlers/', 'controllers/', 'server/'],
+  data:     ['models/', 'db/', 'database/', 'migrations/', 'schemas/', 'repositories/'],
+  tests:    ['tests/', '__tests__/', 'spec/', 'test/', 'e2e/', 'integration/'],
+  config:   ['config/', 'scripts/', '.github/', 'ci/', 'infra/', 'deploy/'],
+}
+
 const selectedNode = ref<NodeInfo | null>(null)
 const searchQuery = ref('')
 const searchMatches = ref<string[]>([])
 const searchIndex = ref(0)
+const subsystemFilter = ref('all')
+const showAllImpact = ref(false)
 
 function zoomToMatch(idx: number) {
   if (!cy || !searchMatches.value.length) return
@@ -80,6 +90,23 @@ const edgeIndex = computed(() => {
   return { imports, importedBy }
 })
 
+const impactRadius = computed((): string[] => {
+  if (!selectedNode.value) return []
+  const idx = edgeIndex.value
+  const visited = new Set<string>()
+  const queue = [selectedNode.value.id]
+  while (queue.length) {
+    const cur = queue.shift()!
+    for (const dep of (idx.importedBy[cur] ?? [])) {
+      if (!visited.has(dep)) {
+        visited.add(dep)
+        queue.push(dep)
+      }
+    }
+  }
+  return [...visited].sort()
+})
+
 function selectNode(id: string, isGod: boolean) {
   const idx = edgeIndex.value
   selectedNode.value = {
@@ -93,7 +120,24 @@ function selectNode(id: string, isGod: boolean) {
 
 function closeDrawer() {
   selectedNode.value = null
-  cy?.elements().removeClass('faded selected')
+  showAllImpact.value = false
+  cy?.elements().removeClass('faded selected impact')
+}
+
+function applySubsystemFilter(filter: string) {
+  subsystemFilter.value = filter
+  if (!cy) return
+  if (filter === 'all') {
+    cy.elements().removeClass('faded')
+    return
+  }
+  const prefixes = SUBSYSTEM_PREFIXES[filter] ?? []
+  cy.nodes().forEach(node => {
+    const id = node.id()
+    const matches = prefixes.some(p => id.startsWith(p))
+    if (matches) node.removeClass('faded')
+    else node.addClass('faded')
+  })
 }
 
 function cssVar(name: string): string {
@@ -226,6 +270,17 @@ function initGraph() {
         },
       },
       {
+        selector: 'node.impact',
+        style: {
+          'background-color': cssVar('--color-warning'),
+          width: 18,
+          height: 18,
+          'border-width': 1,
+          'border-color': cssVar('--color-text'),
+          opacity: 1,
+        },
+      },
+      {
         selector: 'edge.faded',
         style: { opacity: 0.05 },
       },
@@ -253,7 +308,7 @@ function initGraph() {
     const id = node.id()
     const isGod = node.data('isGod') as boolean
 
-    cy!.elements().removeClass('faded selected')
+    cy!.elements().removeClass('faded selected impact')
 
     const neighborhood = node.closedNeighborhood()
     cy!.elements().not(neighborhood).addClass('faded')
@@ -261,6 +316,24 @@ function initGraph() {
     node.removeClass('faded')
 
     selectNode(id, isGod)
+    showAllImpact.value = false
+
+    // Highlight impact radius (files that depend on this one)
+    const idx = edgeIndex.value
+    const visited = new Set<string>()
+    const queue = [id]
+    while (queue.length) {
+      const cur = queue.shift()!
+      for (const dep of (idx.importedBy[cur] ?? [])) {
+        if (!visited.has(dep)) {
+          visited.add(dep)
+          queue.push(dep)
+        }
+      }
+    }
+    visited.forEach(impId => {
+      cy!.getElementById(impId).removeClass('faded').addClass('impact')
+    })
   })
 
   cy.on('tap', (evt) => {
@@ -313,9 +386,20 @@ watch(() => props.graph, initGraph)
     <div v-if="!graph.nodes.length" class="empty-state">No import data found</div>
     <template v-else>
       <div class="dep-graph__legend">
-        <span class="dep-graph__legend-item dep-graph__legend-item--normal">Regular module</span>
-        <span class="dep-graph__legend-item dep-graph__legend-item--god">God module</span>
-        <span class="dep-graph__legend-hint">Click a node to inspect connections</span>
+        <span class="dep-graph__legend-item dep-graph__legend-item--normal">Source file</span>
+        <span class="dep-graph__legend-item dep-graph__legend-item--god" title="Imported by many other files — changing it could break a lot">Core file (depended on by many)</span>
+        <span class="dep-graph__legend-item dep-graph__legend-item--impact" title="Files that would need updating if you change the selected file">Affected by changes</span>
+        <span class="dep-graph__legend-hint">Click any file to see what it imports and what depends on it</span>
+      </div>
+      <div class="dep-graph__filters">
+        <span class="dep-graph__filter-label">Filter by area:</span>
+        <button
+          v-for="f in ['all', 'frontend', 'api', 'data', 'tests', 'config']"
+          :key="f"
+          :class="['dep-graph__filter-btn', subsystemFilter === f && 'dep-graph__filter-btn--active']"
+          :title="f === 'all' ? 'Show all files' : `Show only files in the ${f} area`"
+          @click="applySubsystemFilter(f)"
+        >{{ f }}</button>
       </div>
       <div class="dep-graph__stage">
         <div ref="container" class="dep-graph__canvas" />
@@ -350,7 +434,7 @@ watch(() => props.graph, initGraph)
 
             <div class="dep-graph__drawer-section">
               <h4 class="dep-graph__drawer-section-title">
-                Imports
+                This file uses
                 <span class="dep-graph__drawer-count">{{ selectedNode.imports.length }}</span>
               </h4>
               <div v-if="selectedNode.imports.length" class="dep-graph__drawer-list">
@@ -364,12 +448,12 @@ watch(() => props.graph, initGraph)
                   <span class="dep-graph__drawer-item-label">{{ m.split('/').pop() }}</span>
                 </div>
               </div>
-              <p v-else class="dep-graph__drawer-empty">No outgoing imports</p>
+              <p v-else class="dep-graph__drawer-empty">This file doesn't import anything tracked</p>
             </div>
 
             <div class="dep-graph__drawer-section">
               <h4 class="dep-graph__drawer-section-title">
-                Imported by
+                Other files that use this
                 <span class="dep-graph__drawer-count">{{ selectedNode.importedBy.length }}</span>
               </h4>
               <div v-if="selectedNode.importedBy.length" class="dep-graph__drawer-list">
@@ -383,7 +467,31 @@ watch(() => props.graph, initGraph)
                   <span class="dep-graph__drawer-item-label">{{ m.split('/').pop() }}</span>
                 </div>
               </div>
-              <p v-else class="dep-graph__drawer-empty">Nothing imports this module</p>
+              <p v-else class="dep-graph__drawer-empty">No other files import this one</p>
+            </div>
+
+            <div v-if="impactRadius.length" class="dep-graph__drawer-section dep-graph__drawer-section--impact">
+              <h4 class="dep-graph__drawer-section-title">
+                Change impact
+                <span class="dep-graph__drawer-count dep-graph__drawer-count--impact">{{ impactRadius.length }}</span>
+              </h4>
+              <p class="dep-graph__drawer-impact-hint">
+                If you edit this file, {{ impactRadius.length }} other file{{ impactRadius.length !== 1 ? 's' : '' }} could break or need updating (shown in orange on the graph).
+              </p>
+              <div class="dep-graph__drawer-list">
+                <div
+                  v-for="m in (showAllImpact ? impactRadius : impactRadius.slice(0, 5))"
+                  :key="m"
+                  class="dep-graph__drawer-item dep-graph__drawer-item--impact"
+                  :title="m"
+                >
+                  <span class="dep-graph__drawer-arrow">↗</span>
+                  <span class="dep-graph__drawer-item-label">{{ m.split('/').pop() }}</span>
+                </div>
+              </div>
+              <button v-if="impactRadius.length > 5" class="dep-graph__show-more" @click="showAllImpact = !showAllImpact">
+                {{ showAllImpact ? 'Show less' : `Show all ${impactRadius.length}` }}
+              </button>
             </div>
           </div>
         </Transition>

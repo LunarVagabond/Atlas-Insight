@@ -102,7 +102,8 @@ const chartOptions = {
     <div v-else class="empty-state">No commit data available</div>
 
     <div v-if="commits.contributor_churn.length" style="margin-top: 2rem">
-      <h3 class="panel__title">Contributor Activity</h3>
+      <h3 class="panel__title">Contributor activity by month</h3>
+      <p class="panel__subtitle">Each row = one month of this project's history. "Active" = committed that month. "New" = first time contributing. "Left" = contributed before but not this month.</p>
       <input
         v-model="churnFilter.query.value"
         class="table-search"
@@ -114,14 +115,14 @@ const chartOptions = {
             <th class="runs-table__sortable" @click="churnFilter.setSort('month')">
               Month {{ churnFilter.sortIcon('month') }}
             </th>
-            <th class="runs-table__sortable" @click="churnFilter.setSort('active')">
-              Active {{ churnFilter.sortIcon('active') }}
+            <th class="runs-table__sortable" @click="churnFilter.setSort('active')" title="Developers who made at least one commit this month">
+              Active contributors {{ churnFilter.sortIcon('active') }}
             </th>
-            <th class="runs-table__sortable" @click="churnFilter.setSort('new')">
-              New {{ churnFilter.sortIcon('new') }}
+            <th class="runs-table__sortable" @click="churnFilter.setSort('new')" title="Developers contributing for the first time">
+              First-time contributors {{ churnFilter.sortIcon('new') }}
             </th>
-            <th class="runs-table__sortable" @click="churnFilter.setSort('lost')">
-              Lost {{ churnFilter.sortIcon('lost') }}
+            <th class="runs-table__sortable" @click="churnFilter.setSort('lost')" title="Developers who contributed before but not this month">
+              Stopped contributing {{ churnFilter.sortIcon('lost') }}
             </th>
           </tr>
         </thead>

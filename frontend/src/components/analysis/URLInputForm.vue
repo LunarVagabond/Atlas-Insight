@@ -4,13 +4,15 @@ import axios from 'axios'
 import AppButton from '../ui/AppButton.vue'
 import { useAuthStore } from '../../stores/auth'
 
-const emit = defineEmits<{ submitted: [url: string, pat?: string] }>()
+const emit = defineEmits<{ submitted: [url: string, pat?: string, email?: string] }>()
 defineProps<{ loading?: boolean; error?: string | null }>()
 
 const auth = useAuthStore()
 const url = ref('')
 const pat = ref('')
 const showPat = ref(false)
+const notifyEmail = ref('')
+const showNotify = ref(false)
 const localError = ref('')
 
 interface GhRepo { full_name: string; html_url: string; private: boolean }
@@ -78,12 +80,17 @@ function submit() {
     localError.value = 'Must be a valid GitHub repository URL (e.g. https://github.com/owner/repo)'
     return
   }
-  emit('submitted', trimmed, pat.value.trim() || undefined)
+  emit('submitted', trimmed, pat.value.trim() || undefined, notifyEmail.value.trim() || undefined)
 }
 
 function togglePat() {
   showPat.value = !showPat.value
   if (!showPat.value) pat.value = ''
+}
+
+function toggleNotify() {
+  showNotify.value = !showNotify.value
+  if (!showNotify.value) notifyEmail.value = ''
 }
 </script>
 
@@ -137,6 +144,29 @@ function togglePat() {
         <span class="url-form__pat-toggle-icon">{{ showPat ? '−' : '+' }}</span>
         Personal Access Token
       </button>
+      <button
+        type="button"
+        class="url-form__pat-toggle"
+        :class="{ 'url-form__pat-toggle--active': showNotify }"
+        @click="toggleNotify"
+      >
+        <span class="url-form__pat-toggle-icon">{{ showNotify ? '−' : '+' }}</span>
+        Notify me when done
+      </button>
+    </div>
+
+    <div v-if="showNotify" class="url-form__pat-panel">
+      <p class="url-form__pat-why">
+        Enter your email and we'll notify you when the analysis finishes.
+        Useful for large repositories that take a minute or two.
+      </p>
+      <input
+        v-model="notifyEmail"
+        type="email"
+        class="url-form__input url-form__pat-input"
+        placeholder="you@example.com"
+        autocomplete="email"
+      />
     </div>
 
     <div v-if="showPat" class="url-form__pat-panel">

@@ -8,9 +8,33 @@ const props = defineProps<{
 }>()
 
 const expandedId = ref<string | null>(null)
+const copiedId = ref<string | null>(null)
 
 function toggle(id: string) {
   expandedId.value = expandedId.value === id ? null : id
+}
+
+function peekFile(tour: ArchTour): string | null {
+  const f = tour.entry_files[0]
+  if (!f) return null
+  const parts = f.split('/')
+  return parts[parts.length - 1] ?? null
+}
+
+function copyReadingList(tour: ArchTour) {
+  const lines = [`# ${tour.name}`, '']
+  if (tour.entry_files.length) {
+    lines.push('## Entry Points', ...tour.entry_files.map(f => `- ${f}`), '')
+  }
+  if (tour.reading_order.length) {
+    lines.push('## Reading Order')
+    tour.reading_order.forEach((s, i) => {
+      lines.push(`${i + 1}. ${s.file}${s.note ? ` — ${s.note}` : ''}`)
+    })
+  }
+  navigator.clipboard.writeText(lines.join('\n')).catch(() => {})
+  copiedId.value = tour.id
+  setTimeout(() => { copiedId.value = null }, 2000)
 }
 
 function githubFileUrl(file: string): string | null {
@@ -54,7 +78,12 @@ const SUBSYSTEM_ICONS: Record<string, string> = {
           <span class="tour-card__icon">{{ SUBSYSTEM_ICONS[tour.subsystem_type] ?? '📁' }}</span>
           <div class="tour-card__meta">
             <span class="tour-card__name">{{ tour.name }}</span>
-            <span class="tour-card__count">{{ tour.file_count }} files</span>
+            <div class="tour-card__meta-row">
+              <span class="tour-card__count">{{ tour.file_count }} files</span>
+              <span v-if="peekFile(tour) && expandedId !== tour.id" class="tour-card__peek">
+                → {{ peekFile(tour) }}
+              </span>
+            </div>
           </div>
           <span class="tour-card__chevron">{{ expandedId === tour.id ? '▲' : '▼' }}</span>
         </div>
@@ -62,6 +91,11 @@ const SUBSYSTEM_ICONS: Record<string, string> = {
 
         <Transition name="tour-expand">
           <div v-if="expandedId === tour.id" class="tour-card__body" @click.stop>
+            <div class="tour-card__body-actions">
+              <button class="tour-copy-btn" @click.stop="copyReadingList(tour)">
+                {{ copiedId === tour.id ? '✓ Copied' : '⎘ Copy list' }}
+              </button>
+            </div>
             <!-- Entry Points -->
             <div v-if="tour.entry_files.length" class="tour-section">
               <h4 class="tour-section__title">Entry Points</h4>
@@ -103,7 +137,7 @@ const SUBSYSTEM_ICONS: Record<string, string> = {
             <div v-if="tour.reading_order.length" class="tour-section">
               <h4 class="tour-section__title">Suggested Reading Order</h4>
               <ol class="tour-steps">
-                <li v-for="(step, i) in tour.reading_order" :key="step.file" class="tour-step">
+                <li v-for="(step, i) in tour.reading_order" :key="step.file" :class="['tour-step', i === 0 && 'tour-step--start']">
                   <span class="tour-step__num">{{ i + 1 }}</span>
                   <div class="tour-step__body">
                     <a

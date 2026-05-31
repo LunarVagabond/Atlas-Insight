@@ -105,7 +105,11 @@ def parse_imports(repo_dir: str) -> list[dict]:
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
         for fname in files:
             fpath = os.path.join(root, fname)
-            if os.path.getsize(fpath) > MAX_FILE_SIZE:
+            try:
+                fsize = os.path.getsize(fpath)
+            except OSError:
+                continue
+            if fsize > MAX_FILE_SIZE:
                 continue
             ext = Path(fname).suffix.lower()
             source = _rel(base, fpath)

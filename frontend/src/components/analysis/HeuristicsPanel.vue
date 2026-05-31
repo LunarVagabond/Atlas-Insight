@@ -33,15 +33,30 @@ function level(score: number): 'low' | 'medium' | 'high' {
 }
 
 function riskLabel(score: number): string {
-  if (score < 30) return 'Low Risk'
-  if (score < 60) return 'Moderate Risk'
-  return 'High Risk'
+  if (score < 30) return 'Low concern'
+  if (score < 60) return 'Worth watching'
+  return 'Needs attention'
+}
+
+const SIGNAL_DESCRIPTIONS: Partial<Record<HeuristicSignalKey, string>> = {
+  burnout:               'Is one person doing most of the work? High scores mean too much depends on a single contributor.',
+  abandonment_risk:      'How likely is it that this project is no longer being actively maintained.',
+  monolith_growth:       'Is the codebase growing without clear structure? High scores mean it may be getting harder to navigate.',
+  dependency_health:     'Are the project\'s libraries up to date and actively maintained by their authors?',
+  documentation_quality: 'How well-documented is the project? Good docs help new contributors get started faster.',
+  ci_health:             'Does the project use automated testing and deployment pipelines? These catch bugs before they ship.',
+  bus_factor_risk:       'How many contributors could leave before the project loses critical knowledge?',
+  security_hygiene:      'Are common security practices in place — like a security policy, .gitignore, and avoiding hardcoded secrets?',
+  release_cadence:       'How regularly does the project ship new versions? Consistent releases signal a healthy project.',
+  community_health:      'Does the project have the community files that make it easier for others to contribute and participate?',
+  commit_velocity:       'Is code being committed regularly? Slowing velocity can signal a project winding down.',
 }
 </script>
 
 <template>
   <div class="panel">
-    <h2 class="panel__title">Heuristic Insights</h2>
+    <h2 class="panel__title">Health Signals</h2>
+    <p class="panel__subtitle">Automated signals about this project's activity, health, and contributor patterns — click any card for details.</p>
     <div class="heuristics-grid">
       <AppCard
         v-for="signal in signals"
@@ -55,7 +70,12 @@ function riskLabel(score: number): string {
             <div class="heuristic__title-group">
               <div class="heuristic__icon-label">
                 <span class="heuristic__icon">{{ icon(signal.signal) }}</span>
-                <span class="heuristic__label">{{ signal.label }}</span>
+                <div class="heuristic__label-group">
+                  <span class="heuristic__label">{{ signal.label }}</span>
+                  <span v-if="SIGNAL_DESCRIPTIONS[signal.signal]" class="heuristic__description">
+                    {{ SIGNAL_DESCRIPTIONS[signal.signal] }}
+                  </span>
+                </div>
               </div>
               <span :class="['heuristic__risk', `heuristic__risk--${level(signal.score)}`]">
                 {{ riskLabel(signal.score) }}
@@ -78,7 +98,7 @@ function riskLabel(score: number): string {
 
           <div class="heuristic__footer">
             <span :class="['heuristic__confidence-dot', `heuristic__confidence-dot--${signal.confidence}`]" />
-            <span class="heuristic__confidence-text">{{ signal.confidence }} confidence</span>
+            <span class="heuristic__confidence-text" :title="signal.confidence === 'high' ? 'Strong data signal' : signal.confidence === 'medium' ? 'Moderate data signal' : 'Limited data available'">{{ signal.confidence }} confidence</span>
             <span class="heuristic__details-hint">Details →</span>
           </div>
         </div>

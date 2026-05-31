@@ -288,13 +288,13 @@ const explorerResults = computed(() => {
       <AppCard>
         <div class="stat">
           <div class="stat__value">{{ graph.cycle_count }}</div>
-          <div class="stat__label">Dependency Cycles</div>
+          <div class="stat__label">Circular dependencies</div>
         </div>
       </AppCard>
       <AppCard>
         <div class="stat">
           <div class="stat__value">{{ graph.god_modules.length }}</div>
-          <div class="stat__label">God Modules</div>
+          <div class="stat__label">Core files (depended on by many)</div>
         </div>
       </AppCard>
     </div>
@@ -319,8 +319,8 @@ const explorerResults = computed(() => {
           >
             <span class="arch-explorer__item-label" :title="n.id">{{ n.id.split('/').pop() }}</span>
             <span class="arch-explorer__item-path">{{ n.id }}</span>
-            <span v-if="godIds.has(n.id)" class="arch-explorer__badge arch-explorer__badge--god">god</span>
-            <span v-else-if="n.id in hotspotDegrees" class="arch-explorer__badge arch-explorer__badge--hot">hotspot</span>
+            <span v-if="godIds.has(n.id)" class="arch-explorer__badge arch-explorer__badge--god" title="Imported by many other files">core file</span>
+            <span v-else-if="n.id in hotspotDegrees" class="arch-explorer__badge arch-explorer__badge--hot" title="Heavily connected to other files">well-connected</span>
           </button>
         </div>
         <p v-else-if="explorerQuery" class="arch-explorer__empty">No modules match "{{ explorerQuery }}"</p>
@@ -328,13 +328,14 @@ const explorerResults = computed(() => {
     </div>
 
     <div v-if="graph.god_modules.length" style="margin-top: 1.5rem">
-      <h3 class="panel__title">God Modules <span style="font-size:0.75rem;font-weight:400;color:var(--color-text-muted)">(high in-degree — click to inspect)</span></h3>
-      <input v-model="godFilter.query.value" class="table-search" placeholder="Search modules…" />
+      <h3 class="panel__title">Core files <span style="font-size:0.75rem;font-weight:400;color:var(--color-text-muted)">(imported by many others — click to inspect)</span></h3>
+      <p class="panel__subtitle">Files that many other files depend on. Changing them can have wide effects across the codebase — read these early to understand the project's foundation.</p>
+      <input v-model="godFilter.query.value" class="table-search" placeholder="Search files…" />
       <table class="data-table">
         <thead>
           <tr>
-            <th class="runs-table__sortable" @click="godFilter.setSort('module')">Module {{ godFilter.sortIcon('module') }}</th>
-            <th class="runs-table__sortable" @click="godFilter.setSort('in_degree')">Imported By {{ godFilter.sortIcon('in_degree') }}</th>
+            <th class="runs-table__sortable" @click="godFilter.setSort('module')">File {{ godFilter.sortIcon('module') }}</th>
+            <th class="runs-table__sortable" @click="godFilter.setSort('in_degree')">Used by (# of files) {{ godFilter.sortIcon('in_degree') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -352,20 +353,22 @@ const explorerResults = computed(() => {
     </div>
 
     <div v-if="graph.cycles.length" style="margin-top: 1.5rem">
-      <h3 class="panel__title">Circular Dependencies (sample)</h3>
+      <h3 class="panel__title">Circular dependencies (files that depend on each other)</h3>
+      <p class="panel__subtitle">Like two people waiting for each other to go first — circular imports make code harder to test and refactor. These are worth cleaning up over time.</p>
       <div v-for="(cycle, i) in graph.cycles.slice(0, 5)" :key="i" class="cycle-item">
         <code>{{ cycle.join(' → ') }}</code>
       </div>
     </div>
 
     <div v-if="graph.hotspots.length" style="margin-top: 1.5rem">
-      <h3 class="panel__title">File Hotspots <span style="font-size:0.75rem;font-weight:400;color:var(--color-text-muted)">(click to inspect)</span></h3>
+      <h3 class="panel__title">Most-connected files <span style="font-size:0.75rem;font-weight:400;color:var(--color-text-muted)">(click to inspect)</span></h3>
+      <p class="panel__subtitle">Files with the most import connections — both things they depend on and things that depend on them. High numbers mean this file is central to the project.</p>
       <input v-model="hotFilter.query.value" class="table-search" placeholder="Search files…" />
       <table class="data-table">
         <thead>
           <tr>
             <th class="runs-table__sortable" @click="hotFilter.setSort('file')">File {{ hotFilter.sortIcon('file') }}</th>
-            <th class="runs-table__sortable" @click="hotFilter.setSort('degree')">Connections {{ hotFilter.sortIcon('degree') }}</th>
+            <th class="runs-table__sortable" @click="hotFilter.setSort('degree')">Total connections {{ hotFilter.sortIcon('degree') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -383,7 +386,8 @@ const explorerResults = computed(() => {
     </div>
 
     <div v-if="hotFiles?.length" style="margin-top: 1.5rem">
-      <h3 class="panel__title">Hot Files <span style="font-size:0.75rem;font-weight:400;color:var(--color-text-muted)">(click to inspect)</span></h3>
+      <h3 class="panel__title">Most-changed files <span style="font-size:0.75rem;font-weight:400;color:var(--color-text-muted)">(click to inspect)</span></h3>
+      <p class="panel__subtitle">Files edited most often in this repo's history — worth reading early to understand what's actively developed or frequently bugs.</p>
       <input v-model="hotFilesFilter.query.value" class="table-search" placeholder="Search files…" />
       <table class="data-table">
         <thead>

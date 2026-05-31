@@ -9,9 +9,11 @@ import LoadingSpinner from '../components/ui/LoadingSpinner.vue'
 import CompareModal from '../components/ui/CompareModal.vue'
 import { useAnalysisStore } from '../stores/analysis'
 import type { RunListItem, FeaturedRepo } from '../stores/analysis'
+import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
 const store = useAnalysisStore()
+const auth = useAuthStore()
 
 const featured = ref<FeaturedRepo | null>(null)
 
@@ -38,9 +40,9 @@ onMounted(() => {
   fetchFeatured()
 })
 
-async function handleSubmit(url: string, pat?: string) {
+async function handleSubmit(url: string, pat?: string, email?: string) {
   try {
-    const runId = await store.submitUrl(url, pat)
+    const runId = await store.submitUrl(url, pat, email)
     router.push(`/results/${runId}`)
   } catch {
     // error shown in form
@@ -66,6 +68,12 @@ async function fetchRuns() {
     })
     items.value = data.items
     total.value = data.total
+    // Sync watchlist from server favorites for authenticated users
+    if (auth.isAuthenticated) {
+      watchlist.value = new Set(
+        (data.items as RunListItem[]).filter(r => r.is_favorited).map(r => r.repo_url)
+      )
+    }
   } finally {
     loading.value = false
   }
@@ -107,12 +115,29 @@ const watchlist = ref<Set<string>>(loadWatchlist())
 
 function isPinned(repoUrl: string) { return watchlist.value.has(repoUrl) }
 
-function togglePin(repoUrl: string) {
+async function togglePin(repoUrl: string) {
+  const pinned = watchlist.value.has(repoUrl)
   const w = new Set(watchlist.value)
-  if (w.has(repoUrl)) w.delete(repoUrl)
+  if (pinned) w.delete(repoUrl)
   else w.add(repoUrl)
   watchlist.value = w
-  localStorage.setItem(WATCHLIST_KEY, JSON.stringify([...w]))
+
+  if (auth.isAuthenticated) {
+    const item = items.value.find(r => r.repo_url === repoUrl)
+    if (item?.repo_id) {
+      try {
+        if (pinned) {
+          await axios.delete(`/api/v1/repositories/repos/${item.repo_id}/favorite`)
+        } else {
+          await axios.post(`/api/v1/repositories/repos/${item.repo_id}/favorite`)
+        }
+      } catch {
+        // silent — local state already updated
+      }
+    }
+  } else {
+    localStorage.setItem(WATCHLIST_KEY, JSON.stringify([...w]))
+  }
 }
 
 const pinnedItems = computed(() => items.value.filter(r => watchlist.value.has(r.repo_url)))

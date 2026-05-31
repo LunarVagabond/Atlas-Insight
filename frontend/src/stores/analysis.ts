@@ -37,6 +37,39 @@ export interface ContributionOpportunity {
   has_open_pr?: boolean
   labels?: string[]
   hints?: string[]
+  knowledge_domains?: string[]
+  effort_estimate?: 'quick-win' | 'small' | 'medium' | 'large'
+  affected_file_count?: number
+}
+
+export interface JitIssue {
+  number: number
+  title: string
+  url: string
+  labels: string[]
+  body_excerpt: string
+}
+
+export interface JitPrData {
+  pr_issue_refs: number[]
+  open_prs: number
+}
+
+export interface OwnershipSubsystem {
+  id: string
+  name: string
+  subsystem_type: string
+  file_count: number
+  activity_score: number
+  hot_files: { file: string; commit_count: number }[]
+  god_modules: { module: string; in_degree: number }[]
+  primary_language: string
+}
+
+export interface OwnershipData {
+  subsystems: OwnershipSubsystem[]
+  top_contributors: { author: string; files_touched: number }[]
+  bus_factor: number
 }
 
 export interface RunResult {
@@ -52,6 +85,7 @@ export interface RunResult {
   contribution_opportunities?: ContributionOpportunity[]
   todos?: TodoData
   arch_tours?: ArchTour[]
+  ownership?: OwnershipData
   error?: string
 }
 
@@ -303,6 +337,7 @@ export interface HeuristicSignal {
 
 export interface RunListItem {
   id: string
+  repo_id: string
   status: 'pending' | 'running' | 'completed' | 'failed'
   triggered_at: string
   completed_at: string | null
@@ -311,6 +346,7 @@ export interface RunListItem {
   repo_name: string
   is_stale: boolean
   is_private: boolean
+  is_favorited: boolean
   last_fetched_at: string | null
   tags: string[]
 }
@@ -324,17 +360,24 @@ export const useAnalysisStore = defineStore('analysis', {
     staleRun: null as AnalysisRun | null,
     error: null as string | null,
     _pollInterval: null as ReturnType<typeof setInterval> | null,
+    jitIssues: null as JitIssue[] | null,
+    jitPrs: null as JitPrData | null,
+    jitLoading: false,
   }),
 
   actions: {
-    async submitUrl(url: string, pat?: string) {
+    async submitUrl(url: string, pat?: string, notificationEmail?: string) {
       this.url = url
       this.status = 'submitting'
       this.error = null
       this.run = null
       this.staleRun = null
       try {
-        const { data } = await axios.post('/api/v1/repositories/analyze', { url, pat: pat || undefined })
+        const { data } = await axios.post('/api/v1/repositories/analyze', {
+          url,
+          pat: pat || undefined,
+          notification_email: notificationEmail || undefined,
+        })
         this.currentRunId = data.run_id
         this.status = 'polling'
         this._startPolling(data.run_id)
@@ -344,6 +387,21 @@ export const useAnalysisStore = defineStore('analysis', {
         const axiosErr = err as { response?: { data?: { detail?: string } } }
         this.error = axiosErr.response?.data?.detail ?? 'Failed to submit URL'
         throw err
+      }
+    },
+
+    async fetchJitData(runId: string) {
+      if (this.jitLoading) return
+      this.jitLoading = true
+      try {
+        const [issuesRes, prsRes] = await Promise.allSettled([
+          axios.get(`/api/v1/repositories/runs/${runId}/issues`),
+          axios.get(`/api/v1/repositories/runs/${runId}/prs`),
+        ])
+        this.jitIssues = issuesRes.status === 'fulfilled' ? issuesRes.value.data : null
+        this.jitPrs = prsRes.status === 'fulfilled' ? prsRes.value.data : null
+      } finally {
+        this.jitLoading = false
       }
     },
 

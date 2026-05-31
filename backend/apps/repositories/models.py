@@ -45,6 +45,19 @@ class AnalysisRun(models.Model):
     result = models.JSONField(null=True, blank=True)
     celery_task_id = models.CharField(max_length=255, blank=True, default='')
     webhook_url = models.URLField(blank=True, default='')
+    notification_email = models.EmailField(blank=True, default='')
 
     def __str__(self):
         return f'{self.repo} run {self.pk} ({self.status})'
+
+
+class UserFavorite(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='favorites')
+    repo = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name='favorited_by')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [('user', 'repo')]
+
+    def __str__(self):
+        return f'{self.user} → {self.repo}'

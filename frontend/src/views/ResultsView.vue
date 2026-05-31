@@ -16,6 +16,7 @@ import ContributingPanel from '../components/analysis/ContributingPanel.vue'
 import RoadmapTimeline from '../components/analysis/RoadmapTimeline.vue'
 import SecurityPanel from '../components/analysis/SecurityPanel.vue'
 import ArchitectureToursPanel from '../components/analysis/ArchitectureToursPanel.vue'
+import OwnershipPanel from '../components/analysis/OwnershipPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -51,7 +52,7 @@ watch(isPolling, (polling) => {
 }, { immediate: true })
 
 const hasRoadmap = computed(() => (result.value?.structure?.roadmap_parsed?.milestones?.length ?? 0) > 0)
-const TABS = computed(() => ['Overview', 'Project', 'Architecture', 'Tours', 'Dependencies', 'Security', 'History', 'Heuristics', 'Contributing'])
+const TABS = computed(() => ['Overview', 'Project', 'Architecture', 'Tours', 'Ownership', 'Dependencies', 'Security', 'History', 'Heuristics', 'Contributing'])
 
 const activeTab = ref((route.query.tab as string) || 'Overview')
 
@@ -67,8 +68,16 @@ watch(runId, async (id) => {
   if (!id) { router.push('/'); return }
   activeTab.value = (route.query.tab as string) || 'Overview'
   store._stopPolling()
+  store.jitIssues = null
+  store.jitPrs = null
   await store.pollRun(id)
 }, { immediate: true })
+
+watch(() => store.run?.status, (status) => {
+  if (status === 'completed' && runId.value) {
+    store.fetchJitData(runId.value)
+  }
+})
 
 onUnmounted(() => {
   store._stopPolling()
@@ -191,6 +200,13 @@ function copyLink() {
           </div>
         </template>
         <ArchitectureToursPanel v-if="activeTab === 'Tours'" :tours="result.arch_tours ?? []" :repo-url="store.run?.repo_url" />
+        <OwnershipPanel
+          v-if="activeTab === 'Ownership'"
+          :ownership="result.ownership ?? { subsystems: [], top_contributors: [], bus_factor: 0 }"
+          :jit-issues="store.jitIssues"
+          :jit-loading="store.jitLoading"
+          :repo-url="store.run?.repo_url"
+        />
         <DependenciesPanel v-if="activeTab === 'Dependencies'" :deps="result.dependencies" />
         <SecurityPanel v-if="activeTab === 'Security'" :security="result.security" :heuristics="result.heuristics" :structure="result.structure" />
         <template v-if="activeTab === 'History'">

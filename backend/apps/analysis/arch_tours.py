@@ -42,6 +42,16 @@ ENTRY_FILENAMES = frozenset({
     'mod.rs', 'lib.rs', 'main.rs',
 })
 
+EXT_LABELS: dict[str, str] = {
+    '.py': 'Python', '.js': 'JavaScript', '.ts': 'TypeScript', '.tsx': 'TypeScript/JSX',
+    '.jsx': 'JavaScript/JSX', '.go': 'Go', '.rs': 'Rust', '.java': 'Java',
+    '.rb': 'Ruby', '.php': 'PHP', '.cs': 'C#', '.cpp': 'C++', '.c': 'C',
+    '.vue': 'Vue component', '.svelte': 'Svelte component',
+    '.scss': 'Styles', '.css': 'Styles', '.sql': 'SQL', '.sh': 'Shell script',
+    '.md': 'Documentation', '.yaml': 'Config', '.yml': 'Config', '.toml': 'Config',
+    '.json': 'Config/Data', '.xml': 'Config/Data',
+}
+
 
 def _detect_subsystem_type(dir_name: str) -> str:
     lower = dir_name.lower()
@@ -87,7 +97,9 @@ def _file_note(file: str, subsystem_files: set[str], internal_in_degree: dict[st
     if graph_in_degree.get(file, 0) == max((graph_in_degree.get(f, 0) for f in subsystem_files), default=0):
         if graph_in_degree.get(file, 0) > 0:
             return 'Core logic'
-    return ''
+    # Fallback: file type label so no step is completely unlabelled
+    ext = '.' + basename.rsplit('.', 1)[-1] if '.' in basename else ''
+    return EXT_LABELS.get(ext, '')
 
 
 def generate_arch_tours(structure: dict, graph: dict, commits: dict) -> list[dict]:
@@ -214,19 +226,42 @@ def _generate(structure: dict, graph: dict, commits: dict) -> list[dict]:
         return []
 
     # Prepend a "Full Repository Overview" tour using top-level dirs as steps
+    def _overview_note(d: str) -> str:
+        stype = _detect_subsystem_type(d.split('/')[0])
+        label = SUBSYSTEM_LABELS.get(stype, '')
+        count = len(dir_files[d])
+        return f'{label} · {count} files' if label else f'{count} files'
+
     overview_steps = [
-        {'file': f'{d}/', 'note': SUBSYSTEM_LABELS.get(_detect_subsystem_type(d.split('/')[0]), f'{len(dir_files[d])} files')}
+        {'file': f'{d}/', 'note': _overview_note(d)}
         for d in sorted(dir_files, key=lambda k: -len(dir_files[k]))
         if d.split('/')[0] not in SKIP_DIRS and len(dir_files[d]) >= 3
     ][:10]
 
+    # Global entry points: top files by graph in-degree (= most depended-upon)
+    all_files_set = set(all_files)
+    global_entry_files = [
+        f for f in sorted(graph_in_degree, key=lambda x: -graph_in_degree[x])
+        if f in all_files_set
+        and not any(part in SKIP_DIRS for part in f.split('/'))
+        and graph_in_degree[f] > 0
+    ][:8]
+    # Also include canonical entry filenames if not already present
+    entry_set = set(global_entry_files)
+    for f in sorted(all_files_set):
+        if len(global_entry_files) >= 8:
+            break
+        if f not in entry_set and f.split('/')[-1] in ENTRY_FILENAMES:
+            global_entry_files.append(f)
+            entry_set.add(f)
+
     overview = {
         'id': 'tour_overview',
         'name': 'Full Repository Overview',
-        'description': 'Top-level structure of the repository — a map of all major subsystems.',
+        'description': 'Top-level structure of the repository — a map of all major subsystems and primary entry points.',
         'subsystem_type': 'overview',
         'file_count': total_files,
-        'entry_files': [],
+        'entry_files': global_entry_files,
         'key_files': [],
         'reading_order': overview_steps,
     }

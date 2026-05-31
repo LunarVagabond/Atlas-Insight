@@ -39,6 +39,7 @@ const sortedIssues = computed(() =>
 <template>
   <div class="panel">
     <h2 class="panel__title">Security</h2>
+    <p class="panel__subtitle">Automated pattern matching — not a full security audit. These highlight areas worth reviewing, not confirmed vulnerabilities. Always consult a security professional for production systems.</p>
 
     <!-- Heuristic signal card -->
     <div v-if="securitySignal" class="security-panel__signal-row">
@@ -106,7 +107,7 @@ const sortedIssues = computed(() =>
 
     <!-- Scan issues table -->
     <div v-if="sortedIssues.length" class="security-panel__issues">
-      <h3 class="panel__subtitle">Scan Findings <span class="badge">{{ sortedIssues.length }}</span></h3>
+      <h3 class="panel__subtitle">Patterns detected ({{ sortedIssues.length }}) — review each to decide if action is needed</h3>
       <table class="data-table">
         <thead>
           <tr>
@@ -127,7 +128,7 @@ const sortedIssues = computed(() =>
       </table>
     </div>
     <div v-else class="security-panel__clear">
-      <span>✓</span> No scan findings detected.
+      <span>✓</span> No common security patterns detected — this doesn't guarantee the code is secure, but no automated red flags were found.
     </div>
 
     <HeuristicDrawer :signal="active" @close="active = null" />

@@ -19,6 +19,7 @@ from .import_parser import parse_imports
 from .project_structure import analyze_structure
 from .readme_parser import parse_readme
 from .arch_tours import generate_arch_tours
+from .ownership_analysis import analyze_ownership
 from .security_scan import scan_security
 from .todo_scan import scan_todos
 
@@ -110,6 +111,7 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
             'classification': classification,
             'todos': todos,
             'arch_tours': generate_arch_tours(structure, graph, commits),
+            'ownership': analyze_ownership(structure, commits, graph),
             'contribution_opportunities': analyze_contributions(
                 commits, graph, deps, readme, structure, security, contribution_data, todos=todos
             ),
@@ -183,6 +185,24 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
             )
         except Exception:
             logger.warning('Webhook POST failed for run %s → %s', run.id, run.webhook_url)
+
+    # Send email notification if configured
+    if run.notification_email:
+        try:
+            from django.conf import settings as _s
+            from django.core.mail import send_mail
+            result_url = f'{_s.FRONTEND_URL}/results/{run.id}'
+            subject = f'[Atlas Insight] Analysis {run.status}: {run.repo.owner}/{run.repo.name}'
+            body = (
+                f'Your analysis of {run.repo.url} is complete.\n'
+                f'Status: {run.status}\n\n'
+                f'View results: {result_url}\n'
+            )
+            if run.result and run.result.get('error'):
+                body += f'\nError: {run.result["error"]}\n'
+            send_mail(subject, body, None, [run.notification_email], fail_silently=True)
+        except Exception:
+            logger.warning('Email notification failed for run %s', run.id)
 
 
 @shared_task

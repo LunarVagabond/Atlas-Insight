@@ -49,6 +49,19 @@ function riskVariant(r: ContributionOpportunity['risk']) {
   return r === 'low' ? 'completed' : r === 'medium' ? 'warning' : 'failed'
 }
 
+function effortVariant(e: string) {
+  if (e === 'quick-win' || e === 'small') return 'completed'
+  if (e === 'medium') return 'warning'
+  return 'failed'
+}
+
+const EFFORT_LABELS: Record<string, string> = {
+  'quick-win': 'Quick win (under an hour)',
+  'small': 'Small change (a few hours)',
+  'medium': 'Medium effort (1–2 days)',
+  'large': 'Larger task (multi-day)',
+}
+
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape') emit('close')
 }
@@ -79,9 +92,21 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
             <div class="contrib-drawer__meta">
               <AppBadge :variant="diffVariant(opportunity.difficulty)">{{ opportunity.difficulty }}</AppBadge>
               <AppBadge :variant="riskVariant(opportunity.risk)">{{ opportunity.risk }} risk</AppBadge>
+              <AppBadge v-if="opportunity.effort_estimate" :variant="effortVariant(opportunity.effort_estimate)" :title="'Estimated effort for an average developer'">
+                {{ EFFORT_LABELS[opportunity.effort_estimate] ?? opportunity.effort_estimate }}
+              </AppBadge>
               <template v-if="opportunity.labels?.length">
                 <AppBadge v-for="label in opportunity.labels.slice(0, 4)" :key="label" variant="info">{{ label }}</AppBadge>
               </template>
+            </div>
+            <div v-if="opportunity.knowledge_domains?.length || opportunity.affected_file_count" class="contrib-drawer__feasibility">
+              <span v-if="opportunity.knowledge_domains?.length" class="contrib-drawer__feasibility-domains">
+                <span class="contrib-drawer__feasibility-label">Area:</span>
+                <span v-for="d in opportunity.knowledge_domains" :key="d" class="opp-domain-chip" :title="`This change involves the ${d} area of the codebase`">{{ d.charAt(0).toUpperCase() + d.slice(1) }}</span>
+              </span>
+              <span v-if="opportunity.affected_file_count" class="contrib-drawer__feasibility-files" title="More files = more complex review process">
+                Touches {{ opportunity.affected_file_count }} file{{ opportunity.affected_file_count !== 1 ? 's' : '' }} — {{ opportunity.affected_file_count === 1 ? 'focused change' : 'changes in more files = more complex review' }}
+              </span>
             </div>
 
             <hr class="contrib-drawer__sep" />
