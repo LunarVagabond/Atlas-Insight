@@ -1,0 +1,82 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+const props = defineProps<{
+  result: Record<string, any>
+  repoOwner: string
+  repoName: string
+  onStartReading: () => void
+}>()
+
+function pluralize(n: number, word: string) {
+  return `${n.toLocaleString()} ${word}${n === 1 ? '' : 's'}`
+}
+
+function ageFromDate(isoDate: string): string {
+  const created = new Date(isoDate)
+  const years = Math.floor((Date.now() - created.getTime()) / (1000 * 60 * 60 * 24 * 365))
+  if (years < 1) return 'less than a year old'
+  return `${years} year${years === 1 ? '' : 's'} old`
+}
+
+const narrative = computed(() => {
+  const meta: Record<string, any> = props.result.github_meta ?? {}
+  const cls: Record<string, any> = props.result.classification ?? {}
+  const commits: Record<string, any> = props.result.commits ?? {}
+  const structure: Record<string, any> = props.result.structure ?? {}
+
+  const name = `${props.repoOwner}/${props.repoName}`
+  const lang = meta.primary_language ? `${meta.primary_language} ` : ''
+  const desc = meta.github_description ? (meta.github_description as string).replace(/\.$/, '') : null
+  const health = cls.project_health?.label ?? null
+  const difficulty = cls.contribution_difficulty?.label ?? null
+  const contributors = commits.total_contributors ?? 0
+  const totalCommits = commits.total_commits ?? 0
+  const age = meta.created_at ? ageFromDate(meta.created_at as string) : null
+  const busFactor = structure.bus_factor ?? null
+
+  const sentences: string[] = []
+
+  // Sentence 1: identity
+  let s1 = `**${name}** is a ${lang}repository`
+  if (desc) s1 += ` — ${desc}`
+  if (age) s1 += `, ${age}`
+  if (contributors > 0 && totalCommits > 0) {
+    s1 += `, with ${pluralize(totalCommits, 'commit')} from ${pluralize(contributors, 'contributor')}`
+  }
+  sentences.push(s1 + '.')
+
+  // Sentence 2: health & contribution posture
+  if (health || difficulty) {
+    let s2 = ''
+    if (health) s2 += `It scores **${health}** on project health`
+    if (difficulty) s2 += `${health ? ' and is rated ' : 'Contributions are rated '}**${difficulty}** for new contributors`
+    sentences.push(s2 + '.')
+  }
+
+  // Sentence 3: bus factor signal
+  if (busFactor !== null) {
+    if (busFactor <= 1) {
+      sentences.push('Knowledge is concentrated in very few contributors — consider the bus factor risk before depending on this project.')
+    } else if (busFactor <= 3) {
+      sentences.push(`The bus factor is **${busFactor}** — a small core team carries most of the knowledge.`)
+    } else {
+      sentences.push(`With a bus factor of **${busFactor}**, knowledge is well-distributed across the team.`)
+    }
+  }
+
+  return sentences
+})
+</script>
+
+<template>
+  <div class="repo-narrative">
+    <div class="repo-narrative__body">
+      <p v-for="(sentence, i) in narrative" :key="i" class="repo-narrative__sentence" v-html="sentence.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')" />
+    </div>
+    <div class="repo-narrative__cta">
+      <button class="btn btn--primary repo-narrative__start" @click="onStartReading">
+        Start Reading →
+      </button>
+    </div>
+  </div>
+</template>

@@ -57,9 +57,21 @@ watch(isPolling, (polling) => {
 }, { immediate: true })
 
 const hasRoadmap = computed(() => (result.value?.structure?.roadmap_parsed?.milestones?.length ?? 0) > 0)
-const TABS = computed(() => ['Overview', 'Project', 'Architecture', 'Tours', 'Ownership', 'Dependencies', 'Security', 'History', 'Heuristics', 'Contributing'])
+
+const CHAPTER_TABS = ['Overview', 'Project', 'History', 'Architecture', 'Ownership', 'Dependencies', 'Security', 'Heuristics', 'Contributing', 'Tours']
+const TABS = computed(() => CHAPTER_TABS)
 
 const activeTab = ref((route.query.tab as string) || 'Overview')
+
+const activeChapterIndex = computed(() => CHAPTER_TABS.indexOf(activeTab.value))
+const prevChapter = computed(() => activeChapterIndex.value > 0 ? CHAPTER_TABS[activeChapterIndex.value - 1] : null)
+const nextChapter = computed(() => activeChapterIndex.value < CHAPTER_TABS.length - 1 ? CHAPTER_TABS[activeChapterIndex.value + 1] : null)
+
+function goToChapter(tab: string) {
+  activeTab.value = tab
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
 
 watch(activeTab, (tab) => {
   router.replace({ query: { ...route.query, tab } })
@@ -209,13 +221,21 @@ function copyLink() {
       <div style="margin-top: 1.5rem">
         <OverviewPanel v-if="activeTab === 'Overview'" :result="result" />
         <ProjectPanel v-if="activeTab === 'Project'" :result="result" />
+        <template v-if="activeTab === 'History'">
+          <CommitTimelineChart :commits="result.commits" :repo-url="store.run?.repo_url" :github-contributors="result.github_meta?.contributors" />
+          <div v-if="hasRoadmap && result.structure?.roadmap_parsed" style="margin-top: 1.5rem" class="panel">
+            <RoadmapTimeline
+              :milestones="result.structure.roadmap_parsed.milestones"
+              :roadmap-file="result.structure.roadmap_file ?? 'ROADMAP.md'"
+            />
+          </div>
+        </template>
         <template v-if="activeTab === 'Architecture'">
           <ArchitecturePanel :graph="result.graph" :hot-files="result.structure?.hot_files" :structure="result.structure" :run-id="runId" :repo-url="store.run?.repo_url" />
           <div style="margin-top: 1.5rem">
             <DependencyGraphView :graph="result.graph" />
           </div>
         </template>
-        <ArchitectureToursPanel v-if="activeTab === 'Tours'" :tours="result.arch_tours ?? []" :repo-url="store.run?.repo_url" :run-id="runId" />
         <OwnershipPanel
           v-if="activeTab === 'Ownership'"
           :ownership="result.ownership ?? { subsystems: [], top_contributors: [], bus_factor: 0 }"
@@ -227,17 +247,23 @@ function copyLink() {
         />
         <DependenciesPanel v-if="activeTab === 'Dependencies'" :deps="result.dependencies" />
         <SecurityPanel v-if="activeTab === 'Security'" :security="result.security" :heuristics="result.heuristics" :structure="result.structure" />
-        <template v-if="activeTab === 'History'">
-          <CommitTimelineChart :commits="result.commits" :repo-url="store.run?.repo_url" :github-contributors="result.github_meta?.contributors" />
-          <div v-if="hasRoadmap && result.structure?.roadmap_parsed" style="margin-top: 1.5rem" class="panel">
-            <RoadmapTimeline
-              :milestones="result.structure.roadmap_parsed.milestones"
-              :roadmap-file="result.structure.roadmap_file ?? 'ROADMAP.md'"
-            />
-          </div>
-        </template>
         <HeuristicsPanel v-if="activeTab === 'Heuristics'" :signals="result.heuristics" />
         <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" :structure="result.structure" :todos="result.todos" :arch-tours="result.arch_tours ?? []" />
+        <ArchitectureToursPanel v-if="activeTab === 'Tours'" :tours="result.arch_tours ?? []" :repo-url="store.run?.repo_url" :run-id="runId" />
+
+        <div class="chapter-nav">
+          <button v-if="prevChapter" class="btn btn--secondary chapter-nav__btn" @click="goToChapter(prevChapter)">
+            ← {{ prevChapter }}
+          </button>
+          <span v-else class="chapter-nav__spacer" />
+          <span class="chapter-nav__position">
+            Ch.{{ activeChapterIndex + 1 }} / {{ CHAPTER_TABS.length }}
+          </span>
+          <button v-if="nextChapter" class="btn btn--primary chapter-nav__btn" @click="goToChapter(nextChapter)">
+            {{ nextChapter }} →
+          </button>
+          <span v-else class="chapter-nav__spacer" />
+        </div>
       </div>
     </div>
     </Transition>

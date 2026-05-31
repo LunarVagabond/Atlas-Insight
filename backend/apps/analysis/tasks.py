@@ -120,6 +120,7 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
         }
         run.status = 'completed'
 
+        from django.db.models import F
         repo = run.repo
         repo.last_commit_sha = sha
         repo.last_analyzed_at = timezone.now()
@@ -132,6 +133,7 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
             repo.auth_token_warning = ''
             update_fields += ['auth_token', 'auth_token_warning']
         repo.save(update_fields=update_fields)
+        run.repo.__class__.objects.filter(pk=repo.pk).update(scan_count=F('scan_count') + 1)
         logger.info('Analysis completed for run %s', run_id)
 
     except Exception as exc:
@@ -307,6 +309,64 @@ def evict_stale_clones():
     logger.info(
         'Clone eviction complete: %d clones removed (threshold: %d days)',
         evicted, settings.EVICT_AFTER_DAYS,
+    )
+
+
+@shared_task
+def select_repo_of_week():
+    """Weekly task: pick a public repo for the spotlight using a fair-rotation, weighted algorithm.
+
+    Rotation rule: every repo gets one spotlight before any repo gets a second.
+    Within the eligible tier, weight = scan_count * 0.6 + view_count * 0.4 + 1.
+    Idempotent: skips if current week already has a pick.
+    """
+    import random
+    from datetime import date, timedelta
+
+    from django.db.models import Count
+
+    from apps.repositories.models import RepoOfTheWeek, Repository
+
+    # Monday of current week
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+
+    if RepoOfTheWeek.objects.filter(week_start=week_start).exists():
+        logger.info('Repo of the Week already selected for week %s', week_start)
+        return
+
+    eligible_repos = list(
+        Repository.objects.filter(
+            is_private=False,
+            runs__status='completed',
+        ).distinct()
+    )
+    if not eligible_repos:
+        logger.warning('No eligible public repos for Repo of the Week')
+        return
+
+    pick_counts = dict(
+        RepoOfTheWeek.objects.filter(repo__in=eligible_repos)
+        .values('repo_id')
+        .annotate(n=Count('id'))
+        .values_list('repo_id', 'n')
+    )
+
+    min_picks = min((pick_counts.get(r.pk, 0) for r in eligible_repos), default=0)
+    candidates = [r for r in eligible_repos if pick_counts.get(r.pk, 0) <= min_picks]
+
+    weights = [r.scan_count * 0.6 + r.view_count * 0.4 + 1 for r in candidates]
+    chosen = random.choices(candidates, weights=weights, k=1)[0]
+    current_picks = pick_counts.get(chosen.pk, 0)
+
+    RepoOfTheWeek.objects.create(
+        repo=chosen,
+        week_start=week_start,
+        pick_number=current_picks + 1,
+    )
+    logger.info(
+        'Repo of the Week selected: %s/%s (pick #%d)',
+        chosen.owner, chosen.name, current_picks + 1,
     )
 
 

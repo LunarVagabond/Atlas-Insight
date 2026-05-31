@@ -16,6 +16,8 @@ class Repository(models.Model):
     auth_token = models.CharField(max_length=255, blank=True, default='')
     auth_token_warning = models.CharField(max_length=500, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
+    view_count = models.IntegerField(default=0)
+    scan_count = models.IntegerField(default=0)
 
     class Meta:
         verbose_name_plural = 'repositories'
@@ -61,3 +63,17 @@ class UserFavorite(models.Model):
 
     def __str__(self):
         return f'{self.user} → {self.repo}'
+
+
+class RepoOfTheWeek(models.Model):
+    repo = models.ForeignKey(Repository, on_delete=models.PROTECT, related_name='spotlights')
+    week_start = models.DateField()
+    selected_at = models.DateTimeField(auto_now_add=True)
+    pick_number = models.IntegerField()
+
+    class Meta:
+        ordering = ['-week_start']
+        unique_together = [('repo', 'week_start')]
+
+    def __str__(self):
+        return f'{self.repo} — week of {self.week_start}'

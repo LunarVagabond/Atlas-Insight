@@ -45,6 +45,11 @@ const router = createRouter({
       name: 'about',
       component: () => import('../views/AboutView.vue'),
     },
+    {
+      path: '/spotlight',
+      name: 'spotlight',
+      component: () => import('../views/SpotlightView.vue'),
+    },
   ],
 })
 

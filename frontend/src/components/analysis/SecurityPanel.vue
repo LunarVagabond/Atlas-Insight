@@ -40,7 +40,6 @@ const sortedIssues = computed(() =>
   <div class="panel">
     <h2 class="panel__title">Security</h2>
     <p class="panel__subtitle">Automated pattern matching — not a full security audit. These highlight areas worth reviewing, not confirmed vulnerabilities. Always consult a security professional for production systems.</p>
-
     <!-- Heuristic signal card -->
     <div v-if="securitySignal" class="security-panel__signal-row">
       <AppCard
@@ -130,6 +129,8 @@ const sortedIssues = computed(() =>
     <div v-else class="security-panel__clear">
       <span>✓</span> No common security patterns detected — this doesn't guarantee the code is secure, but no automated red flags were found.
     </div>
+
+    <p class="panel__disclaimer">⚠️ This analysis is based on repository metadata and file patterns only. It does not inspect code for vulnerabilities. A positive score here does not mean the code is secure — never rely on this as a substitute for a proper security audit or penetration test.</p>
 
     <HeuristicDrawer :signal="active" @close="active = null" />
   </div>

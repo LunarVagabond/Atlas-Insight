@@ -537,6 +537,23 @@
     gap: $space-2;
   }
 
+  &__narrative {
+    flex-basis: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+    padding-top: $space-3;
+    border-top: 1px solid var(--color-border);
+    margin-top: $space-2;
+  }
+
+  &__narrative-line {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+    margin: 0;
+  }
+
   &__stack {
     display: flex;
     flex-wrap: wrap;
@@ -553,7 +570,7 @@
   &__oss {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
     gap: $space-1;
     padding: $space-3 $space-4;
     border-radius: $radius-md;
@@ -614,6 +631,40 @@
     font-size: 0.75rem;
     font-weight: 600;
     color: var(--color-text-secondary);
+  }
+
+  &__toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 0 0 $space-3;
+    margin-bottom: $space-3;
+    border-bottom: 1px solid var(--color-border);
+    cursor: pointer;
+    color: var(--color-text-muted);
+    font-size: 0.8125rem;
+    gap: $space-2;
+
+    &:hover {
+      color: var(--color-text);
+    }
+  }
+
+  &__toggle-label {
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  &__toggle-chevron {
+    font-size: 1rem;
+    transition: transform 0.2s ease;
+
+    &--collapsed {
+      transform: rotate(-90deg);
+    }
   }
 }
 
@@ -1979,6 +2030,18 @@
   margin: -$space-2 0 $space-5;
   line-height: 1.55;
   font-style: italic;
+}
+
+.panel__disclaimer {
+  font-size: 0.8rem;
+  color: var(--color-warning, #b45309);
+  background: color-mix(in srgb, var(--color-warning, #b45309) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-warning, #b45309) 30%, transparent);
+  border-radius: $radius-sm;
+  padding: $space-3 $space-4;
+  margin: $space-6 0 $space-5;
+  line-height: 1.55;
+  text-align: center;
 }
 
 .security-issue {
@@ -5750,5 +5813,419 @@
       padding: 1px 4px;
       border-radius: $radius-sm;
     }
+  }
+}
+
+// ── Repo Narrative ────────────────────────────────────────────────────────────
+.repo-narrative {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-accent);
+  border-radius: $radius-lg;
+  padding: $space-6;
+  display: flex;
+  align-items: flex-start;
+  gap: $space-6;
+
+  &__body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+  }
+
+  &__sentence {
+    font-size: 1rem;
+    line-height: 1.7;
+    color: var(--color-text);
+    margin: 0;
+
+    strong {
+      color: var(--color-accent);
+      font-weight: 600;
+    }
+  }
+
+  &__cta {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  &__start {
+    white-space: nowrap;
+  }
+}
+
+// ── Chapter Nav ───────────────────────────────────────────────────────────────
+.chapter-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: $space-8;
+  padding-top: $space-6;
+  border-top: 1px solid var(--color-border);
+
+  &__btn {
+    min-width: 140px;
+  }
+
+  &__spacer {
+    min-width: 140px;
+  }
+
+  &__position {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+// ── Repo of the Week Card ────────────────────────────────────────────────────
+.rotw-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: $radius-lg;
+  padding: $space-6;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--color-accent), var(--color-success));
+  }
+
+  &__eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-accent);
+    margin-bottom: $space-3;
+  }
+
+  &__content {
+    display: flex;
+    align-items: flex-start;
+    gap: $space-6;
+  }
+
+  &__left {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: $space-2;
+
+    a {
+      color: var(--color-text);
+      text-decoration: none;
+
+      &:hover { color: var(--color-accent); }
+    }
+  }
+
+  &__desc {
+    font-size: 0.9375rem;
+    color: var(--color-text-secondary);
+    margin-bottom: $space-3;
+    line-height: 1.5;
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    flex-wrap: wrap;
+    margin-bottom: $space-3;
+  }
+
+  &__lang {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    font-family: $font-mono;
+  }
+
+  &__stars {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+  }
+
+  &__week {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    margin-bottom: $space-2;
+  }
+
+  &__pick-badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: $radius-md;
+    background: var(--color-accent);
+    color: #fff;
+    font-weight: 500;
+    margin-bottom: $space-3;
+  }
+
+  &__topics {
+    display: flex;
+    gap: $space-2;
+    flex-wrap: wrap;
+  }
+
+  &__topic {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: $radius-md;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+  }
+
+  &__action {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+  }
+}
+
+// ── Spotlight Timeline ────────────────────────────────────────────────────────
+.spotlight-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+}
+
+.spotlight-entry {
+  display: flex;
+  gap: $space-4;
+  align-items: flex-start;
+
+  &__week-label {
+    flex-shrink: 0;
+    width: 110px;
+    font-size: 0.8125rem;
+    font-family: $font-mono;
+    color: var(--color-text-muted);
+    padding-top: $space-1;
+  }
+
+  &__card {
+    flex: 1;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: $radius-md;
+    padding: $space-4 $space-5;
+    display: flex;
+    align-items: center;
+    gap: $space-4;
+    cursor: pointer;
+    transition: border-color $transition-normal;
+
+    &:hover { border-color: var(--color-accent); }
+  }
+
+  &__info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__name {
+    font-weight: 600;
+    font-size: 0.9375rem;
+    margin-bottom: $space-1;
+  }
+
+  &__meta {
+    display: flex;
+    gap: $space-3;
+    align-items: center;
+    flex-wrap: wrap;
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+  }
+
+  &__pick {
+    font-size: 0.75rem;
+    padding: 1px 6px;
+    border-radius: $radius-sm;
+    background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+    color: var(--color-accent);
+    font-weight: 500;
+  }
+}
+
+// ── Spotlight Hero ────────────────────────────────────────────────────────────
+.spotlight-hero {
+  position: relative;
+  text-align: center;
+  padding: 5rem 2rem 4rem;
+  overflow: hidden;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+
+  &__bg-glow {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 60% at 50% 0%, color-mix(in srgb, var(--color-accent) 12%, transparent), transparent),
+      radial-gradient(ellipse 40% 40% at 80% 80%, color-mix(in srgb, var(--color-success) 8%, transparent), transparent);
+    pointer-events: none;
+  }
+
+  &__eyebrow {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: $space-3;
+    margin-bottom: $space-4;
+    flex-wrap: wrap;
+  }
+
+  &__week-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    padding: 4px 14px;
+    background: var(--color-bg);
+  }
+
+  &__repeat-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 4px 14px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+    color: var(--color-accent);
+    border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+  }
+
+  &__congrats {
+    position: relative;
+    font-size: 1.125rem;
+    color: var(--color-text-secondary);
+    margin-bottom: $space-2;
+    font-weight: 400;
+  }
+
+  &__author {
+    font-weight: 700;
+    color: var(--color-accent);
+  }
+
+  &__title {
+    position: relative;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--color-text);
+    margin-bottom: $space-2;
+    line-height: 1.1;
+  }
+
+  &__tagline {
+    position: relative;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--color-accent);
+    margin-bottom: $space-5;
+  }
+
+  &__desc {
+    position: relative;
+    max-width: 560px;
+    margin: 0 auto $space-5;
+    font-size: 1.0625rem;
+    color: var(--color-text-secondary);
+    line-height: 1.65;
+  }
+
+  &__meta {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: $space-3;
+    margin-bottom: $space-4;
+    flex-wrap: wrap;
+  }
+
+  &__lang {
+    font-size: 0.875rem;
+    font-family: $font-mono;
+    color: var(--color-text-muted);
+  }
+
+  &__stars {
+    font-size: 0.9375rem;
+    color: var(--color-text-secondary);
+    font-weight: 500;
+  }
+
+  &__topics {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    gap: $space-2;
+    flex-wrap: wrap;
+    margin-bottom: $space-6;
+  }
+
+  &__topic {
+    font-size: 0.75rem;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+  }
+
+  &__actions {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    gap: $space-3;
+    flex-wrap: wrap;
+  }
+
+  &__empty {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-8 0;
+  }
+
+  &__empty-icon {
+    font-size: 3rem;
+    line-height: 1;
+  }
+
+  &__empty-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  &__empty-sub {
+    color: var(--color-text-muted);
+    font-size: 0.9375rem;
   }
 }

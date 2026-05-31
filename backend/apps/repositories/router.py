@@ -12,7 +12,7 @@ from ninja.errors import HttpError
 from apps.analysis.github_meta import fetch_contribution_data, fetch_latest_sha
 from apps.analysis.tasks import analyze_repository
 
-from .models import AnalysisRun, Repository, UserFavorite
+from .models import AnalysisRun, Repository, RepoOfTheWeek, UserFavorite
 
 logger = logging.getLogger(__name__)
 router = Router(tags=['repositories'])
@@ -272,6 +272,7 @@ def list_runs(
 
 @router.get('/runs/{run_id}', response=RunStatusSchema)
 def get_run(request, run_id: uuid.UUID):
+    from django.db.models import F
     try:
         run = AnalysisRun.objects.select_related('repo', 'user').get(id=run_id)
     except AnalysisRun.DoesNotExist:
@@ -279,6 +280,8 @@ def get_run(request, run_id: uuid.UUID):
     if run.repo.is_private:
         if not request.user.is_authenticated or run.user != request.user:
             raise HttpError(403, 'Access denied')
+    if run.status == 'completed':
+        Repository.objects.filter(pk=run.repo_id).update(view_count=F('view_count') + 1)
     return RunStatusSchema(
         id=run.id,
         status=run.status,
@@ -489,6 +492,103 @@ def get_featured(request):
         topics=meta.get('topics', []),
         github_description=meta.get('github_description'),
     )
+
+
+class SpotlightSchema(Schema):
+    run_id: uuid.UUID
+    repo_url: str
+    repo_owner: str
+    repo_name: str
+    week_start: str
+    stars: Optional[int] = None
+    health_label: Optional[str] = None
+    health_key: Optional[str] = None
+    primary_language: Optional[str] = None
+    topics: list[str] = []
+    github_description: Optional[str] = None
+    pick_number: int
+
+
+class SpotlightItemSchema(Schema):
+    week_start: str
+    repo_url: str
+    repo_owner: str
+    repo_name: str
+    run_id: Optional[uuid.UUID] = None
+    health_label: Optional[str] = None
+    health_key: Optional[str] = None
+    primary_language: Optional[str] = None
+    stars: Optional[int] = None
+    pick_number: int
+
+
+class SpotlightHistorySchema(Schema):
+    items: list[SpotlightItemSchema]
+    total: int
+    page: int
+    per_page: int
+
+
+def _spotlight_to_schema(spot: 'RepoOfTheWeek') -> Optional[SpotlightSchema]:
+    run = spot.repo.runs.filter(status='completed').order_by('-triggered_at').first()
+    if not run or not run.result:
+        return None
+    meta = run.result.get('github_meta', {})
+    health = run.result.get('classification', {}).get('project_health', {})
+    return SpotlightSchema(
+        run_id=run.id,
+        repo_url=spot.repo.url,
+        repo_owner=spot.repo.owner,
+        repo_name=spot.repo.name,
+        week_start=spot.week_start.isoformat(),
+        stars=meta.get('stars'),
+        health_label=health.get('label'),
+        health_key=health.get('key'),
+        primary_language=meta.get('primary_language'),
+        topics=meta.get('topics', []),
+        github_description=meta.get('github_description'),
+        pick_number=spot.pick_number,
+    )
+
+
+@router.get('/spotlight/current', response={200: Optional[SpotlightSchema]})
+def get_spotlight_current(request):
+    from datetime import date, timedelta
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    try:
+        spot = RepoOfTheWeek.objects.select_related('repo').get(week_start=week_start)
+    except RepoOfTheWeek.DoesNotExist:
+        return 200, None
+    schema = _spotlight_to_schema(spot)
+    return 200, schema
+
+
+@router.get('/spotlight/history', response=SpotlightHistorySchema)
+def get_spotlight_history(request, page: int = 1, per_page: int = 20):
+    qs = RepoOfTheWeek.objects.select_related('repo').order_by('-week_start')
+    total = qs.count()
+    offset = (page - 1) * per_page
+    spots = list(qs[offset: offset + per_page])
+    items = []
+    for spot in spots:
+        run = spot.repo.runs.filter(status='completed').order_by('-triggered_at').first()
+        meta = run.result.get('github_meta', {}) if run and run.result else {}
+        cls = run.result.get('classification', {}) if run and run.result else {}
+        health = cls.get('project_health', {})
+        items.append(SpotlightItemSchema(
+            week_start=spot.week_start.isoformat(),
+            repo_url=spot.repo.url,
+            repo_owner=spot.repo.owner,
+            repo_name=spot.repo.name,
+            run_id=run.id if run else None,
+            health_label=health.get('label'),
+            health_key=health.get('key'),
+            primary_language=meta.get('primary_language'),
+            stars=meta.get('stars'),
+            pick_number=spot.pick_number,
+        ))
+    return SpotlightHistorySchema(items=items, total=total, page=page, per_page=per_page)
 
 
 def _jit_token(run: AnalysisRun) -> str:

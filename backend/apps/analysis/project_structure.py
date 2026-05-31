@@ -450,16 +450,25 @@ def _get_repo_age(repo_obj: Repo) -> int | None:
 
 def _compute_bus_factor(repo_obj: Repo) -> tuple[int, list[dict]]:
     author_files: dict[str, set] = collections.defaultdict(set)
+    email_to_name: dict[str, str] = {}
     try:
-        output = repo_obj.git.log('--format=%ae', '--name-only', '-300', 'HEAD')
+        # AUTHOR: prefix lets us skip blank lines safely.
+        # Without it, git inserts a blank line between the email and the
+        # --name-only file list, which resets current_author so the first
+        # filename after each commit is misidentified as the next author.
+        # Format: AUTHOR:<email>|<name> so we capture display name too.
+        output = repo_obj.git.log('--format=AUTHOR:%ae|%an', '--name-only', '-300', 'HEAD')
         current_author: str | None = None
         for line in output.splitlines():
             line = line.strip()
             if not line:
-                current_author = None
-            elif current_author is None:
-                current_author = line
-            else:
+                continue
+            if line.startswith('AUTHOR:'):
+                parts = line[7:].split('|', 1)
+                current_author = parts[0]
+                if current_author and len(parts) > 1 and parts[1]:
+                    email_to_name[current_author] = parts[1]
+            elif current_author:
                 author_files[current_author].add(line)
     except Exception:
         return 1, []
@@ -473,9 +482,15 @@ def _compute_bus_factor(repo_obj: Repo) -> tuple[int, list[dict]]:
 
     sorted_authors = sorted(author_files.items(), key=lambda x: -len(x[1]))
     top_contributors = [
-        {'author': a, 'files_touched': len(f)} for a, f in sorted_authors[:10]
+        {
+            'author': email_to_name.get(a, a),
+            'email': a,
+            'files_touched': len(f),
+        }
+        for a, f in sorted_authors[:10]
     ]
 
+    total_authors = len(author_files)
     target = len(all_files) * 0.8
     covered: set[str] = set()
     bus_factor = 0
@@ -485,7 +500,8 @@ def _compute_bus_factor(repo_obj: Repo) -> tuple[int, list[dict]]:
         if len(covered) >= target:
             break
 
-    return max(1, bus_factor), top_contributors
+    # Bus factor can never exceed the actual number of unique contributors
+    return min(max(1, bus_factor), total_authors), top_contributors
 
 
 def _get_hot_files(repo_obj: Repo) -> list[dict]:

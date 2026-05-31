@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import URLInputForm from '../components/analysis/URLInputForm.vue'
+import RepoOfWeekCard from '../components/analysis/RepoOfWeekCard.vue'
 import AppBadge from '../components/ui/AppBadge.vue'
 import AppButton from '../components/ui/AppButton.vue'
 import LoadingSpinner from '../components/ui/LoadingSpinner.vue'
@@ -16,6 +17,7 @@ const store = useAnalysisStore()
 const auth = useAuthStore()
 
 const featured = ref<FeaturedRepo | null>(null)
+const spotlight = ref<any>(null)
 
 type BadgeVariant = 'pending' | 'running' | 'completed' | 'failed' | 'warning' | 'info'
 const HEALTH_COLORS: Record<string, BadgeVariant> = {
@@ -35,9 +37,19 @@ async function fetchFeatured() {
   }
 }
 
+async function fetchSpotlight() {
+  try {
+    const { data } = await axios.get('/api/v1/repositories/spotlight/current')
+    spotlight.value = data
+  } catch {
+    spotlight.value = null
+  }
+}
+
 onMounted(() => {
   store.error = null
   fetchFeatured()
+  fetchSpotlight()
 })
 
 async function handleSubmit(url: string, pat?: string, email?: string) {
@@ -159,6 +171,10 @@ const unpinnedItems = computed(() => items.value.filter(r => !watchlist.value.ha
         @submitted="handleSubmit"
       />
     </main>
+
+    <div v-if="spotlight" class="featured-section">
+      <RepoOfWeekCard :spotlight="spotlight" />
+    </div>
 
     <div v-if="featured" class="featured-section">
       <div class="featured-repo-card">

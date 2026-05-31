@@ -45,10 +45,9 @@ function subsystemIssues(sub: OwnershipSubsystem): JitIssue[] {
 }
 
 function contributorInitials(author: string): string {
-  const name = author.split('@')[0]
-  const parts = name.split(/[\s._-]+/).filter(Boolean)
+  const parts = author.split(/[\s._-]+/).filter(Boolean)
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  return name.slice(0, 2).toUpperCase()
+  return author.slice(0, 2).toUpperCase()
 }
 
 function githubFileUrl(file: string): string | null {
@@ -105,11 +104,11 @@ function toggleHint(e: Event, key: string) {
     </div>
     <!-- Fallback: git-based contributors (no GitHub data) -->
     <div v-else-if="ownership.top_contributors.length" class="ownership-contributors">
-      <div v-for="c in ownership.top_contributors.slice(0, 8)" :key="c.author" class="ownership-contributor" :title="c.author">
+      <div v-for="c in ownership.top_contributors.slice(0, 8)" :key="c.author" class="ownership-contributor" :title="c.email ?? c.author">
         <div class="ownership-contributor__initials">{{ contributorInitials(c.author) }}</div>
         <div class="ownership-contributor__info">
-          <span class="ownership-contributor__name">{{ c.author.split('@')[0] }}</span>
-          <span class="ownership-contributor__files">{{ c.files_touched }} files</span>
+          <span class="ownership-contributor__name">{{ c.author }}</span>
+          <span class="ownership-contributor__files">{{ c.files_touched }} files touched</span>
         </div>
       </div>
     </div>

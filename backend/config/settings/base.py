@@ -205,6 +205,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.analysis.tasks.cleanup_old_logs',
         'schedule': crontab(minute=30, hour=3),  # daily at 03:30 UTC
     },
+    'select-repo-of-week': {
+        'task': 'apps.analysis.tasks.select_repo_of_week',
+        'schedule': crontab(minute=0, hour=0, day_of_week=1),  # Monday 00:00 UTC
+    },
 }
 
 RUNS_TO_KEEP_PER_REPO = config('RUNS_TO_KEEP_PER_REPO', default=10, cast=int)

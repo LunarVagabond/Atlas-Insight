@@ -113,7 +113,7 @@ export interface OwnershipSubsystem {
 
 export interface OwnershipData {
   subsystems: OwnershipSubsystem[]
-  top_contributors: { author: string; files_touched: number }[]
+  top_contributors: { author: string; email?: string; files_touched: number }[]
   bus_factor: number
 }
 
@@ -214,7 +214,7 @@ export interface StructureData {
   last_release: { name: string; date: string } | null
   repo_age_days: number | null
   bus_factor: number
-  top_contributors: { author: string; files_touched: number }[]
+  top_contributors: { author: string; email?: string; files_touched: number }[]
   hot_files: { file: string; commit_count: number }[]
   tech_stack?: string[]
   all_files?: string[]
