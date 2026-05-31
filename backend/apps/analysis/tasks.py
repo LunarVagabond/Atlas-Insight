@@ -14,7 +14,7 @@ from .dep_report import analyze_dependencies
 from .git_ops import clone_or_fetch
 from .github_meta import fetch_github_meta
 from .graph_analysis import analyze_graph
-from .heuristics import compute_heuristics
+from .heuristics import compute_heuristics, compute_oss_score
 from .import_parser import parse_imports
 from .project_structure import analyze_structure
 from .readme_parser import parse_readme
@@ -95,6 +95,7 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
                 pass
 
         signals = compute_heuristics(commits, graph, deps, readme, structure, security)
+        oss_score = compute_oss_score(signals)
         classification = classify_repo(
             commits, graph, deps, readme, structure, security, github_meta
         )
@@ -104,6 +105,7 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
             'graph': graph,
             'dependencies': deps,
             'heuristics': signals,
+            'oss_score': oss_score,
             'readme': readme,
             'structure': structure,
             'security': security,

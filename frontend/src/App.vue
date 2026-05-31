@@ -42,6 +42,7 @@ const menuOpen = ref(false)
       <div class="navbar__nav-links">
         <RouterLink to="/runs" class="navbar__nav-link">Browse</RouterLink>
         <RouterLink v-if="authStore.isAuthenticated" to="/dashboard" class="navbar__nav-link">My Analyses</RouterLink>
+        <RouterLink to="/about" class="navbar__nav-link">About</RouterLink>
       </div>
       <div class="navbar__actions">
         <button class="theme-toggle" @click="toggleTheme" :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'">

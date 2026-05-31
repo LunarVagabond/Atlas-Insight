@@ -22,3 +22,9 @@
 - [ ] Webhook support — auto-reanalyze on GitHub push events
 - [ ] Rate limit dashboard — surface GitHub API quota usage
 - [ ] Background re-analysis scheduler for watched repos
+
+
+### Thoughts
+
+- Should we limit when re-runs can happen? If there is 1000+ users looking at this we need to be able to stop repetive re-runs of repos so we don't crash our system
+- Security should be looked at / audited we are storing OAuth logins and PAT's I just want to be extra cautios here.

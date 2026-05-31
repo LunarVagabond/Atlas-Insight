@@ -23,7 +23,11 @@ const route = useRoute()
 const router = useRouter()
 const store = useAnalysisStore()
 const runId = computed(() => route.params.runId as string)
-const result = computed(() => store.run?.result)
+const result = computed(() => {
+  const r = store.run?.result
+  if (!r || r.error) return null
+  return r
+})
 const isPolling = computed(() => ['pending', 'running'].includes(store.run?.status ?? ''))
 const isInitialLoading = computed(() => store.status === 'polling' && !store.run)
 const showProgress = computed(() => isInitialLoading.value || isPolling.value)
@@ -178,7 +182,10 @@ function copyLink() {
           <p>This repository may require a Personal Access Token. Go back and use the PAT option when submitting.</p>
         </div>
         <div class="analysis-error-card__actions">
-          <a href="/" class="btn btn--primary">← New Analysis</a>
+          <AppButton variant="primary" :disabled="reanalyzing" @click="reanalyze">
+            {{ reanalyzing ? 'Queuing…' : '↻ Re-run Analysis' }}
+          </AppButton>
+          <a href="/" class="btn btn--secondary">← New Analysis</a>
         </div>
       </div>
     </div>

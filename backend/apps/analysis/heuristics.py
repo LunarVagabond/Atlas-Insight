@@ -341,3 +341,49 @@ def compute_heuristics(
         })
 
     return signals
+
+
+def compute_oss_score(signals: list[dict]) -> dict:
+    """Compute a 0–10 OSS health score from heuristic signals. 10 = perfect."""
+    signal_map = {s['signal']: s['score'] for s in signals}
+
+    weights = {
+        'community_health': 0.25,
+        'documentation_quality': 0.20,
+        'ci_health': 0.20,
+        'release_cadence': 0.15,
+        'abandonment_risk': 0.10,
+        'bus_factor_risk': 0.10,
+    }
+
+    weighted = 0.0
+    total_weight = 0.0
+    for sig, weight in weights.items():
+        if sig in signal_map:
+            weighted += (100 - signal_map[sig]) * weight
+            total_weight += weight
+
+    raw = (weighted / total_weight) if total_weight else 50.0
+    score = round(raw / 10, 1)
+    score = max(0.0, min(10.0, score))
+
+    if score >= 9.0:
+        badge = 'champion'
+        label = 'Champion'
+    elif score >= 7.5:
+        badge = 'thriving'
+        label = 'Thriving'
+    elif score >= 6.0:
+        badge = 'growing'
+        label = 'Growing'
+    elif score >= 4.0:
+        badge = 'seedling'
+        label = 'Seedling'
+    elif score >= 2.0:
+        badge = 'struggling'
+        label = 'Struggling'
+    else:
+        badge = 'dormant'
+        label = 'Dormant'
+
+    return {'score': score, 'badge': badge, 'label': label}

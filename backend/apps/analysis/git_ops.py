@@ -62,16 +62,30 @@ def _is_auth_error(exc: git.GitCommandError) -> bool:
 
 def _sync_to_origin_head(repo: git.Repo) -> str:
     """Make cached clone match origin's default branch and return checked-out SHA."""
-    # Resolve origin/HEAD -> refs/remotes/origin/<default-branch>
-    origin_head = repo.git.symbolic_ref('refs/remotes/origin/HEAD').strip()
-    branch = origin_head.rsplit('/', 1)[-1]
+    branch = None
+    try:
+        origin_head = repo.git.symbolic_ref('refs/remotes/origin/HEAD').strip()
+        branch = origin_head.rsplit('/', 1)[-1]
+    except git.GitCommandError:
+        pass
 
-    # Ensure local branch points at origin/<branch>, then clean stale files.
-    if branch in repo.heads:
-        repo.git.checkout(branch)
-    else:
-        repo.git.checkout('-B', branch, f'origin/{branch}')
-    repo.git.reset('--hard', f'origin/{branch}')
+    checked_out = False
+    if branch:
+        try:
+            if branch in repo.heads:
+                repo.git.checkout(branch)
+            else:
+                repo.git.checkout('-B', branch, f'origin/{branch}')
+            repo.git.reset('--hard', f'origin/{branch}')
+            checked_out = True
+        except git.GitCommandError:
+            pass
+
+    if not checked_out:
+        # origin/HEAD doesn't resolve cleanly (e.g. points to a tag, not a branch)
+        # Fall back to FETCH_HEAD which is always set after a successful fetch.
+        repo.git.reset('--hard', 'FETCH_HEAD')
+
     repo.git.clean('-fdx')
     return repo.head.commit.hexsha
 

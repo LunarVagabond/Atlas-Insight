@@ -117,11 +117,18 @@ export interface OwnershipData {
   bus_factor: number
 }
 
+export interface OssScore {
+  score: number
+  badge: 'champion' | 'thriving' | 'growing' | 'seedling' | 'struggling' | 'dormant'
+  label: string
+}
+
 export interface RunResult {
   commits: CommitData
   graph: GraphData
   dependencies: DepsData
   heuristics: HeuristicSignal[]
+  oss_score?: OssScore
   readme?: ReadmeData
   structure?: StructureData
   security?: SecurityData
