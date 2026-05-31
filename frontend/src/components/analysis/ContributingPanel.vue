@@ -3,13 +3,15 @@ import { computed, ref } from 'vue'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
 import ContributionDrawer from './ContributionDrawer.vue'
-import type { ContributionOpportunity, StructureData, TodoData } from '../../stores/analysis'
+import ContributionPathPanel from './ContributionPathPanel.vue'
+import type { ArchTour, ContributionOpportunity, StructureData, TodoData } from '../../stores/analysis'
 
 const props = defineProps<{
   opportunities: ContributionOpportunity[]
   repoUrl?: string
   structure?: StructureData
   todos?: TodoData
+  archTours?: ArchTour[]
 }>()
 
 type CategoryFilter = 'all' | ContributionOpportunity['category']
@@ -272,6 +274,15 @@ const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
       No opportunities found for this filter.
     </div>
 
-    <ContributionDrawer :opportunity="activeOpp" @close="activeOpp = null" />
+    <!-- Contribution Path Generator -->
+    <ContributionPathPanel
+      v-if="archTours?.length"
+      :tours="archTours"
+      :opportunities="opportunities"
+      :repo-url="repoUrl"
+      style="margin-top: 2rem"
+    />
+
+    <ContributionDrawer :opportunity="activeOpp" :arch-tours="archTours" :repo-url="repoUrl" @close="activeOpp = null" />
   </div>
 </template>

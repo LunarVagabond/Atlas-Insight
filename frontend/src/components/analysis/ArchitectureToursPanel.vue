@@ -1,11 +1,18 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { ArchTour } from '../../stores/analysis'
+import FileHistoryDrawer from './FileHistoryDrawer.vue'
 
 const props = defineProps<{
   tours: ArchTour[]
   repoUrl?: string
+  runId?: string
 }>()
+
+const activeFilePath = ref<string | null>(null)
+function openFileHistory(file: string) {
+  if (!file.endsWith('/')) activeFilePath.value = file
+}
 
 const expandedId = ref<string | null>(null)
 const copiedId = ref<string | null>(null)
@@ -129,6 +136,7 @@ const SUBSYSTEM_ICONS: Record<string, string> = {
                   >{{ kf.file }}</a>
                   <button v-else class="tour-file__copy" @click.stop="copyPath(kf.file)">{{ kf.file }}</button>
                   <span v-if="kf.commit_count" class="tour-file__commits">{{ kf.commit_count }} commits</span>
+                  <button v-if="runId && !kf.file.endsWith('/')" class="file-history-btn" :title="`View commit history for ${kf.file}`" @click.stop="openFileHistory(kf.file)">📜</button>
                 </li>
               </ul>
             </div>
@@ -162,5 +170,12 @@ const SUBSYSTEM_ICONS: Record<string, string> = {
     <div v-else class="empty-state">
       No architecture tours available — graph data may be insufficient for this repository.
     </div>
+
+    <FileHistoryDrawer
+      :run-id="runId ?? null"
+      :path="activeFilePath"
+      :repo-url="repoUrl"
+      @close="activeFilePath = null"
+    />
   </div>
 </template>

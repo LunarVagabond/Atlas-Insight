@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { Line } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -12,82 +12,203 @@ import {
   Legend,
   Filler,
 } from 'chart.js'
-import type { CommitData, MonthlyCommit } from '../../stores/analysis'
+import type { CommitData, GitHubContributor, MonthlyCommit } from '../../stores/analysis'
 import TimelineFilter, { type FilterSelection } from './TimelineFilter.vue'
 import CommitMonthDrawer from './CommitMonthDrawer.vue'
-import { useTableFilter } from '../../composables/useTableFilter'
+import GitGraphSvg, { type GraphRow, type GraphCommit, type MonthSep } from './GitGraphSvg.vue'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 
-const props = defineProps<{ commits: CommitData; repoUrl?: string }>()
+const props = defineProps<{
+  commits: CommitData
+  repoUrl?: string
+  githubContributors?: GitHubContributor[]
+}>()
 
+// ── Filter (shared: chart + git log) ─────────────────────────────────────────
 const filteredMonthly = ref<{ month: string; count: number }[]>([])
 const selection = ref<FilterSelection>({ year: 'All', months: new Set() })
+function onFilterChange(sel: FilterSelection) { selection.value = sel }
 
-function onFilterChange(sel: FilterSelection) {
-  selection.value = sel
-}
-
-const filteredChurn = computed(() => {
-  let rows = props.commits.contributor_churn
-  if (selection.value.year !== 'All') {
-    rows = rows.filter(r => r.month.startsWith(selection.value.year))
-  }
-  if (selection.value.months.size > 0) {
-    rows = rows.filter(r => selection.value.months.has(parseInt(r.month.slice(5, 7))))
-  }
-  return rows
-})
-
-const churnFilter = useTableFilter(
-  filteredChurn as unknown as import('vue').Ref<Record<string, unknown>[]>,
-  ['month'],
-  'month',
-  'desc',
-)
-
+// ── Chart ─────────────────────────────────────────────────────────────────────
 const chartData = computed(() => ({
   labels: filteredMonthly.value.map(d => d.month),
-  datasets: [
-    {
-      label: 'Commits',
-      data: filteredMonthly.value.map(d => d.count),
-      borderColor: '#0969da',
-      backgroundColor: 'rgba(9, 105, 218, 0.1)',
-      fill: true,
-      tension: 0.3,
-      pointRadius: 3,
-    },
-  ],
+  datasets: [{
+    label: 'Commits',
+    data: filteredMonthly.value.map(d => d.count),
+    borderColor: '#0969da',
+    backgroundColor: 'rgba(9, 105, 218, 0.1)',
+    fill: true,
+    tension: 0.3,
+    pointRadius: 3,
+  }],
 }))
-
-const activeMonth = ref<string | null>(null)
-const activeMonthCommits = computed<MonthlyCommit[]>(() =>
-  activeMonth.value ? (props.commits.monthly_commits?.[activeMonth.value] ?? []) : []
-)
-
-function openMonth(month: string) {
-  activeMonth.value = month
-}
-
 const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
-    tooltip: { mode: 'index' as const, intersect: false },
-  },
+  plugins: { legend: { display: false }, tooltip: { mode: 'index' as const, intersect: false } },
   scales: {
     x: { ticks: { maxTicksLimit: 14 }, grid: { display: false } },
     y: { beginAtZero: true, ticks: { precision: 0 } },
   },
 }
+
+// ── Month drawer ──────────────────────────────────────────────────────────────
+const activeMonth = ref<string | null>(null)
+const activeMonthCommits = computed<MonthlyCommit[]>(() =>
+  activeMonth.value ? (props.commits.monthly_commits?.[activeMonth.value] ?? []) : []
+)
+
+// ── Author palette ────────────────────────────────────────────────────────────
+const PALETTE = [
+  '#0969da','#7c3aed','#059669','#d97706',
+  '#dc2626','#0891b2','#db2777','#65a30d',
+  '#ea580c','#4338ca','#0f766e','#b45309',
+]
+
+const authorColorMap = computed<Map<string, string>>(() => {
+  const map = new Map<string, string>()
+  let idx = 0
+  const mc = props.commits.monthly_commits ?? {}
+  for (const month of Object.keys(mc).sort().reverse()) {
+    for (const c of mc[month]) {
+      if (!map.has(c.author)) {
+        map.set(c.author, PALETTE[idx % PALETTE.length])
+        idx++
+      }
+    }
+  }
+  return map
+})
+
+// ── Filter months from selection ──────────────────────────────────────────────
+function monthInFilter(month: string): boolean {
+  if (selection.value.year !== 'All' && !month.startsWith(selection.value.year)) return false
+  if (selection.value.months.size > 0 && !selection.value.months.has(parseInt(month.slice(5, 7)))) return false
+  return true
+}
+
+// ── Contributors (filtered by active date range) ───────────────────────────────
+interface ContribEntry {
+  name: string
+  initials: string
+  color: string
+  commitCount: number
+  avatarUrl?: string
+  profileUrl?: string
+}
+
+function authorInitials(name: string): string {
+  const clean = name.replace(/\[bot\]/, '').trim()
+  const parts = clean.split(/[\s._-]+/).filter(Boolean)
+  return parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : clean.slice(0, 2).toUpperCase()
+}
+
+const contributors = computed<ContribEntry[]>(() => {
+  const mc = props.commits.monthly_commits ?? {}
+  const counts = new Map<string, number>()
+  const filteredActive = selection.value.year !== 'All' || selection.value.months.size > 0
+
+  for (const [month, commits] of Object.entries(mc)) {
+    if (filteredActive && !monthInFilter(month)) continue
+    for (const c of commits) {
+      counts.set(c.author, (counts.get(c.author) ?? 0) + 1)
+    }
+  }
+
+  const ghMap = new Map<string, GitHubContributor>()
+  for (const g of props.githubContributors ?? []) ghMap.set(g.login, g)
+
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([name, count]) => {
+      const gh = ghMap.get(name) ?? ghMap.get(name.replace(/\[bot\]/, ''))
+      return {
+        name,
+        initials: authorInitials(name),
+        color: authorColorMap.value.get(name) ?? '#888',
+        commitCount: count,
+        avatarUrl: gh?.avatar_url,
+        profileUrl: gh?.html_url,
+      }
+    })
+})
+
+// ── Git graph rows (commits + month separators, newest first) ─────────────────
+function relativeDate(iso: string): string {
+  const diffDays = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
+  if (diffDays < 1) return 'today'
+  if (diffDays < 7) return `${diffDays}d`
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w`
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo`
+  return `${Math.floor(diffDays / 365)}y`
+}
+
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+function formatMonthLabel(m: string): string {
+  const [year, month] = m.split('-')
+  return `${MONTH_NAMES[parseInt(month) - 1]} ${year}`
+}
+
+const searchQuery = ref('')
+const graphScrollEl = ref<HTMLElement | null>(null)
+
+// Reset scroll to top when filter changes (not search)
+watch(selection, () => {
+  nextTick(() => { if (graphScrollEl.value) graphScrollEl.value.scrollTop = 0 })
+}, { deep: true })
+
+const graphRows = computed<GraphRow[]>(() => {
+  const mc = props.commits.monthly_commits
+  if (!mc) return []
+
+  const q = searchQuery.value.trim().toLowerCase()
+  const rows: GraphRow[] = []
+
+  const sortedMonths = Object.keys(mc).sort().reverse().slice(0, 36)
+
+  for (const month of sortedMonths) {
+    if (!monthInFilter(month)) continue
+    const raw = mc[month]
+    if (!raw?.length) continue
+
+    const commits = raw
+      .filter(c => !q || c.message.toLowerCase().includes(q) || c.author.toLowerCase().includes(q) || c.sha.startsWith(q))
+      .map(c => ({
+        sha: c.sha,
+        parents: c.parents ?? [],
+        message: c.message,
+        author: c.author,
+        date: c.date,
+        color: authorColorMap.value.get(c.author) ?? '#888',
+        relativeDate: relativeDate(c.date),
+        commitUrl: props.repoUrl ? `${props.repoUrl}/commit/${c.sha}` : null,
+      } satisfies GraphCommit))
+
+    if (!commits.length) continue
+
+    const sep: MonthSep = {
+      isMonth: true,
+      label: formatMonthLabel(month),
+      month,
+      count: commits.length,
+    }
+
+    rows.push(sep, ...commits)
+  }
+
+  return rows
+})
+
+const totalCommits = computed(() => graphRows.value.filter(r => !(r as MonthSep).isMonth).length)
 </script>
 
 <template>
-  <div class="panel">
-    <h2 class="panel__title">Commit Timeline</h2>
+  <div class="panel git-history-panel">
+    <h2 class="panel__title">Commit History</h2>
 
+    <!-- Frequency chart -->
     <div v-if="commits.monthly_frequency.length">
       <TimelineFilter
         :data="commits.monthly_frequency"
@@ -101,50 +222,82 @@ const chartOptions = {
     </div>
     <div v-else class="empty-state">No commit data available</div>
 
-    <div v-if="commits.contributor_churn.length" style="margin-top: 2rem">
-      <h3 class="panel__title">Contributor activity by month</h3>
-      <p class="panel__subtitle">Each row = one month of this project's history. "Active" = committed that month. "New" = first time contributing. "Left" = contributed before but not this month.</p>
-      <input
-        v-model="churnFilter.query.value"
-        class="table-search"
-        placeholder="Search by month…"
-      />
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th class="runs-table__sortable" @click="churnFilter.setSort('month')">
-              Month {{ churnFilter.sortIcon('month') }}
-            </th>
-            <th class="runs-table__sortable" @click="churnFilter.setSort('active')" title="Developers who made at least one commit this month">
-              Active contributors {{ churnFilter.sortIcon('active') }}
-            </th>
-            <th class="runs-table__sortable" @click="churnFilter.setSort('new')" title="Developers contributing for the first time">
-              First-time contributors {{ churnFilter.sortIcon('new') }}
-            </th>
-            <th class="runs-table__sortable" @click="churnFilter.setSort('lost')" title="Developers who contributed before but not this month">
-              Stopped contributing {{ churnFilter.sortIcon('lost') }}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="row in (churnFilter.filtered.value as any[])"
-            :key="row.month"
-            class="churn-row"
-            :class="{ 'churn-row--clickable': commits.monthly_commits?.[row.month]?.length }"
-            @click="commits.monthly_commits?.[row.month]?.length && openMonth(row.month)"
-          >
-            <td class="churn-row__month">
-              {{ row.month }}
-              <span v-if="commits.monthly_commits?.[row.month]?.length" class="churn-row__hint">↗</span>
-            </td>
-            <td>{{ row.active }}</td>
-            <td style="color: var(--color-success)">+{{ row.new }}</td>
-            <td style="color: var(--color-error)">-{{ row.lost }}</td>
-          </tr>
-        </tbody>
-      </table>
-      <div v-if="!churnFilter.filtered.value.length" class="empty-state" style="margin-top:1rem">No contributor data for selected range</div>
+    <!-- Stats row -->
+    <div class="git-history-stats">
+      <span class="git-history-stat">
+        <strong>{{ commits.total_commits.toLocaleString() }}</strong> commits
+      </span>
+      <span class="git-history-stat__sep">·</span>
+      <span class="git-history-stat">
+        <strong>{{ commits.total_contributors }}</strong> contributors
+      </span>
+      <span class="git-history-stat__sep">·</span>
+      <span class="git-history-stat">
+        last <strong>{{ commits.days_since_last_commit ?? '?' }}d</strong> ago
+      </span>
+      <template v-if="(commits.reverted_commits?.length ?? 0) > 0">
+        <span class="git-history-stat__sep">·</span>
+        <span class="git-history-stat git-history-stat--warn">
+          <strong>{{ commits.reverted_commits!.length }}</strong> reverts
+        </span>
+      </template>
+    </div>
+
+    <!-- Contributors (filtered by date range) -->
+    <div v-if="contributors.length" class="git-contribs">
+      <div class="git-contribs__label">
+        Contributors
+        <span v-if="selection.year !== 'All' || selection.months.size > 0" class="git-contribs__filter-note">
+          (in selected range)
+        </span>
+      </div>
+      <div class="git-contribs__row">
+        <a
+          v-for="c in contributors"
+          :key="c.name"
+          :href="c.profileUrl ?? undefined"
+          :target="c.profileUrl ? '_blank' : undefined"
+          rel="noopener noreferrer"
+          :class="['git-contrib', c.profileUrl && 'git-contrib--link']"
+          :title="`${c.name} — ${c.commitCount} commits`"
+        >
+          <img
+            v-if="c.avatarUrl"
+            :src="c.avatarUrl"
+            :alt="c.name"
+            class="git-contrib__avatar"
+            :style="{ borderColor: c.color }"
+          />
+          <span
+            v-else
+            class="git-contrib__initials"
+            :style="{ background: c.color + '22', color: c.color, borderColor: c.color }"
+          >{{ c.initials }}</span>
+          <span class="git-contrib__name">{{ c.name.replace(/\[bot\]/, '').split(' ')[0] }}</span>
+          <span class="git-contrib__count">{{ c.commitCount }}</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Git log graph -->
+    <div class="git-log-section">
+      <div class="git-log-toolbar">
+        <span class="git-log-toolbar__title">
+          git log --graph
+          <span class="git-log-toolbar__count">({{ totalCommits.toLocaleString() }})</span>
+        </span>
+        <input v-model="searchQuery" class="git-log-search" placeholder="Filter commits, authors, shas…" />
+      </div>
+
+      <div v-if="graphRows.length" ref="graphScrollEl" class="git-graph-scroll">
+        <GitGraphSvg :rows="graphRows" @click-month="activeMonth = $event" />
+      </div>
+      <div v-else-if="searchQuery" class="empty-state" style="margin-top:1rem">
+        No commits match "{{ searchQuery }}"
+      </div>
+      <div v-else class="empty-state" style="margin-top:1rem">
+        No commit data for selected range
+      </div>
     </div>
   </div>
 

@@ -17,6 +17,7 @@ import RoadmapTimeline from '../components/analysis/RoadmapTimeline.vue'
 import SecurityPanel from '../components/analysis/SecurityPanel.vue'
 import ArchitectureToursPanel from '../components/analysis/ArchitectureToursPanel.vue'
 import OwnershipPanel from '../components/analysis/OwnershipPanel.vue'
+import DeltaPanel from '../components/analysis/DeltaPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -70,12 +71,14 @@ watch(runId, async (id) => {
   store._stopPolling()
   store.jitIssues = null
   store.jitPrs = null
+  store.diffData = null
   await store.pollRun(id)
 }, { immediate: true })
 
 watch(() => store.run?.status, (status) => {
   if (status === 'completed' && runId.value) {
     store.fetchJitData(runId.value)
+    store.fetchDiff(runId.value)
   }
 })
 
@@ -189,6 +192,12 @@ function copyLink() {
       <div v-if="store.run?.auth_token_warning" class="analysis-token-warning">
         {{ store.run.auth_token_warning }}
       </div>
+      <DeltaPanel
+        v-if="store.diffData || store.diffLoading"
+        :diff-data="store.diffData ?? { available: false }"
+        :loading="store.diffLoading"
+        style="margin-bottom: 1rem"
+      />
       <AppTabs :tabs="TABS" v-model="activeTab" />
       <div style="margin-top: 1.5rem">
         <OverviewPanel v-if="activeTab === 'Overview'" :result="result" />
@@ -199,7 +208,7 @@ function copyLink() {
             <DependencyGraphView :graph="result.graph" />
           </div>
         </template>
-        <ArchitectureToursPanel v-if="activeTab === 'Tours'" :tours="result.arch_tours ?? []" :repo-url="store.run?.repo_url" />
+        <ArchitectureToursPanel v-if="activeTab === 'Tours'" :tours="result.arch_tours ?? []" :repo-url="store.run?.repo_url" :run-id="runId" />
         <OwnershipPanel
           v-if="activeTab === 'Ownership'"
           :ownership="result.ownership ?? { subsystems: [], top_contributors: [], bus_factor: 0 }"
@@ -207,11 +216,12 @@ function copyLink() {
           :jit-loading="store.jitLoading"
           :repo-url="store.run?.repo_url"
           :github-contributors="result.github_meta?.contributors"
+          :run-id="runId"
         />
         <DependenciesPanel v-if="activeTab === 'Dependencies'" :deps="result.dependencies" />
         <SecurityPanel v-if="activeTab === 'Security'" :security="result.security" :heuristics="result.heuristics" :structure="result.structure" />
         <template v-if="activeTab === 'History'">
-          <CommitTimelineChart :commits="result.commits" :repo-url="store.run?.repo_url" />
+          <CommitTimelineChart :commits="result.commits" :repo-url="store.run?.repo_url" :github-contributors="result.github_meta?.contributors" />
           <div v-if="hasRoadmap && result.structure?.roadmap_parsed" style="margin-top: 1.5rem" class="panel">
             <RoadmapTimeline
               :milestones="result.structure.roadmap_parsed.milestones"
@@ -220,7 +230,7 @@ function copyLink() {
           </div>
         </template>
         <HeuristicsPanel v-if="activeTab === 'Heuristics'" :signals="result.heuristics" />
-        <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" :structure="result.structure" :todos="result.todos" />
+        <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" :structure="result.structure" :todos="result.todos" :arch-tours="result.arch_tours ?? []" />
       </div>
     </div>
     </Transition>

@@ -1,12 +1,58 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import AppBadge from '../ui/AppBadge.vue'
-import type { ContributionOpportunity } from '../../stores/analysis'
+import type { ArchTour, ContributionOpportunity } from '../../stores/analysis'
 
-defineProps<{ opportunity: ContributionOpportunity | null }>()
+const props = defineProps<{
+  opportunity: ContributionOpportunity | null
+  archTours?: ArchTour[]
+  repoUrl?: string
+}>()
 const emit = defineEmits<{ close: [] }>()
+
+const SUBSYSTEM_KEYWORDS: Record<string, string[]> = {
+  frontend:  ['ui', 'component', 'page', 'view', 'style', 'css', 'layout', 'render', 'display', 'button', 'form', 'modal'],
+  api:       ['api', 'endpoint', 'route', 'handler', 'request', 'response', 'controller', 'auth', 'middleware'],
+  data:      ['model', 'schema', 'migration', 'database', 'query', 'db', 'orm', 'table', 'index'],
+  tests:     ['test', 'spec', 'coverage', 'assertion', 'mock', 'fixture', 'e2e'],
+  config:    ['config', 'ci', 'deploy', 'pipeline', 'workflow', 'docker', 'k8s', 'env'],
+  docs:      ['doc', 'readme', 'contributing', 'changelog', 'guide', 'tutorial'],
+}
+
+const guidanceTour = computed<ArchTour | null>(() => {
+  if (!props.archTours?.length || !props.opportunity) return null
+  const isIssue = props.opportunity.category === 'github-issue' || props.opportunity.category === 'feature'
+  if (!isIssue) return null
+  const text = `${props.opportunity.title} ${props.opportunity.description}`.toLowerCase()
+  let bestTour: ArchTour | null = null
+  let bestScore = 0
+  for (const tour of props.archTours) {
+    if (tour.subsystem_type === 'overview') continue
+    const keywords = SUBSYSTEM_KEYWORDS[tour.subsystem_type] ?? []
+    const score = keywords.filter(kw => text.includes(kw)).length
+    if (score > bestScore) {
+      bestScore = score
+      bestTour = tour
+    }
+  }
+  return bestScore > 0 ? bestTour : null
+})
+
+const guidanceSuggestedFiles = computed<string[]>(() => {
+  if (!guidanceTour.value) return []
+  const files = [
+    ...guidanceTour.value.entry_files.slice(0, 2),
+    ...guidanceTour.value.reading_order.slice(0, 2).map(s => s.file),
+  ]
+  return [...new Set(files)].slice(0, 4)
+})
+
+function githubFileUrl(file: string): string | null {
+  if (!props.repoUrl || !file) return null
+  return `${props.repoUrl}/blob/HEAD/${file}`
+}
 
 function renderMarkdown(text: string): string {
   const raw = marked.parse(text, { async: false }) as string
@@ -125,6 +171,42 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
               <ul class="contrib-drawer__hints">
                 <li v-for="hint in opportunity.hints" :key="hint" class="contrib-drawer__hint" v-html="renderHint(hint)" />
               </ul>
+            </template>
+
+            <!-- Issue readiness score -->
+            <template v-if="opportunity.readiness_label">
+              <hr class="contrib-drawer__sep" />
+              <h4 class="contrib-drawer__section-title">Approachability</h4>
+              <div class="contrib-drawer__readiness">
+                <div :class="['readiness-badge', `readiness-badge--${opportunity.readiness_label.toLowerCase()}`]">
+                  {{ opportunity.readiness_label }}
+                </div>
+                <div class="readiness-bar">
+                  <div class="readiness-bar__fill" :style="{ width: `${opportunity.readiness_score}%` }" />
+                </div>
+                <span class="readiness-score-text">{{ opportunity.readiness_score }}/100</span>
+              </div>
+            </template>
+
+            <!-- Contributor guidance: suggested files from arch tours -->
+            <template v-if="guidanceTour && guidanceSuggestedFiles.length">
+              <hr class="contrib-drawer__sep" />
+              <h4 class="contrib-drawer__section-title">Where to Look First</h4>
+              <div class="contrib-guidance">
+                <p class="contrib-guidance__intro">
+                  This issue likely touches the <strong>{{ guidanceTour.name }}</strong> area. Start by reading these files:
+                </p>
+                <div class="contrib-guidance__files">
+                  <a
+                    v-for="file in guidanceSuggestedFiles"
+                    :key="file"
+                    :href="githubFileUrl(file) ?? '#'"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="contrib-guidance__file"
+                  >{{ file }}</a>
+                </div>
+              </div>
             </template>
 
             <template v-if="opportunity.issue_url">

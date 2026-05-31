@@ -40,6 +40,51 @@ export interface ContributionOpportunity {
   knowledge_domains?: string[]
   effort_estimate?: 'quick-win' | 'small' | 'medium' | 'large'
   affected_file_count?: number
+  readiness_score?: number
+  readiness_label?: string
+}
+
+export interface HeuristicDelta {
+  signal: string
+  label: string
+  before: number
+  after: number
+  delta: number
+  direction: 'up' | 'down' | 'same'
+}
+
+export interface ClassificationDelta {
+  before_label: string
+  after_label: string
+  delta: number
+  changed: boolean
+}
+
+export interface DiffData {
+  available: boolean
+  previous_run_id?: string
+  previous_triggered_at?: string
+  heuristics?: HeuristicDelta[]
+  dependencies?: { added: string[]; removed: string[]; added_count: number; removed_count: number }
+  contributors?: { before: number; after: number; delta: number }
+  graph?: { nodes_before: number; nodes_after: number; nodes_delta: number; god_modules_before: number; god_modules_after: number; god_modules_delta: number }
+  structure?: { files_before: number; files_after: number; files_delta: number; test_ratio_before: number; test_ratio_after: number }
+  classification?: { project_health?: ClassificationDelta | null; contribution_difficulty?: ClassificationDelta | null; documentation_grade?: ClassificationDelta | null; code_complexity?: ClassificationDelta | null }
+}
+
+export interface FileHistoryCommit {
+  sha: string
+  full_sha: string
+  message: string
+  date: string
+  author: string
+  url: string
+  issue_refs: number[]
+}
+
+export interface FileHistory {
+  path: string
+  commits: FileHistoryCommit[]
 }
 
 export interface JitIssue {
@@ -278,8 +323,10 @@ export interface FeaturedRepo {
 export interface MonthlyCommit {
   sha: string
   message: string
+  body?: string | null
   author: string
   date: string
+  parents?: string[]
 }
 
 export interface CommitData {
@@ -293,6 +340,7 @@ export interface CommitData {
   monthly_frequency: { month: string; count: number }[]
   contributor_churn: { month: string; active: number; new: number; lost: number }[]
   monthly_commits?: Record<string, MonthlyCommit[]>
+  reverted_commits?: { sha: string; message: string; date: string; files: string[] }[]
 }
 
 export interface GraphData {
@@ -363,6 +411,8 @@ export const useAnalysisStore = defineStore('analysis', {
     jitIssues: null as JitIssue[] | null,
     jitPrs: null as JitPrData | null,
     jitLoading: false,
+    diffData: null as DiffData | null,
+    diffLoading: false,
   }),
 
   actions: {
@@ -402,6 +452,28 @@ export const useAnalysisStore = defineStore('analysis', {
         this.jitPrs = prsRes.status === 'fulfilled' ? prsRes.value.data : null
       } finally {
         this.jitLoading = false
+      }
+    },
+
+    async fetchDiff(runId: string) {
+      if (this.diffLoading) return
+      this.diffLoading = true
+      try {
+        const { data } = await axios.get(`/api/v1/repositories/runs/${runId}/diff`)
+        this.diffData = data
+      } catch {
+        this.diffData = { available: false }
+      } finally {
+        this.diffLoading = false
+      }
+    },
+
+    async fetchFileHistory(runId: string, path: string): Promise<FileHistory | null> {
+      try {
+        const { data } = await axios.get(`/api/v1/repositories/runs/${runId}/file-history`, { params: { path } })
+        return data as FileHistory
+      } catch {
+        return null
       }
     },
 
@@ -475,6 +547,9 @@ export const useAnalysisStore = defineStore('analysis', {
       this.run = null
       this.staleRun = null
       this.error = null
+      this.diffData = null
+      this.jitIssues = null
+      this.jitPrs = null
     },
   },
 })

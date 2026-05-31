@@ -293,6 +293,31 @@ _FEATURE_LABELS = frozenset({
 })
 
 
+def _issue_readiness(issue: dict, pr_refs: set) -> tuple[int, str]:
+    """Score 0–100 for how ready an issue is for a new contributor."""
+    score = 50
+    labels_set = set(issue.get('labels', []))
+    if labels_set & _BEGINNER_LABELS:
+        score += 35
+    elif labels_set & _FEATURE_LABELS:
+        score += 10
+    body = issue.get('body_excerpt', '') or ''
+    if len(body) > 200:
+        score += 15
+    elif len(body) > 50:
+        score += 5
+    if issue.get('number') in pr_refs:
+        score -= 25
+    score = max(0, min(100, score))
+    if score >= 75:
+        label = 'Ready'
+    elif score >= 50:
+        label = 'Approachable'
+    else:
+        label = 'Complex'
+    return score, label
+
+
 def _issue_opportunities(contribution_data: dict) -> list[dict]:
     pr_refs = set(contribution_data.get('pr_issue_refs', []))
     opps: list[dict] = []
@@ -313,6 +338,8 @@ def _issue_opportunities(contribution_data: dict) -> list[dict]:
         else:
             difficulty, risk = 'intermediate', 'medium'
 
+        readiness_score, readiness_label = _issue_readiness(issue, pr_refs)
+
         opps.append({
             'id': f'issue_{issue["number"]}',
             'title': issue['title'],
@@ -324,6 +351,8 @@ def _issue_opportunities(contribution_data: dict) -> list[dict]:
             'issue_number': issue['number'],
             'has_open_pr': issue['number'] in pr_refs,
             'labels': issue['labels'],
+            'readiness_score': readiness_score,
+            'readiness_label': readiness_label,
             'hints': [
                 'Read the full issue description and all comments on GitHub to understand exactly what is being asked for',
                 'Search the codebase for the function, file, or keyword mentioned in the issue before writing any code',

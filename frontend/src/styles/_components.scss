@@ -3686,6 +3686,362 @@
   opacity: 0.7;
 }
 
+
+// ===== COMMIT HISTORY =====
+.git-history-panel { overflow: visible; }
+
+.git-history-stats {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $space-2;
+  margin-top: $space-3;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  strong { color: var(--color-text); }
+}
+.git-history-stat { display: flex; align-items: center; gap: 4px; }
+.git-history-stat__sep { color: var(--color-border); }
+.git-history-stat--warn strong { color: var(--color-warning); }
+
+// ── Contributors strip ────────────────────────────────────────────────────────
+.git-contribs {
+  margin-top: $space-5;
+  border-top: 1px solid var(--color-border);
+  padding-top: $space-4;
+
+  &__label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-secondary);
+    margin-bottom: $space-3;
+  }
+
+  &__filter-note {
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--color-text-muted);
+  }
+
+  &__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-2;
+  }
+}
+
+.git-contrib {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  text-decoration: none;
+  color: var(--color-text);
+  transition: background $transition-fast, border-color $transition-fast;
+
+  &--link:hover {
+    background: var(--color-surface-hover);
+    border-color: var(--color-accent);
+  }
+
+  &__avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid transparent;
+    flex-shrink: 0;
+  }
+
+  &__initials {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1px solid;
+    font-size: 0.6rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    letter-spacing: -0.5px;
+  }
+
+  &__name {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__count { font-size: 0.75rem; color: var(--color-text-muted); }
+}
+
+// ── Git log section ───────────────────────────────────────────────────────────
+.git-log-section {
+  margin-top: $space-5;
+  border-top: 1px solid var(--color-border);
+  padding-top: $space-4;
+}
+
+.git-log-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-3;
+  margin-bottom: $space-3;
+
+  &__title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  &__count {
+    font-weight: 400;
+    color: var(--color-text-muted);
+    font-size: 0.8125rem;
+  }
+}
+
+.git-log-search {
+  flex: 1;
+  min-width: 0;
+  padding: $space-1 $space-3;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-md;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  font-family: 'JetBrains Mono', monospace;
+
+  &::placeholder { color: var(--color-text-muted); }
+  &:focus { outline: none; border-color: var(--color-accent); }
+}
+
+.git-graph-scroll {
+  overflow-y: auto;
+  overflow-x: auto;
+  max-height: 640px;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-md;
+  background: var(--color-surface);
+  // No mask-image — it clips scrollbars on some browsers
+}
+
+// ── GitGraphSvg component ─────────────────────────────────────────────────────
+.gg-container {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.gg-svg {
+  flex-shrink: 0;
+  display: block;
+  // subtle bg to make the gutter readable
+  background: var(--color-surface);
+}
+
+.gg-node {
+  cursor: pointer;
+  transition: r 0.1s;
+
+  &:hover { r: 6; }
+}
+
+.gg-rows {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.gg-dates {
+  flex-shrink: 0;
+  overflow: hidden;
+  border-right: 1px dashed var(--color-border);
+  margin-right: $space-2;
+}
+
+// Month separator in graph column: just a subtle rule
+.gg-sep-rule {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px dashed var(--color-border);
+}
+
+// Commit row
+.gg-row {
+  display: flex;
+  flex-direction: column;
+  padding: 0 $space-2;
+  transition: background $transition-fast;
+  cursor: default;
+  min-width: 0;
+
+  &--hovered { background: var(--color-surface-hover); }
+
+  &__top-line {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    width: 100%;
+    flex-shrink: 0;
+  }
+
+  &__main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  &__body {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    padding: $space-1 $space-2 $space-2;
+    border-top: 1px dashed var(--color-border);
+    margin: 0 0 $space-1;
+    line-height: 1.5;
+    overflow: hidden;
+  }
+
+  &__expand-btn {
+    background: none;
+    border: 1px solid var(--color-border);
+    border-radius: $radius-sm;
+    color: var(--color-text-muted);
+    font-size: 0.6rem;
+    padding: 0 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+    line-height: 1.5;
+    transition: color $transition-fast, border-color $transition-fast;
+
+    &:hover {
+      color: var(--color-text);
+      border-color: var(--color-text-secondary);
+    }
+
+    &--open {
+      color: var(--color-accent);
+      border-color: var(--color-accent);
+    }
+  }
+
+  &__sha {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-decoration: none;
+    flex-shrink: 0;
+
+    &:hover { text-decoration: underline; }
+  }
+
+  &__merge-tag {
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: $radius-sm;
+    background: var(--color-info-bg);
+    color: var(--color-info);
+    flex-shrink: 0;
+  }
+
+  &__msg {
+    font-size: 0.8125rem;
+    color: var(--color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  &__author {
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 999px;
+    border: 1px solid;
+    flex-shrink: 0;
+    white-space: nowrap;
+    letter-spacing: -0.3px;
+  }
+}
+
+// Date column
+.gg-date {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  padding: 0 $space-3;
+  transition: background $transition-fast;
+
+  &--hovered { background: var(--color-surface-hover); }
+
+  // Month label row in the timeline — single centered line
+  &--month {
+    align-items: center;
+    justify-content: center;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface-hover);
+    cursor: pointer;
+    user-select: none;
+
+    &:hover .gg-date__month-inline { color: var(--color-accent); }
+  }
+
+  &__month-inline {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+    text-align: center;
+    transition: color $transition-fast;
+    line-height: 1;
+
+    em {
+      font-style: normal;
+      font-weight: 400;
+      color: var(--color-text-muted);
+      font-size: 0.65rem;
+    }
+  }
+
+  &__text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+    line-height: 1.2;
+  }
+
+  &__rel {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    line-height: 1.2;
+  }
+}
+
 // ===== URL FORM REPO DROPDOWN =====
 .url-form__repo-dropdown {
   position: absolute;
@@ -4503,5 +4859,623 @@
     align-items: center;
     flex-shrink: 0;
     padding-top: $space-1;
+  }
+}
+
+// ===== DELTA PANEL (#70) =====
+.delta-bar {
+  border: 1px solid var(--color-border);
+  border-radius: $radius-lg;
+  overflow: hidden;
+  font-size: 0.875rem;
+
+  &--loading {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-3 $space-4;
+    color: var(--color-text-secondary);
+    background: var(--color-surface);
+  }
+
+  &--has-changes {
+    border-color: var(--color-warning);
+    background: var(--color-surface);
+  }
+
+  &--no-changes {
+    border-color: var(--color-border);
+    background: var(--color-surface);
+  }
+
+  &__loading-text {
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-3 $space-4;
+    cursor: pointer;
+    user-select: none;
+
+    &:hover {
+      background: var(--color-surface-hover);
+    }
+  }
+
+  &__icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  &__label {
+    font-weight: 600;
+    color: var(--color-text);
+    flex-shrink: 0;
+  }
+
+  &__summary {
+    flex: 1;
+    color: var(--color-text-secondary);
+    font-size: 0.8125rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__toggle {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+  }
+
+  &__body {
+    border-top: 1px solid var(--color-border);
+    padding: $space-4;
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+  }
+}
+
+.delta-section {
+  &__title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-secondary);
+    margin-bottom: $space-2;
+  }
+
+  &--metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-3 $space-6;
+  }
+}
+
+.delta-signals {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+}
+
+.delta-signal {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  font-size: 0.8125rem;
+
+  &__label {
+    flex: 1;
+    color: var(--color-text);
+  }
+
+  &__scores {
+    display: flex;
+    align-items: center;
+    gap: $space-1;
+    color: var(--color-text-secondary);
+  }
+
+  &__before { opacity: 0.6; }
+  &__arrow { color: var(--color-text-muted); }
+  &__after { font-weight: 600; }
+}
+
+.delta-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: $radius-sm;
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex-shrink: 0;
+
+  &--up    { background: var(--badge-completed-bg); color: var(--badge-completed-text); }
+  &--down  { background: var(--badge-failed-bg); color: var(--badge-failed-text); }
+  &--same  { background: var(--color-border); color: var(--color-text-secondary); }
+  &--neutral { background: var(--color-info-bg); color: var(--color-info); }
+}
+
+.delta-classification {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  font-size: 0.8125rem;
+  padding: $space-1 0;
+
+  &__key {
+    flex: 1;
+    color: var(--color-text-secondary);
+    text-transform: capitalize;
+  }
+
+  &__before { color: var(--color-text-secondary); text-decoration: line-through; }
+  &__arrow  { color: var(--color-text-muted); }
+  &__after  { color: var(--color-text); font-weight: 600; }
+}
+
+.delta-deps {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+
+  &__group {
+    display: flex;
+    align-items: flex-start;
+    gap: $space-2;
+  }
+
+  &__label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: $radius-sm;
+    flex-shrink: 0;
+    margin-top: 2px;
+
+    &--added   { background: var(--badge-completed-bg); color: var(--badge-completed-text); }
+    &--removed { background: var(--badge-failed-bg); color: var(--badge-failed-text); }
+  }
+
+  &__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-1;
+  }
+
+  &__more {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    padding: 2px 0;
+  }
+}
+
+.delta-dep-chip {
+  font-size: 0.75rem;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 1px 6px;
+  border-radius: $radius-sm;
+
+  &--added   { background: var(--badge-completed-bg); color: var(--badge-completed-text); }
+  &--removed { background: var(--badge-failed-bg); color: var(--badge-failed-text); }
+}
+
+.delta-metric {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  font-size: 0.8125rem;
+
+  &__label  { color: var(--color-text-secondary); }
+  &__before { color: var(--color-text-secondary); opacity: 0.7; }
+  &__arrow  { color: var(--color-text-muted); }
+  &__after  { color: var(--color-text); font-weight: 600; }
+}
+
+// ===== FILE HISTORY DRAWER (#59) =====
+.file-history-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  padding: 0 2px;
+  opacity: 0.5;
+  transition: opacity $transition-fast;
+  flex-shrink: 0;
+
+  &:hover { opacity: 1; }
+}
+
+.file-history__path {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem !important;
+  word-break: break-all;
+}
+
+.file-history__actions {
+  margin-bottom: $space-4;
+}
+
+.file-history__loading,
+.file-history__error {
+  display: flex;
+  align-items: center;
+  gap: $space-3;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  padding: $space-4 0;
+}
+
+.file-history__empty {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.file-history__timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.fh-commit {
+  padding: $space-3 0;
+  border-bottom: 1px solid var(--color-border);
+
+  &:last-child { border-bottom: none; }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    margin-bottom: $space-1;
+    flex-wrap: wrap;
+  }
+
+  &__sha {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8125rem;
+    color: var(--color-accent);
+    text-decoration: none;
+    font-weight: 600;
+
+    &:hover { text-decoration: underline; }
+  }
+
+  &__date {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+  }
+
+  &__author {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    flex: 1;
+  }
+
+  &__message {
+    font-size: 0.875rem;
+    color: var(--color-text);
+    margin: 0 0 $space-1;
+  }
+
+  &__refs {
+    display: flex;
+    align-items: center;
+    gap: $space-1;
+    flex-wrap: wrap;
+  }
+
+  &__refs-label {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  &__ref-link {
+    font-size: 0.75rem;
+    color: var(--color-accent);
+    text-decoration: none;
+
+    &:hover { text-decoration: underline; }
+  }
+}
+
+// ===== CONTRIBUTION PATH PANEL (#58) =====
+.contrib-path {
+  border-top: 1px solid var(--color-border);
+  padding-top: $space-6;
+
+  &__title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: $space-1;
+  }
+
+  &__intro {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+    margin-bottom: $space-4;
+  }
+
+  &__areas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-2;
+    margin-bottom: $space-4;
+  }
+
+  &__area-btn {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-2 $space-3;
+    border: 1px solid var(--color-border);
+    border-radius: $radius-md;
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: border-color $transition-fast, background $transition-fast;
+
+    &:hover { background: var(--color-surface-hover); }
+
+    &--active {
+      border-color: var(--color-accent);
+      background: var(--color-info-bg);
+      color: var(--color-accent);
+      font-weight: 500;
+    }
+  }
+
+  &__area-icon { font-size: 1rem; }
+  &__area-label { }
+
+  &__result {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: $radius-lg;
+    padding: $space-4;
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+  }
+
+  &__area-desc {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+    margin: 0;
+  }
+
+  &__reading {
+    background: var(--color-surface-hover);
+    border-radius: $radius-md;
+    padding: $space-3;
+  }
+
+  &__reading-title {
+    font-weight: 600;
+    font-size: 0.875rem;
+    margin-bottom: $space-1;
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+  }
+
+  &__reading-desc {
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+    margin-bottom: $space-3;
+  }
+
+  &__phase {
+    margin-bottom: $space-3;
+
+    &:last-child { margin-bottom: 0; }
+  }
+
+  &__phase-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-secondary);
+    margin-bottom: $space-2;
+  }
+
+  &__files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-1;
+  }
+
+  &__file {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--color-accent);
+    text-decoration: none;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: $radius-sm;
+    padding: 2px 8px;
+
+    &:hover { text-decoration: underline; }
+  }
+
+  &__reading-order {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+  }
+
+  &__step {
+    display: flex;
+    align-items: baseline;
+    gap: $space-2;
+    font-size: 0.8125rem;
+  }
+
+  &__step-num {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--color-border);
+    color: var(--color-text-secondary);
+    font-size: 0.7rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  &__step-file {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--color-accent);
+    text-decoration: none;
+
+    &:hover { text-decoration: underline; }
+  }
+
+  &__step-note {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+  }
+
+  &__no-tour {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+    font-style: italic;
+  }
+
+  &__opps {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+  }
+
+  &__opp-list {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+    margin-top: $space-2;
+  }
+
+  &__opp {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: $radius-md;
+    padding: $space-3;
+  }
+
+  &__opp-header {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    margin-bottom: $space-1;
+    flex-wrap: wrap;
+  }
+
+  &__opp-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    flex: 1;
+  }
+
+  &__opp-issue {
+    font-size: 0.75rem;
+    color: var(--color-accent);
+    text-decoration: none;
+
+    &:hover { text-decoration: underline; }
+  }
+
+  &__opp-desc {
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+    margin: 0;
+  }
+
+  &__no-opps {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+    font-style: italic;
+  }
+}
+
+// ===== READINESS SCORE (#61) =====
+.contrib-drawer__readiness {
+  display: flex;
+  align-items: center;
+  gap: $space-3;
+  margin-top: $space-2;
+}
+
+.readiness-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: $radius-sm;
+  flex-shrink: 0;
+
+  &--ready        { background: var(--badge-completed-bg); color: var(--badge-completed-text); }
+  &--approachable { background: var(--color-warning-bg); color: var(--color-warning); }
+  &--complex      { background: var(--badge-failed-bg); color: var(--badge-failed-text); }
+}
+
+.readiness-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--color-border);
+  border-radius: $radius-sm;
+  overflow: hidden;
+
+  &__fill {
+    height: 100%;
+    background: var(--color-accent);
+    border-radius: $radius-sm;
+    transition: width $transition-slow;
+  }
+}
+
+.readiness-score-text {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+// ===== CONTRIBUTOR GUIDANCE (#62) =====
+.contrib-guidance {
+  margin-top: $space-2;
+
+  &__intro {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+    margin-bottom: $space-2;
+  }
+
+  &__files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-1;
+  }
+
+  &__file {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--color-accent);
+    text-decoration: none;
+    background: var(--color-surface-hover);
+    border: 1px solid var(--color-border);
+    border-radius: $radius-sm;
+    padding: 2px 8px;
+
+    &:hover { text-decoration: underline; }
   }
 }

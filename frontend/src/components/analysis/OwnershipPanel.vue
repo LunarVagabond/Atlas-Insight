@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { GitHubContributor, OwnershipData, OwnershipSubsystem, JitIssue } from '../../stores/analysis'
+import FileHistoryDrawer from './FileHistoryDrawer.vue'
 
 const props = defineProps<{
   ownership: OwnershipData
@@ -8,7 +9,11 @@ const props = defineProps<{
   jitLoading: boolean
   repoUrl?: string
   githubContributors?: GitHubContributor[]
+  runId?: string
 }>()
+
+const activeFilePath = ref<string | null>(null)
+function openFileHistory(file: string) { activeFilePath.value = file }
 
 const SUBSYSTEM_ICONS: Record<string, string> = {
   frontend: '🖥',
@@ -149,6 +154,7 @@ function toggleHint(e: Event, key: string) {
             >{{ hf.file.split('/').pop() }}</a>
             <code v-else class="ownership-hot-file__code">{{ hf.file.split('/').pop() }}</code>
             <span class="ownership-hot-file__count" :title="`Changed ${hf.commit_count} times in git history`">{{ hf.commit_count }} commits</span>
+            <button v-if="runId" class="file-history-btn" :title="`View commit history for ${hf.file}`" @click="openFileHistory(hf.file)">📜</button>
           </div>
         </div>
 
@@ -189,5 +195,12 @@ function toggleHint(e: Event, key: string) {
     <div v-else class="empty-state">
       No subsystem data available — re-analyze the repository to generate ownership signals.
     </div>
+
+    <FileHistoryDrawer
+      :run-id="runId ?? null"
+      :path="activeFilePath"
+      :repo-url="repoUrl"
+      @close="activeFilePath = null"
+    />
   </div>
 </template>

@@ -36,12 +36,16 @@ def analyze_commits(repo: Repo) -> dict:
             weekly[week_key] += 1
             monthly[month_key] += 1
             contributor_by_period[month_key].add(author)
-            if len(monthly_commits[month_key]) < 30:
+            if len(monthly_commits[month_key]) < 60:
+                subject = commit.message.split('\n')[0][:80]
+                body_lines = commit.message[len(commit.message.split('\n')[0]):].strip()
                 monthly_commits[month_key].append({
                     'sha': commit.hexsha[:7],
-                    'message': commit.message.split('\n')[0][:80],
+                    'message': subject,
+                    'body': body_lines[:500] if body_lines else None,
                     'author': commit.author.name or commit.author.email,
                     'date': dt.date().isoformat(),
+                    'parents': [p.hexsha[:7] for p in commit.parents],
                 })
 
         if len(reverted_commits) < 100 and commit.message.strip().startswith('Revert '):

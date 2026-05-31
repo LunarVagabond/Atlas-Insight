@@ -519,6 +519,162 @@ def get_run_prs(request, run_id: uuid.UUID):
     return result
 
 
+def _compute_run_diff(curr: dict, prev: dict, prev_run_id, prev_triggered_at) -> dict:
+    curr_h = {h['signal']: h for h in curr.get('heuristics', [])}
+    prev_h = {h['signal']: h for h in prev.get('heuristics', [])}
+    heuristic_deltas = []
+    for signal, ch in curr_h.items():
+        ph = prev_h.get(signal)
+        if ph:
+            delta = ch['score'] - ph['score']
+            heuristic_deltas.append({
+                'signal': signal,
+                'label': ch['label'],
+                'before': ph['score'],
+                'after': ch['score'],
+                'delta': delta,
+                'direction': 'up' if delta > 2 else 'down' if delta < -2 else 'same',
+            })
+
+    curr_dep_names = {d['name'] for d in curr.get('dependencies', {}).get('dependencies', [])}
+    prev_dep_names = {d['name'] for d in prev.get('dependencies', {}).get('dependencies', [])}
+
+    curr_struct = curr.get('structure', {})
+    prev_struct = prev.get('structure', {})
+    curr_graph = curr.get('graph', {})
+    prev_graph = prev.get('graph', {})
+    curr_cls = curr.get('classification', {})
+    prev_cls = prev.get('classification', {})
+
+    def cls_delta(key):
+        c = curr_cls.get(key, {})
+        p = prev_cls.get(key, {})
+        if not c or not p:
+            return None
+        return {
+            'before_label': p.get('label'),
+            'after_label': c.get('label'),
+            'delta': c.get('score', 0) - p.get('score', 0),
+            'changed': c.get('key') != p.get('key'),
+        }
+
+    added_deps = sorted(curr_dep_names - prev_dep_names)[:20]
+    removed_deps = sorted(prev_dep_names - curr_dep_names)[:20]
+
+    return {
+        'available': True,
+        'previous_run_id': str(prev_run_id),
+        'previous_triggered_at': prev_triggered_at.isoformat(),
+        'heuristics': heuristic_deltas,
+        'dependencies': {
+            'added': added_deps,
+            'removed': removed_deps,
+            'added_count': len(curr_dep_names - prev_dep_names),
+            'removed_count': len(prev_dep_names - curr_dep_names),
+        },
+        'contributors': {
+            'before': prev.get('commits', {}).get('total_contributors', 0),
+            'after': curr.get('commits', {}).get('total_contributors', 0),
+            'delta': curr.get('commits', {}).get('total_contributors', 0) - prev.get('commits', {}).get('total_contributors', 0),
+        },
+        'graph': {
+            'nodes_before': prev_graph.get('node_count', 0),
+            'nodes_after': curr_graph.get('node_count', 0),
+            'nodes_delta': curr_graph.get('node_count', 0) - prev_graph.get('node_count', 0),
+            'god_modules_before': len(prev_graph.get('god_modules', [])),
+            'god_modules_after': len(curr_graph.get('god_modules', [])),
+            'god_modules_delta': len(curr_graph.get('god_modules', [])) - len(prev_graph.get('god_modules', [])),
+        },
+        'structure': {
+            'files_before': prev_struct.get('total_files', 0),
+            'files_after': curr_struct.get('total_files', 0),
+            'files_delta': curr_struct.get('total_files', 0) - prev_struct.get('total_files', 0),
+            'test_ratio_before': round(prev_struct.get('test_ratio', 0), 3),
+            'test_ratio_after': round(curr_struct.get('test_ratio', 0), 3),
+        },
+        'classification': {
+            'project_health': cls_delta('project_health'),
+            'contribution_difficulty': cls_delta('contribution_difficulty'),
+            'documentation_grade': cls_delta('documentation_grade'),
+            'code_complexity': cls_delta('code_complexity'),
+        },
+    }
+
+
+@router.get('/runs/{run_id}/diff')
+def get_run_diff(request, run_id: uuid.UUID):
+    try:
+        run = AnalysisRun.objects.select_related('repo').get(id=run_id)
+    except AnalysisRun.DoesNotExist:
+        raise HttpError(404, 'Run not found')
+    if run.repo.is_private and not request.user.is_authenticated:
+        raise HttpError(403, 'Access denied')
+    if run.status != 'completed' or not run.result:
+        return {'available': False}
+
+    prev_run = (
+        AnalysisRun.objects
+        .filter(repo=run.repo, status='completed', triggered_at__lt=run.triggered_at)
+        .exclude(id=run.id)
+        .order_by('-triggered_at')
+        .first()
+    )
+    if not prev_run or not prev_run.result:
+        return {'available': False}
+
+    return _compute_run_diff(run.result, prev_run.result, prev_run.id, prev_run.triggered_at)
+
+
+@router.get('/runs/{run_id}/file-history')
+def get_file_history(request, run_id: uuid.UUID, path: str = ''):
+    import hashlib
+    import re as _re
+    import requests as _requests
+
+    try:
+        run = AnalysisRun.objects.select_related('repo').get(id=run_id)
+    except AnalysisRun.DoesNotExist:
+        raise HttpError(404, 'Run not found')
+    if run.repo.is_private and not request.user.is_authenticated:
+        raise HttpError(403, 'Access denied')
+    if not path:
+        raise HttpError(422, 'path parameter required')
+
+    from django.core.cache import cache
+    path_hash = hashlib.md5(path.encode()).hexdigest()[:8]
+    cache_key = f'jit_{run_id}_fh_{path_hash}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    token = _jit_token(run)
+    headers = _jit_headers(token)
+    url = f'https://api.github.com/repos/{run.repo.owner}/{run.repo.name}/commits'
+    resp = _requests.get(url, headers=headers, params={'path': path, 'per_page': 10}, timeout=10)
+    if not resp.ok:
+        raise HttpError(502, 'Failed to fetch file history from GitHub')
+
+    commits = []
+    for c in resp.json():
+        if not isinstance(c, dict):
+            continue
+        message = c.get('commit', {}).get('message', '').split('\n')[0][:120]
+        refs = [int(m) for m in _re.findall(r'#(\d+)', message)][:5]
+        commits.append({
+            'sha': c['sha'][:7],
+            'full_sha': c['sha'],
+            'message': message,
+            'date': c.get('commit', {}).get('author', {}).get('date', ''),
+            'author': c.get('commit', {}).get('author', {}).get('name', ''),
+            'url': c.get('html_url', ''),
+            'issue_refs': refs,
+        })
+
+    result = {'path': path, 'commits': commits}
+    cache.set(cache_key, result, 900)
+    return result
+
+
 @router.post('/repos/{repo_id}/favorite', response={200: None})
 def add_favorite(request, repo_id: uuid.UUID):
     if not request.user.is_authenticated:
