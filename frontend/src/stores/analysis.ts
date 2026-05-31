@@ -192,6 +192,13 @@ export interface Classification {
   tags: string[]
 }
 
+export interface MonthlyCommit {
+  sha: string
+  message: string
+  author: string
+  date: string
+}
+
 export interface CommitData {
   total_commits: number
   total_contributors: number
@@ -202,6 +209,7 @@ export interface CommitData {
   weekly_frequency: { week: string; count: number }[]
   monthly_frequency: { month: string; count: number }[]
   contributor_churn: { month: string; active: number; new: number; lost: number }[]
+  monthly_commits?: Record<string, MonthlyCommit[]>
 }
 
 export interface GraphData {

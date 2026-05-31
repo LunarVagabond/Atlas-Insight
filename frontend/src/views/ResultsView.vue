@@ -192,7 +192,7 @@ function copyLink() {
         <DependenciesPanel v-if="activeTab === 'Dependencies'" :deps="result.dependencies" />
         <SecurityPanel v-if="activeTab === 'Security'" :security="result.security" :heuristics="result.heuristics" :structure="result.structure" />
         <template v-if="activeTab === 'History'">
-          <CommitTimelineChart :commits="result.commits" />
+          <CommitTimelineChart :commits="result.commits" :repo-url="store.run?.repo_url" />
           <div v-if="hasRoadmap && result.structure?.roadmap_parsed" style="margin-top: 1.5rem" class="panel">
             <RoadmapTimeline
               :milestones="result.structure.roadmap_parsed.milestones"

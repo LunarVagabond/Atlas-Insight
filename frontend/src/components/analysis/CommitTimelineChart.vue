@@ -12,13 +12,14 @@ import {
   Legend,
   Filler,
 } from 'chart.js'
-import type { CommitData } from '../../stores/analysis'
+import type { CommitData, MonthlyCommit } from '../../stores/analysis'
 import TimelineFilter, { type FilterSelection } from './TimelineFilter.vue'
+import CommitMonthDrawer from './CommitMonthDrawer.vue'
 import { useTableFilter } from '../../composables/useTableFilter'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 
-const props = defineProps<{ commits: CommitData }>()
+const props = defineProps<{ commits: CommitData; repoUrl?: string }>()
 
 const filteredMonthly = ref<{ month: string; count: number }[]>([])
 const selection = ref<FilterSelection>({ year: 'All', months: new Set() })
@@ -59,6 +60,15 @@ const chartData = computed(() => ({
     },
   ],
 }))
+
+const activeMonth = ref<string | null>(null)
+const activeMonthCommits = computed<MonthlyCommit[]>(() =>
+  activeMonth.value ? (props.commits.monthly_commits?.[activeMonth.value] ?? []) : []
+)
+
+function openMonth(month: string) {
+  activeMonth.value = month
+}
 
 const chartOptions = {
   responsive: true,
@@ -116,8 +126,17 @@ const chartOptions = {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="row in (churnFilter.filtered.value as any[])" :key="row.month">
-            <td>{{ row.month }}</td>
+          <tr
+            v-for="row in (churnFilter.filtered.value as any[])"
+            :key="row.month"
+            class="churn-row"
+            :class="{ 'churn-row--clickable': commits.monthly_commits?.[row.month]?.length }"
+            @click="commits.monthly_commits?.[row.month]?.length && openMonth(row.month)"
+          >
+            <td class="churn-row__month">
+              {{ row.month }}
+              <span v-if="commits.monthly_commits?.[row.month]?.length" class="churn-row__hint">↗</span>
+            </td>
             <td>{{ row.active }}</td>
             <td style="color: var(--color-success)">+{{ row.new }}</td>
             <td style="color: var(--color-error)">-{{ row.lost }}</td>
@@ -127,4 +146,11 @@ const chartOptions = {
       <div v-if="!churnFilter.filtered.value.length" class="empty-state" style="margin-top:1rem">No contributor data for selected range</div>
     </div>
   </div>
+
+  <CommitMonthDrawer
+    :month="activeMonth"
+    :commits="activeMonthCommits"
+    :repo-url="repoUrl"
+    @close="activeMonth = null"
+  />
 </template>

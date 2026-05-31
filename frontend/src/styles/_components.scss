@@ -3340,3 +3340,221 @@
   margin: $space-3 0 0;
   line-height: 1.6;
 }
+
+// ===== COMMIT MONTH DRAWER =====
+.cm-drawer-root {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cm-drawer__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.cm-drawer__panel {
+  position: relative;
+  width: 400px;
+  max-width: 92vw;
+  height: 100%;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.cm-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $space-4 $space-6;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.cm-drawer__title {
+  display: flex;
+  align-items: baseline;
+  gap: $space-3;
+}
+
+.cm-drawer__month-label {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.cm-drawer__count {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.cm-drawer__close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 1rem;
+  padding: $space-1 $space-2;
+  border-radius: $radius-sm;
+  transition: color $transition-fast, background $transition-fast;
+
+  &:hover {
+    color: var(--color-text);
+    background: var(--color-surface-hover);
+  }
+}
+
+.cm-drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: $space-4 $space-6;
+}
+
+.cm-drawer__list {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+}
+
+.cm-drawer__commit {
+  padding: $space-3;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: $radius-md;
+}
+
+.cm-drawer__commit-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-2;
+  margin-bottom: $space-1;
+}
+
+.cm-drawer__sha {
+  font-family: $font-mono;
+  font-size: 0.75rem;
+  color: var(--color-accent);
+  text-decoration: none;
+
+  &:hover { text-decoration: underline; }
+
+  &--plain { color: var(--color-text-muted); }
+}
+
+.cm-drawer__date {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.cm-drawer__message {
+  font-size: 0.875rem;
+  color: var(--color-text);
+  margin: 0 0 $space-1;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.cm-drawer__author {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.cm-drawer__empty {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  text-align: center;
+  margin-top: $space-8;
+}
+
+// cm-drawer transition
+.cm-drawer-enter-active {
+  transition: opacity 0.2s ease;
+  .cm-drawer__panel { transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+  .cm-drawer__backdrop { transition: opacity 0.2s ease; }
+}
+
+.cm-drawer-leave-active {
+  transition: opacity 0.18s ease;
+  .cm-drawer__panel { transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+  .cm-drawer__backdrop { transition: opacity 0.18s ease; }
+}
+
+.cm-drawer-enter-from,
+.cm-drawer-leave-to {
+  .cm-drawer__panel { transform: translateX(100%); }
+  .cm-drawer__backdrop { opacity: 0; }
+}
+
+// Clickable churn table rows
+.churn-row {
+  &--clickable {
+    cursor: pointer;
+
+    &:hover { background: var(--color-surface-hover); }
+  }
+}
+
+.churn-row__month {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+}
+
+.churn-row__hint {
+  font-size: 0.7rem;
+  color: var(--color-accent);
+  opacity: 0.7;
+}
+
+// ===== URL FORM REPO DROPDOWN =====
+.url-form__repo-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: $radius-md;
+  box-shadow: 0 4px 16px var(--color-shadow);
+  z-index: 200;
+  overflow: hidden;
+}
+
+.url-form__repo-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-2;
+  padding: $space-2 $space-4;
+  cursor: pointer;
+  transition: background $transition-fast;
+
+  &:hover { background: var(--color-surface-hover); }
+
+  & + & { border-top: 1px solid var(--color-border); }
+}
+
+.url-form__repo-name {
+  font-size: 0.875rem;
+  color: var(--color-text);
+  font-family: $font-mono;
+}
+
+.url-form__repo-private {
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: $radius-sm;
+  padding: 1px $space-1;
+  white-space: nowrap;
+}

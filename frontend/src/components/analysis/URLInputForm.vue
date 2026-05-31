@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import axios from 'axios'
 import AppButton from '../ui/AppButton.vue'
 import { useAuthStore } from '../../stores/auth'
 
@@ -12,10 +13,62 @@ const pat = ref('')
 const showPat = ref(false)
 const localError = ref('')
 
+interface GhRepo { full_name: string; html_url: string; private: boolean }
+const userRepos = ref<GhRepo[]>([])
+const reposLoading = ref(false)
+const showDropdown = ref(false)
+
+const filteredRepos = computed(() => {
+  const q = url.value.trim().toLowerCase()
+  if (!q) return userRepos.value.slice(0, 8)
+  return userRepos.value.filter(r =>
+    r.full_name.toLowerCase().includes(q) || r.html_url.toLowerCase().includes(q)
+  ).slice(0, 8)
+})
+
+const canShowDropdown = computed(() =>
+  auth.isAuthenticated && auth.user?.github_connected && showDropdown.value && filteredRepos.value.length > 0
+)
+
+async function fetchUserRepos() {
+  if (!auth.isAuthenticated || !auth.user?.github_connected) return
+  if (userRepos.value.length) return
+  reposLoading.value = true
+  try {
+    const { data } = await axios.get('/api/v1/repositories/my-repos')
+    userRepos.value = data
+  } catch {
+    // silently fail — dropdown just won't show
+  } finally {
+    reposLoading.value = false
+  }
+}
+
+function onFocus() {
+  showDropdown.value = true
+  fetchUserRepos()
+}
+
+function selectRepo(repo: GhRepo) {
+  url.value = repo.html_url
+  showDropdown.value = false
+}
+
+function onClickOutside(e: MouseEvent) {
+  const form = document.querySelector('.url-form')
+  if (form && !form.contains(e.target as Node)) {
+    showDropdown.value = false
+  }
+}
+
+onMounted(() => document.addEventListener('mousedown', onClickOutside))
+onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
+
 const GITHUB_RE = /^https?:\/\/github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+\/?$/
 
 function submit() {
   localError.value = ''
+  showDropdown.value = false
   const trimmed = url.value.trim()
   if (!trimmed) {
     localError.value = 'Please enter a GitHub URL'
@@ -36,7 +89,7 @@ function togglePat() {
 
 <template>
   <form class="url-form" @submit.prevent="submit">
-    <div class="url-form__input-row">
+    <div class="url-form__input-row" style="position: relative">
       <input
         v-model="url"
         type="url"
@@ -45,10 +98,25 @@ function togglePat() {
         :disabled="loading"
         autocomplete="off"
         spellcheck="false"
+        @focus="onFocus"
+        @input="showDropdown = true"
       />
       <AppButton type="submit" size="lg" :loading="loading">
         Analyze
       </AppButton>
+
+      <!-- Repo dropdown -->
+      <div v-if="canShowDropdown" class="url-form__repo-dropdown">
+        <div
+          v-for="repo in filteredRepos"
+          :key="repo.full_name"
+          class="url-form__repo-option"
+          @mousedown.prevent="selectRepo(repo)"
+        >
+          <span class="url-form__repo-name">{{ repo.full_name }}</span>
+          <span v-if="repo.private" class="url-form__repo-private">private</span>
+        </div>
+      </div>
     </div>
 
     <div class="url-form__meta">

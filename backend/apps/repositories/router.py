@@ -364,6 +364,42 @@ def _make_svg(label: str, value: str, color: str) -> str:
     )
 
 
+class MyRepoSchema(Schema):
+    full_name: str
+    html_url: str
+    private: bool
+
+
+@router.get('/my-repos', response=list[MyRepoSchema])
+def my_repos(request):
+    if not request.user.is_authenticated:
+        raise HttpError(401, 'Not authenticated')
+    from allauth.socialaccount.models import SocialToken
+    import requests as _requests
+    social = SocialToken.objects.filter(
+        account__user=request.user,
+        account__provider='github',
+    ).first()
+    if not social:
+        raise HttpError(403, 'GitHub not connected')
+    resp = _requests.get(
+        'https://api.github.com/user/repos',
+        headers={
+            'Authorization': f'Bearer {social.token}',
+            'Accept': 'application/vnd.github+json',
+        },
+        params={'per_page': 100, 'sort': 'pushed', 'affiliation': 'owner,collaborator'},
+        timeout=10,
+    )
+    if not resp.ok:
+        raise HttpError(502, 'Failed to fetch repos from GitHub')
+    return [
+        MyRepoSchema(full_name=r['full_name'], html_url=r['html_url'], private=r['private'])
+        for r in resp.json()
+        if isinstance(r, dict)
+    ]
+
+
 @router.get('/admin/stats')
 def admin_stats(request):
     import os
