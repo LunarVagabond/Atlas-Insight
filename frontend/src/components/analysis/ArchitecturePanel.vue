@@ -2,10 +2,11 @@
 import { ref, computed } from 'vue'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
+import FileHistoryDrawer from './FileHistoryDrawer.vue'
 import type { GraphData, StructureData } from '../../stores/analysis'
 import { useTableFilter } from '../../composables/useTableFilter'
 
-const props = defineProps<{ graph: GraphData; hotFiles?: { file: string; commit_count: number }[]; structure?: StructureData }>()
+const props = defineProps<{ graph: GraphData; hotFiles?: { file: string; commit_count: number }[]; structure?: StructureData; runId?: string; repoUrl?: string }>()
 
 const hotFilesSource = computed(() => (props.hotFiles ?? []) as Record<string, unknown>[])
 const hotFilesFilter = useTableFilter(hotFilesSource, ['file'], 'commit_count', 'desc')
@@ -69,6 +70,9 @@ function openDrawer(id: string) {
 function closeDrawer() {
   drawerFile.value = null
 }
+
+const activeFilePath = ref<string | null>(null)
+function openFileHistory(file: string) { activeFilePath.value = file }
 
 // ── File type descriptions ────────────────────────────────────────────────────
 
@@ -395,6 +399,7 @@ const explorerResults = computed(() => {
             <th>#</th>
             <th class="runs-table__sortable" @click="hotFilesFilter.setSort('file')">File {{ hotFilesFilter.sortIcon('file') }}</th>
             <th class="runs-table__sortable" @click="hotFilesFilter.setSort('commit_count')">Times Changed {{ hotFilesFilter.sortIcon('commit_count') }}</th>
+            <th v-if="runId"></th>
           </tr>
         </thead>
         <tbody>
@@ -407,6 +412,9 @@ const explorerResults = computed(() => {
             <td>{{ idx + 1 }}</td>
             <td>{{ hf.file }}</td>
             <td>{{ hf.commit_count.toLocaleString() }}</td>
+            <td v-if="runId">
+              <button v-if="!hf.file.endsWith('/')" class="file-history-btn" :title="`View commit history for ${hf.file}`" @click.stop="openFileHistory(hf.file)">📜</button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -490,5 +498,12 @@ const explorerResults = computed(() => {
         </div>
       </Transition>
     </Teleport>
+
+    <FileHistoryDrawer
+      :run-id="runId ?? null"
+      :path="activeFilePath"
+      :repo-url="repoUrl"
+      @close="activeFilePath = null"
+    />
   </div>
 </template>

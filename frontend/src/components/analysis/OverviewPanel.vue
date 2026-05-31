@@ -127,6 +127,12 @@ const langBarColors = ['#0969da', '#2da44e', '#e36209', '#8250df']
           <div class="stat__label">Overall Health Score</div>
         </div>
       </AppCard>
+      <AppCard v-if="structure?.total_lines">
+        <div class="stat">
+          <div class="stat__value">{{ structure.total_lines.toLocaleString() }}</div>
+          <div class="stat__label">Lines of Code</div>
+        </div>
+      </AppCard>
     </div>
 
     <!-- Abandoned warning -->

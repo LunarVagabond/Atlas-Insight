@@ -72,6 +72,10 @@ function riskVariant(r: ContributionOpportunity['risk']) {
   return r === 'low' ? 'completed' : r === 'medium' ? 'warning' : 'failed'
 }
 
+function readinessVariant(label: string) {
+  return label === 'Ready' ? 'completed' : label === 'Approachable' ? 'warning' : 'failed'
+}
+
 const availableFilters = computed(() =>
   FILTERS.filter(f => {
     if (f.key === 'all') return true
@@ -184,6 +188,7 @@ const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
           <div class="contrib-card__footer">
             <AppBadge :variant="diffVariant(opp.difficulty)">{{ opp.difficulty }}</AppBadge>
             <AppBadge :variant="riskVariant(opp.risk)">{{ opp.risk }} risk</AppBadge>
+            <AppBadge v-if="opp.readiness_label" :variant="readinessVariant(opp.readiness_label)">{{ opp.readiness_label }}</AppBadge>
             <span class="contrib-card__category">{{ CATEGORY_LABELS[opp.category] }}</span>
           </div>
         </AppCard>
@@ -234,6 +239,7 @@ const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
           <div class="contrib-card__footer">
             <AppBadge :variant="diffVariant(opp.difficulty)">{{ opp.difficulty }}</AppBadge>
             <AppBadge :variant="riskVariant(opp.risk)">{{ opp.risk }} risk</AppBadge>
+            <AppBadge v-if="opp.readiness_label" :variant="readinessVariant(opp.readiness_label)">{{ opp.readiness_label }}</AppBadge>
             <span class="contrib-card__category">{{ CATEGORY_LABELS[opp.category] }}</span>
           </div>
         </AppCard>
@@ -264,6 +270,7 @@ const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
           <div class="contrib-card__footer">
             <AppBadge :variant="diffVariant(opp.difficulty)">{{ opp.difficulty }}</AppBadge>
             <AppBadge :variant="riskVariant(opp.risk)">{{ opp.risk }} risk</AppBadge>
+            <AppBadge v-if="opp.readiness_label" :variant="readinessVariant(opp.readiness_label)">{{ opp.readiness_label }}</AppBadge>
             <span class="contrib-card__category">{{ CATEGORY_LABELS[opp.category] }}</span>
           </div>
         </AppCard>
@@ -280,6 +287,7 @@ const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
       :tours="archTours"
       :opportunities="opportunities"
       :repo-url="repoUrl"
+      :all-files="structure?.all_files"
       style="margin-top: 2rem"
     />
 

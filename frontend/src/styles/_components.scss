@@ -4246,6 +4246,13 @@
     margin-bottom: $space-1;
   }
 
+  &__read-mark {
+    font-size: 0.75rem;
+    color: var(--color-success, #4caf50);
+    flex-shrink: 0;
+    font-weight: 700;
+  }
+
   &__chevron {
     color: var(--color-text-muted);
     font-size: 0.7rem;
@@ -5501,5 +5508,124 @@
     padding: 2px 8px;
 
     &:hover { text-decoration: underline; }
+  }
+}
+
+// ── Settings view ─────────────────────────────────────────────────────────────
+
+.settings-view {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: $space-8 $space-6;
+
+  &__header {
+    margin-bottom: $space-6;
+  }
+
+  &__title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+}
+
+.settings-section {
+  padding: $space-6;
+
+  &__title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: $space-2;
+    color: var(--color-text);
+  }
+
+  &__desc {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    margin-bottom: $space-5;
+    line-height: 1.6;
+  }
+}
+
+.settings-token-form {
+  display: flex;
+  gap: $space-3;
+  margin-bottom: $space-2;
+
+  &__input {
+    flex: 1;
+    padding: $space-2 $space-3;
+    border: 1px solid var(--color-border);
+    border-radius: $radius-md;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-size: 0.875rem;
+
+    &:focus {
+      outline: none;
+      border-color: var(--color-accent);
+    }
+  }
+
+  &__error {
+    font-size: 0.8125rem;
+    color: var(--color-error, #e53935);
+    margin-top: $space-1;
+  }
+}
+
+.settings-token-list__empty {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  margin-top: $space-4;
+}
+
+.settings-token-table {
+  margin-top: $space-4;
+}
+
+.settings-token-reveal {
+  border: 1px solid var(--color-warning, #f59e0b);
+  border-radius: $radius-lg;
+  padding: $space-4 $space-5;
+  margin-bottom: $space-5;
+  background: var(--color-surface);
+
+  &__alert {
+    font-size: 0.875rem;
+    color: var(--color-text);
+    margin-bottom: $space-3;
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    flex-wrap: wrap;
+    margin-bottom: $space-3;
+  }
+
+  &__value {
+    flex: 1;
+    font-family: $font-mono;
+    font-size: 0.8125rem;
+    background: var(--color-bg);
+    padding: $space-2 $space-3;
+    border-radius: $radius-md;
+    border: 1px solid var(--color-border);
+    overflow: auto;
+    word-break: break-all;
+  }
+
+  &__usage {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+
+    code {
+      font-family: $font-mono;
+      background: var(--color-bg);
+      padding: 1px 4px;
+      border-radius: $radius-sm;
+    }
   }
 }

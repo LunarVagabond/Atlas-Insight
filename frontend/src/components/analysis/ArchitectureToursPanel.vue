@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { ArchTour } from '../../stores/analysis'
 import FileHistoryDrawer from './FileHistoryDrawer.vue'
 
@@ -17,8 +17,34 @@ function openFileHistory(file: string) {
 const expandedId = ref<string | null>(null)
 const copiedId = ref<string | null>(null)
 
+const TOURS_READ_KEY = computed(() =>
+  props.runId ? `github-archaeologist:tours-read:${props.runId}` : null
+)
+
+function loadReadTours(): Set<string> {
+  if (!TOURS_READ_KEY.value) return new Set()
+  try {
+    const raw = localStorage.getItem(TOURS_READ_KEY.value)
+    return new Set(raw ? JSON.parse(raw) : [])
+  } catch {
+    return new Set()
+  }
+}
+
+const readTours = ref<Set<string>>(loadReadTours())
+
+function isRead(id: string) { return readTours.value.has(id) }
+
+function markRead(id: string) {
+  if (!TOURS_READ_KEY.value || readTours.value.has(id)) return
+  readTours.value = new Set([...readTours.value, id])
+  localStorage.setItem(TOURS_READ_KEY.value, JSON.stringify([...readTours.value]))
+}
+
 function toggle(id: string) {
-  expandedId.value = expandedId.value === id ? null : id
+  const opening = expandedId.value !== id
+  expandedId.value = opening ? id : null
+  if (opening) markRead(id)
 }
 
 function peekFile(tour: ArchTour): string | null {
@@ -92,6 +118,7 @@ const SUBSYSTEM_ICONS: Record<string, string> = {
               </span>
             </div>
           </div>
+          <span v-if="isRead(tour.id) && expandedId !== tour.id" class="tour-card__read-mark" title="You've read this tour">✓</span>
           <span class="tour-card__chevron">{{ expandedId === tour.id ? '▲' : '▼' }}</span>
         </div>
         <p class="tour-card__desc">{{ tour.description }}</p>
@@ -117,6 +144,7 @@ const SUBSYSTEM_ICONS: Record<string, string> = {
                     @click.stop
                   >{{ f }}</a>
                   <button v-else class="tour-file__copy" @click.stop="copyPath(f)">{{ f }}</button>
+                  <button v-if="runId && !f.endsWith('/')" class="file-history-btn" :title="`View commit history for ${f}`" @click.stop="openFileHistory(f)">📜</button>
                 </li>
               </ul>
             </div>

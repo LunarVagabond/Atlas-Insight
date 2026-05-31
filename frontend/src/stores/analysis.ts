@@ -397,6 +397,7 @@ export interface RunListItem {
   is_favorited: boolean
   last_fetched_at: string | null
   tags: string[]
+  has_previous_run: boolean
 }
 
 export const useAnalysisStore = defineStore('analysis', {

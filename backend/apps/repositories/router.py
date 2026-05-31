@@ -17,6 +17,28 @@ from .models import AnalysisRun, Repository, UserFavorite
 logger = logging.getLogger(__name__)
 router = Router(tags=['repositories'])
 
+
+def _resolve_api_token_user(request):
+    """If request carries a valid Bearer token, return the associated user; else None."""
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    if not auth_header.startswith('Bearer '):
+        return None
+    from django.utils import timezone
+
+    from apps.users.models import APIToken
+    raw = auth_header[7:]
+    token_hash = APIToken.hash_token(raw)
+    try:
+        api_token = APIToken.objects.select_related('user').get(
+            token_hash=token_hash,
+            revoked_at__isnull=True,
+        )
+    except APIToken.DoesNotExist:
+        return None
+    api_token.last_used_at = timezone.now()
+    api_token.save(update_fields=['last_used_at'])
+    return api_token.user
+
 GITHUB_URL_RE = re.compile(
     r'^https?://github\.com/([a-zA-Z0-9_.-]+)/([a-zA-Z0-9_.-]+?)(?:\.git)?/?$'
 )
@@ -63,6 +85,7 @@ class RunListItemSchema(Schema):
     is_favorited: bool = False
     last_fetched_at: Optional[str]
     tags: list[str] = []
+    has_previous_run: bool = False
 
 
 class RunListSchema(Schema):
@@ -144,7 +167,7 @@ def analyze(request, payload: AnalyzeRequest):
             return AnalyzeResponse(run_id=latest_run.id, status='completed', cached=True)
         # latest run is failed/pending/running — fall through and re-queue
 
-    user = request.user if request.user.is_authenticated else None
+    user = request.user if request.user.is_authenticated else _resolve_api_token_user(request)
     run = AnalysisRun.objects.create(
         repo=repo, status='pending', user=user,
         webhook_url=payload.webhook_url or '',
@@ -167,7 +190,7 @@ def list_runs(
     per_page: int = 25,
     mine: bool = False,
 ):
-    from django.db.models import OuterRef, Subquery
+    from django.db.models import Exists, OuterRef, Subquery
 
     # Latest run per repo
     latest_per_repo = AnalysisRun.objects.filter(
@@ -178,6 +201,14 @@ def list_runs(
     ).values('latest_id')
 
     qs = AnalysisRun.objects.filter(pk__in=latest_ids).select_related('repo', 'user')
+
+    # Annotate whether each run has a prior completed run for the same repo
+    prev_run_exists = AnalysisRun.objects.filter(
+        repo=OuterRef('repo'),
+        status='completed',
+        triggered_at__lt=OuterRef('triggered_at'),
+    )
+    qs = qs.annotate(has_previous_run=Exists(prev_run_exists))
 
     # Visibility: public repos shown to everyone; private only to the run's owner
     if request.user.is_authenticated:
@@ -229,6 +260,7 @@ def list_runs(
                 is_favorited=r.repo_id in fav_repo_ids,
                 last_fetched_at=r.repo.last_fetched_at.isoformat() if r.repo.last_fetched_at else None,
                 tags=r.result.get('classification', {}).get('tags', []) if r.result else [],
+                has_previous_run=getattr(r, 'has_previous_run', False),
             )
             for r in runs
         ],

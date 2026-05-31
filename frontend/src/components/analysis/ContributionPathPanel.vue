@@ -6,6 +6,7 @@ const props = defineProps<{
   tours: ArchTour[]
   opportunities: ContributionOpportunity[]
   repoUrl?: string
+  allFiles?: string[]
 }>()
 
 type Area = 'frontend' | 'api' | 'data' | 'tests' | 'config' | 'docs'
@@ -28,12 +29,29 @@ const AREA_OPP_CATEGORIES: Record<Area, string[]> = {
   docs:      ['documentation', 'community'],
 }
 
+const AREA_PREFIXES: Record<Area, string[]> = {
+  frontend: ['src', 'frontend', 'client', 'ui', 'app', 'web', 'pages', 'components'],
+  api:      ['api', 'routes', 'routers', 'endpoints', 'controllers', 'views', 'handlers', 'server'],
+  data:     ['models', 'db', 'database', 'migrations', 'schemas', 'entities', 'repositories'],
+  tests:    ['tests', '__tests__', 'spec', 'specs', 'test', 'e2e', 'integration'],
+  config:   ['.github', 'config', 'scripts', 'ci', 'infra', 'deploy', 'k8s', 'docker'],
+  docs:     ['docs', 'documentation', 'doc', 'wiki'],
+}
+
 const selectedArea = ref<Area | null>(null)
 
 const matchingTour = computed<ArchTour | null>(() => {
   if (!selectedArea.value) return null
   const types = AREA_META[selectedArea.value].subsystem_types
   return props.tours.find(t => types.includes(t.subsystem_type)) ?? null
+})
+
+const filteredFallbackFiles = computed<string[]>(() => {
+  if (!selectedArea.value || matchingTour.value || !props.allFiles?.length) return []
+  const prefixes = AREA_PREFIXES[selectedArea.value]
+  return props.allFiles
+    .filter(f => prefixes.includes(f.split('/')[0] ?? ''))
+    .slice(0, 30)
 })
 
 const matchingOpps = computed<ContributionOpportunity[]>(() => {
@@ -125,6 +143,23 @@ const areas = Object.keys(AREA_META) as Area[]
           </div>
         </div>
 
+        <div v-else-if="filteredFallbackFiles.length" class="contrib-path__reading">
+          <div class="contrib-path__reading-title">
+            <span>{{ AREA_META[selectedArea].icon }}</span>
+            Files in this area
+          </div>
+          <p class="contrib-path__reading-desc">No curated tour found — showing files matching common {{ AREA_META[selectedArea].label }} directory patterns.</p>
+          <div class="contrib-path__files">
+            <a
+              v-for="file in filteredFallbackFiles"
+              :key="file"
+              :href="githubFileUrl(file) ?? '#'"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="contrib-path__file"
+            >{{ file }}</a>
+          </div>
+        </div>
         <div v-else class="contrib-path__no-tour">
           No dedicated tour found for this area — explore the <strong>Tours</strong> tab for the full architecture overview.
         </div>

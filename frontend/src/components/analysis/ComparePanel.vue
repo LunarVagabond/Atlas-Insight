@@ -227,6 +227,12 @@ function docVariant(key?: string): string {
           <div class="compare-panel__cell">{{ fmt(structA.total_files) }}</div>
           <div class="compare-panel__cell">{{ fmt(structB.total_files) }}</div>
         </div>
+
+        <div class="compare-panel__metric-label" style="margin-top:0.75rem">Lines of Code</div>
+        <div class="compare-panel__row">
+          <div class="compare-panel__cell">{{ fmt(structA.total_lines) }}</div>
+          <div class="compare-panel__cell">{{ fmt(structB.total_lines) }}</div>
+        </div>
       </AppCard>
     </section>
 

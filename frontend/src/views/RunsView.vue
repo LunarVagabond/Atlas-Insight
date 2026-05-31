@@ -195,6 +195,7 @@ function goToRun(id: string) {
                 <div style="display:flex;align-items:center;gap:0.5rem">
                   <AppBadge :variant="run.status">{{ run.status }}</AppBadge>
                   <AppBadge v-if="run.is_stale" variant="warning">Stale</AppBadge>
+                  <AppBadge v-if="run.has_previous_run" variant="info" title="A previous scan exists — delta comparison available">△ Updated</AppBadge>
                 </div>
               </td>
               <td>{{ formatDate(run.triggered_at) }}</td>

@@ -136,6 +136,7 @@
   }
 
   &__dropdown-item {
+    display: block;
     width: 100%;
     text-align: left;
     padding: 10px 14px;
@@ -144,6 +145,8 @@
     background: none;
     border: none;
     cursor: pointer;
+    text-decoration: none;
+    box-sizing: border-box;
     transition: background $transition-fast;
 
     &:hover { background: var(--color-surface-hover); }
