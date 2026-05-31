@@ -3,12 +3,13 @@ import { computed, ref } from 'vue'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
 import ContributionDrawer from './ContributionDrawer.vue'
-import type { ContributionOpportunity, StructureData } from '../../stores/analysis'
+import type { ContributionOpportunity, StructureData, TodoData } from '../../stores/analysis'
 
 const props = defineProps<{
   opportunities: ContributionOpportunity[]
   repoUrl?: string
   structure?: StructureData
+  todos?: TodoData
 }>()
 
 type CategoryFilter = 'all' | ContributionOpportunity['category']
@@ -97,6 +98,19 @@ const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
       <a :href="pullsUrl!" target="_blank" rel="noopener noreferrer" class="contrib-links__link">
         ⊞ Open PRs ↗
       </a>
+    </div>
+
+    <div v-if="todos?.total" class="contrib-signals">
+      <div class="contrib-signals__item">
+        <span class="contrib-signals__count">{{ todos.total }}</span>
+        <span class="contrib-signals__label">code markers</span>
+      </div>
+      <template v-for="(count, type) in todos.by_type" :key="type">
+        <div v-if="count > 0" class="contrib-signals__item">
+          <code class="contrib-signals__type">{{ type }}</code>
+          <span class="contrib-signals__type-count">{{ count }}</span>
+        </div>
+      </template>
     </div>
 
     <p class="contrib-summary">

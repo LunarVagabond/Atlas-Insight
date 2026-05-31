@@ -20,6 +20,7 @@ def analyze_commits(repo: Repo) -> dict:
     last_commit_date = None
 
     monthly_commits: dict[str, list] = collections.defaultdict(list)
+    reverted_commits: list[dict] = []
 
     for commit in commits:
         dt = datetime.fromtimestamp(commit.committed_date, tz=timezone.utc)
@@ -42,6 +43,18 @@ def analyze_commits(repo: Repo) -> dict:
                     'author': commit.author.name or commit.author.email,
                     'date': dt.date().isoformat(),
                 })
+
+        if len(reverted_commits) < 100 and commit.message.strip().startswith('Revert '):
+            try:
+                files = list(commit.stats.files.keys())[:10]
+            except Exception:
+                files = []
+            reverted_commits.append({
+                'sha': commit.hexsha[:7],
+                'message': commit.message.split('\n')[0][:120],
+                'date': dt.date().isoformat(),
+                'files': files,
+            })
 
         delta = now - dt
         if delta.days <= 90:
@@ -83,4 +96,5 @@ def analyze_commits(repo: Repo) -> dict:
         'monthly_frequency': [{'month': k, 'count': v} for k, v in sorted(monthly.items())],
         'contributor_churn': churn,
         'monthly_commits': dict(monthly_commits),
+        'reverted_commits': reverted_commits,
     }

@@ -400,6 +400,50 @@ def my_repos(request):
     ]
 
 
+class FeaturedRepoSchema(Schema):
+    run_id: uuid.UUID
+    repo_url: str
+    repo_owner: str
+    repo_name: str
+    stars: Optional[int] = None
+    health_label: Optional[str] = None
+    health_key: Optional[str] = None
+    primary_language: Optional[str] = None
+    topics: list[str] = []
+    github_description: Optional[str] = None
+
+
+@router.get('/featured', response={200: Optional[FeaturedRepoSchema]})
+def get_featured(request):
+    from django.conf import settings as django_settings
+    featured_url = getattr(django_settings, 'FEATURED_REPO_URL', '').strip()
+    if not featured_url:
+        return 200, None
+    try:
+        repo = Repository.objects.get(url=featured_url.rstrip('/'))
+    except Repository.DoesNotExist:
+        return 200, None
+    if repo.is_private:
+        return 200, None
+    run = repo.runs.filter(status='completed').order_by('-triggered_at').first()
+    if not run or not run.result:
+        return 200, None
+    meta = run.result.get('github_meta', {})
+    health = run.result.get('classification', {}).get('project_health', {})
+    return 200, FeaturedRepoSchema(
+        run_id=run.id,
+        repo_url=repo.url,
+        repo_owner=repo.owner,
+        repo_name=repo.name,
+        stars=meta.get('stars'),
+        health_label=health.get('label'),
+        health_key=health.get('key'),
+        primary_language=meta.get('primary_language'),
+        topics=meta.get('topics', []),
+        github_description=meta.get('github_description'),
+    )
+
+
 @router.get('/admin/stats')
 def admin_stats(request):
     import os

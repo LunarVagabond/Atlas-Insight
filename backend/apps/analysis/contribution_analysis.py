@@ -333,6 +333,67 @@ def _issue_opportunities(contribution_data: dict) -> list[dict]:
     return opps
 
 
+def _todo_opportunities(todos: dict) -> list[dict]:
+    """Generate refactoring opportunities from TODO/FIXME clusters."""
+    import collections as _coll
+    by_file: dict[str, list[dict]] = _coll.defaultdict(list)
+    for item in todos.get('items', []):
+        by_file[item['file']].append(item)
+
+    opps = []
+    for file, markers in sorted(by_file.items(), key=lambda kv: -len(kv[1])):
+        if len(markers) < 5:
+            continue
+        hints = [
+            f'`{m["file"]}:{m["line"]}` — {m["type"]}: {m["text"]}' if m['text'] else f'`{m["file"]}:{m["line"]}` — {m["type"]}'
+            for m in markers[:5]
+        ]
+        basename = file.split('/')[-1]
+        opps.append({
+            'id': f'todo_cluster_{basename}',
+            'title': f'Resolve {len(markers)} code markers in {basename}',
+            'description': f'{file} contains {len(markers)} TODO/FIXME/HACK markers indicating unfinished work or known issues.',
+            'difficulty': 'beginner',
+            'risk': 'low',
+            'category': 'refactoring',
+            'hints': hints,
+        })
+        if len(opps) >= 10:
+            break
+    return opps
+
+
+def _revert_opportunities(commits: dict) -> list[dict]:
+    """Generate opportunities from files with repeated reverted commits."""
+    import collections as _coll
+    file_revert_count: dict[str, int] = _coll.defaultdict(int)
+    for rc in commits.get('reverted_commits', []):
+        for f in rc.get('files', []):
+            file_revert_count[f] += 1
+
+    opps = []
+    for file, count in sorted(file_revert_count.items(), key=lambda kv: -kv[1]):
+        if count < 3:
+            continue
+        basename = file.split('/')[-1]
+        opps.append({
+            'id': f'revert_hotspot_{basename}',
+            'title': f'Investigate historically problematic area: {basename}',
+            'description': f'{file} has been part of {count} reverted commits, suggesting recurring instability or unclear requirements.',
+            'difficulty': 'intermediate',
+            'risk': 'medium',
+            'category': 'refactoring',
+            'hints': [
+                f'Open `{file}` and read through its git history: `git log --follow -p {file}`',
+                'Look for recurring patterns in the reverted changes — they often reveal a missing abstraction or unclear ownership',
+                'Consider adding tests before making changes to catch regressions early',
+            ],
+        })
+        if len(opps) >= 5:
+            break
+    return opps
+
+
 def analyze_contributions(
     commits: dict,
     graph: dict,
@@ -341,8 +402,12 @@ def analyze_contributions(
     structure: dict | None,
     security: dict | None,
     contribution_data: dict | None = None,
+    todos: dict | None = None,
 ) -> list[dict]:
     opps = _heuristic_opportunities(commits, graph, deps, readme, structure, security)
+    if todos:
+        opps.extend(_todo_opportunities(todos))
+    opps.extend(_revert_opportunities(commits))
     if contribution_data:
         opps.extend(_issue_opportunities(contribution_data))
     return opps

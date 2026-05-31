@@ -18,7 +18,9 @@ from .heuristics import compute_heuristics
 from .import_parser import parse_imports
 from .project_structure import analyze_structure
 from .readme_parser import parse_readme
+from .arch_tours import generate_arch_tours
 from .security_scan import scan_security
+from .todo_scan import scan_todos
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +67,7 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
         readme = parse_readme(repo_dir)
         structure = analyze_structure(repo_obj, repo_dir, deps=deps)
         security = scan_security(repo_obj, repo_dir)
+        todos = scan_todos(repo_dir)
         github_meta = fetch_github_meta(run.repo.owner, run.repo.name, token=pat)
         contribution_data = github_meta.pop('contribution_data', None)
         github_languages = github_meta.pop('github_languages', None)
@@ -105,7 +108,11 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
             'security': security,
             'github_meta': github_meta,
             'classification': classification,
-            'contribution_opportunities': analyze_contributions(commits, graph, deps, readme, structure, security, contribution_data),
+            'todos': todos,
+            'arch_tours': generate_arch_tours(structure, graph, commits),
+            'contribution_opportunities': analyze_contributions(
+                commits, graph, deps, readme, structure, security, contribution_data, todos=todos
+            ),
         }
         run.status = 'completed'
 

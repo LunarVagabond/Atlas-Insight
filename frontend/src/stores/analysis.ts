@@ -50,6 +50,8 @@ export interface RunResult {
   github_meta?: GitHubMeta
   classification?: Classification
   contribution_opportunities?: ContributionOpportunity[]
+  todos?: TodoData
+  arch_tours?: ArchTour[]
   error?: string
 }
 
@@ -190,6 +192,53 @@ export interface Classification {
   code_complexity: ClassificationLevel
   documentation_grade: ClassificationLevel
   tags: string[]
+}
+
+export interface TodoItem {
+  file: string
+  line: number
+  type: string
+  text: string
+}
+
+export interface TodoData {
+  total: number
+  by_type: Record<string, number>
+  items: TodoItem[]
+}
+
+export interface ArchTourFile {
+  file: string
+  commit_count?: number
+}
+
+export interface ArchTourStep {
+  file: string
+  note: string
+}
+
+export interface ArchTour {
+  id: string
+  name: string
+  description: string
+  subsystem_type: string
+  file_count: number
+  entry_files: string[]
+  key_files: ArchTourFile[]
+  reading_order: ArchTourStep[]
+}
+
+export interface FeaturedRepo {
+  run_id: string
+  repo_url: string
+  repo_owner: string
+  repo_name: string
+  stars: number | null
+  health_label: string | null
+  health_key: string | null
+  primary_language: string | null
+  topics: string[]
+  github_description: string | null
 }
 
 export interface MonthlyCommit {

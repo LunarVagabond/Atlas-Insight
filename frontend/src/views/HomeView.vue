@@ -8,12 +8,35 @@ import AppButton from '../components/ui/AppButton.vue'
 import LoadingSpinner from '../components/ui/LoadingSpinner.vue'
 import CompareModal from '../components/ui/CompareModal.vue'
 import { useAnalysisStore } from '../stores/analysis'
-import type { RunListItem } from '../stores/analysis'
+import type { RunListItem, FeaturedRepo } from '../stores/analysis'
 
 const router = useRouter()
 const store = useAnalysisStore()
 
-onMounted(() => { store.error = null })
+const featured = ref<FeaturedRepo | null>(null)
+
+type BadgeVariant = 'pending' | 'running' | 'completed' | 'failed' | 'warning' | 'info'
+const HEALTH_COLORS: Record<string, BadgeVariant> = {
+  thriving: 'completed',
+  active: 'completed',
+  stable: 'warning',
+  declining: 'failed',
+  abandoned: 'failed',
+}
+
+async function fetchFeatured() {
+  try {
+    const { data } = await axios.get('/api/v1/repositories/featured')
+    featured.value = data
+  } catch {
+    featured.value = null
+  }
+}
+
+onMounted(() => {
+  store.error = null
+  fetchFeatured()
+})
 
 async function handleSubmit(url: string, pat?: string) {
   try {
@@ -111,6 +134,48 @@ const unpinnedItems = computed(() => items.value.filter(r => !watchlist.value.ha
         @submitted="handleSubmit"
       />
     </main>
+
+    <div v-if="featured" class="featured-section">
+      <div class="featured-repo-card">
+        <div class="featured-repo-card__eyebrow">Featured Analysis</div>
+        <div class="featured-repo-card__content">
+          <div class="featured-repo-card__left">
+            <h3 class="featured-repo-card__name">
+              <a :href="featured.repo_url" target="_blank" rel="noopener noreferrer">
+                {{ featured.repo_owner }}/{{ featured.repo_name }} ↗
+              </a>
+            </h3>
+            <p v-if="featured.github_description" class="featured-repo-card__desc">
+              {{ featured.github_description }}
+            </p>
+            <div class="featured-repo-card__meta">
+              <span v-if="featured.primary_language" class="featured-repo-card__lang">
+                {{ featured.primary_language }}
+              </span>
+              <span v-if="featured.stars !== null" class="featured-repo-card__stars">
+                ★ {{ featured.stars?.toLocaleString() }}
+              </span>
+              <AppBadge
+                v-if="featured.health_label && featured.health_key"
+                :variant="(HEALTH_COLORS[featured.health_key] ?? 'info') as BadgeVariant"
+              >
+                {{ featured.health_label }}
+              </AppBadge>
+            </div>
+            <div v-if="featured.topics.length" class="featured-repo-card__topics">
+              <span v-for="t in featured.topics.slice(0, 5)" :key="t" class="featured-repo-card__topic">
+                {{ t }}
+              </span>
+            </div>
+          </div>
+          <div class="featured-repo-card__action">
+            <AppButton variant="primary" @click="router.push(`/results/${featured.run_id}`)">
+              Explore full analysis →
+            </AppButton>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div class="home-runs">
       <div class="home-runs__header">

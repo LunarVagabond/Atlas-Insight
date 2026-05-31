@@ -15,6 +15,7 @@ import ProjectPanel from '../components/analysis/ProjectPanel.vue'
 import ContributingPanel from '../components/analysis/ContributingPanel.vue'
 import RoadmapTimeline from '../components/analysis/RoadmapTimeline.vue'
 import SecurityPanel from '../components/analysis/SecurityPanel.vue'
+import ArchitectureToursPanel from '../components/analysis/ArchitectureToursPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -50,7 +51,7 @@ watch(isPolling, (polling) => {
 }, { immediate: true })
 
 const hasRoadmap = computed(() => (result.value?.structure?.roadmap_parsed?.milestones?.length ?? 0) > 0)
-const TABS = computed(() => ['Overview', 'Project', 'Architecture', 'Dependencies', 'Security', 'History', 'Heuristics', 'Contributing'])
+const TABS = computed(() => ['Overview', 'Project', 'Architecture', 'Tours', 'Dependencies', 'Security', 'History', 'Heuristics', 'Contributing'])
 
 const activeTab = ref((route.query.tab as string) || 'Overview')
 
@@ -189,6 +190,7 @@ function copyLink() {
             <DependencyGraphView :graph="result.graph" />
           </div>
         </template>
+        <ArchitectureToursPanel v-if="activeTab === 'Tours'" :tours="result.arch_tours ?? []" :repo-url="store.run?.repo_url" />
         <DependenciesPanel v-if="activeTab === 'Dependencies'" :deps="result.dependencies" />
         <SecurityPanel v-if="activeTab === 'Security'" :security="result.security" :heuristics="result.heuristics" :structure="result.structure" />
         <template v-if="activeTab === 'History'">
@@ -201,7 +203,7 @@ function copyLink() {
           </div>
         </template>
         <HeuristicsPanel v-if="activeTab === 'Heuristics'" :signals="result.heuristics" />
-        <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" :structure="result.structure" />
+        <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" :structure="result.structure" :todos="result.todos" />
       </div>
     </div>
     </Transition>
