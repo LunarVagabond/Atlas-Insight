@@ -27,22 +27,68 @@ const props = defineProps<{
 
 // ── Filter (shared: chart + git log) ─────────────────────────────────────────
 const filteredMonthly = ref<{ month: string; count: number }[]>([])
-const selection = ref<FilterSelection>({ year: 'All', months: new Set() })
+const selection = ref<FilterSelection>({ year: 'All', months: new Set(), days: new Set() })
 function onFilterChange(sel: FilterSelection) { selection.value = sel }
 
+// Day data: "YYYY-MM" → sorted unique day numbers from commit dates
+const dayData = computed<Record<string, number[]>>(() => {
+  const mc = props.commits.monthly_commits ?? {}
+  const result: Record<string, number[]> = {}
+  for (const [month, commits] of Object.entries(mc)) {
+    const days = new Set(commits.map(c => parseInt(c.date.slice(8, 10))))
+    result[month] = Array.from(days).sort((a, b) => a - b)
+  }
+  return result
+})
+
+// ── Day-level chart data (when day filter active) ─────────────────────────────
+const dayChartData = computed<{ label: string; count: number }[] | null>(() => {
+  const sel = selection.value
+  if (!sel.days.size || sel.year === 'All') return null
+  const mc = props.commits.monthly_commits ?? {}
+
+  // Active month key(s) — only works when exactly one month active
+  const activeMos = sel.months.size > 0 ? Array.from(sel.months) : null
+  if (!activeMos || activeMos.length !== 1) return null
+  const moKey = `${sel.year}-${String(activeMos[0]).padStart(2, '0')}`
+  const commits = mc[moKey] ?? []
+
+  const minDay = Math.min(...sel.days)
+  const maxDay = Math.max(...sel.days)
+
+  // Build day-level counts for the inclusive range
+  const counts = new Map<number, number>()
+  for (let d = minDay; d <= maxDay; d++) counts.set(d, 0)
+  for (const c of commits) {
+    const d = parseInt(c.date.slice(8, 10))
+    if (d >= minDay && d <= maxDay) counts.set(d, (counts.get(d) ?? 0) + 1)
+  }
+
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  const moLabel = MONTH_NAMES[activeMos[0] - 1]
+  return Array.from(counts.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([day, count]) => ({ label: `${moLabel} ${day}`, count }))
+})
+
 // ── Chart ─────────────────────────────────────────────────────────────────────
-const chartData = computed(() => ({
-  labels: filteredMonthly.value.map(d => d.month),
-  datasets: [{
-    label: 'Commits',
-    data: filteredMonthly.value.map(d => d.count),
-    borderColor: '#0969da',
-    backgroundColor: 'rgba(9, 105, 218, 0.1)',
-    fill: true,
-    tension: 0.3,
-    pointRadius: 3,
-  }],
-}))
+const chartData = computed(() => {
+  const daily = dayChartData.value
+  const labels = daily ? daily.map(d => d.label) : filteredMonthly.value.map(d => d.month)
+  const data   = daily ? daily.map(d => d.count) : filteredMonthly.value.map(d => d.count)
+  return {
+    labels,
+    datasets: [{
+      label: 'Commits',
+      data,
+      borderColor: '#0969da',
+      backgroundColor: 'rgba(9, 105, 218, 0.1)',
+      fill: true,
+      tension: 0.3,
+      pointRadius: daily ? 5 : 3,
+    }],
+  }
+})
 const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -88,6 +134,14 @@ function monthInFilter(month: string): boolean {
   return true
 }
 
+function commitInDayFilter(isoDate: string): boolean {
+  if (!selection.value.days.size) return true
+  const day = parseInt(isoDate.slice(8, 10))
+  const minDay = Math.min(...selection.value.days)
+  const maxDay = Math.max(...selection.value.days)
+  return day >= minDay && day <= maxDay
+}
+
 // ── Contributors (filtered by active date range) ───────────────────────────────
 interface ContribEntry {
   name: string
@@ -107,11 +161,12 @@ function authorInitials(name: string): string {
 const contributors = computed<ContribEntry[]>(() => {
   const mc = props.commits.monthly_commits ?? {}
   const counts = new Map<string, number>()
-  const filteredActive = selection.value.year !== 'All' || selection.value.months.size > 0
+  const filteredActive = selection.value.year !== 'All' || selection.value.months.size > 0 || selection.value.days.size > 0
 
   for (const [month, commits] of Object.entries(mc)) {
     if (filteredActive && !monthInFilter(month)) continue
     for (const c of commits) {
+      if (!commitInDayFilter(c.date)) continue
       counts.set(c.author, (counts.get(c.author) ?? 0) + 1)
     }
   }
@@ -174,11 +229,13 @@ const graphRows = computed<GraphRow[]>(() => {
     if (!raw?.length) continue
 
     const commits = raw
+      .filter(c => commitInDayFilter(c.date))
       .filter(c => !q || c.message.toLowerCase().includes(q) || c.author.toLowerCase().includes(q) || c.sha.startsWith(q))
       .map(c => ({
         sha: c.sha,
         parents: c.parents ?? [],
         message: c.message,
+        body: c.body ?? null,
         author: c.author,
         date: c.date,
         color: authorColorMap.value.get(c.author) ?? '#888',
@@ -202,6 +259,22 @@ const graphRows = computed<GraphRow[]>(() => {
 })
 
 const totalCommits = computed(() => graphRows.value.filter(r => !(r as MonthSep).isMonth).length)
+
+const commitDateRange = computed<string>(() => {
+  const dates = graphRows.value
+    .filter(r => !(r as MonthSep).isMonth)
+    .map(r => (r as GraphCommit).date)
+    .filter(Boolean)
+  if (!dates.length) return ''
+  const sorted = [...dates].sort()
+  const fmt = (iso: string) => {
+    const d = new Date(iso)
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  }
+  const oldest = fmt(sorted[0])
+  const newest = fmt(sorted[sorted.length - 1])
+  return oldest === newest ? oldest : `${oldest} – ${newest}`
+})
 </script>
 
 <template>
@@ -212,11 +285,12 @@ const totalCommits = computed(() => graphRows.value.filter(r => !(r as MonthSep)
     <div v-if="commits.monthly_frequency.length">
       <TimelineFilter
         :data="commits.monthly_frequency"
+        :day-data="dayData"
         @update:filtered="filteredMonthly = $event"
         @change="onFilterChange"
       />
       <div class="chart-wrapper" style="margin-top: 1rem">
-        <Line v-if="filteredMonthly.length" :data="chartData" :options="chartOptions" />
+        <Line v-if="dayChartData ? dayChartData.length : filteredMonthly.length" :data="chartData" :options="chartOptions" />
         <div v-else class="empty-state">No data for selected range</div>
       </div>
     </div>
@@ -247,7 +321,7 @@ const totalCommits = computed(() => graphRows.value.filter(r => !(r as MonthSep)
     <div v-if="contributors.length" class="git-contribs">
       <div class="git-contribs__label">
         Contributors
-        <span v-if="selection.year !== 'All' || selection.months.size > 0" class="git-contribs__filter-note">
+        <span v-if="selection.year !== 'All' || selection.months.size > 0 || selection.days.size > 0" class="git-contribs__filter-note">
           (in selected range)
         </span>
       </div>
@@ -282,10 +356,13 @@ const totalCommits = computed(() => graphRows.value.filter(r => !(r as MonthSep)
     <!-- Git log graph -->
     <div class="git-log-section">
       <div class="git-log-toolbar">
-        <span class="git-log-toolbar__title">
-          git log --graph
-          <span class="git-log-toolbar__count">({{ totalCommits.toLocaleString() }})</span>
-        </span>
+        <div class="git-log-toolbar__left">
+          <span class="git-log-toolbar__title">
+            git log --graph
+            <span class="git-log-toolbar__count">({{ totalCommits.toLocaleString() }})</span>
+          </span>
+          <span v-if="commitDateRange" class="git-log-toolbar__range">{{ commitDateRange }}</span>
+        </div>
         <input v-model="searchQuery" class="git-log-search" placeholder="Filter commits, authors, shas…" />
       </div>
 

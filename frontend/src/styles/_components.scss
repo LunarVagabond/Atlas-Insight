@@ -902,6 +902,17 @@
       opacity: 0.35;
       cursor: not-allowed;
     }
+
+    &--day {
+      padding: 3px 7px;
+      font-variant-numeric: tabular-nums;
+      min-width: 2rem;
+      text-align: center;
+    }
+  }
+
+  &__chips--days {
+    gap: $space-1;
   }
 }
 
@@ -3799,6 +3810,13 @@
   gap: $space-3;
   margin-bottom: $space-3;
 
+  &__left {
+    display: flex;
+    align-items: baseline;
+    gap: $space-3;
+    flex-shrink: 0;
+  }
+
   &__title {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.875rem;
@@ -3810,6 +3828,12 @@
     font-weight: 400;
     color: var(--color-text-muted);
     font-size: 0.8125rem;
+  }
+
+  &__range {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
   }
 }
 

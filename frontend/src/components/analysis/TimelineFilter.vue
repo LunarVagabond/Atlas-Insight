@@ -3,9 +3,13 @@ import { computed, ref, watch } from 'vue'
 
 interface MonthEntry { month: string; count: number }
 
-export interface FilterSelection { year: string; months: Set<number> }
+export interface FilterSelection { year: string; months: Set<number>; days: Set<number> }
 
-const props = defineProps<{ data: MonthEntry[] }>()
+const props = defineProps<{
+  data: MonthEntry[]
+  // "YYYY-MM" → sorted list of day numbers that have commits
+  dayData?: Record<string, number[]>
+}>()
 const emit = defineEmits<{
   (e: 'update:filtered', val: MonthEntry[]): void
   (e: 'change', val: FilterSelection): void
@@ -20,8 +24,13 @@ const years = computed(() => {
 
 const selectedYear = ref('All')
 const selectedMonths = ref<Set<number>>(new Set())
+const selectedDays = ref<Set<number>>(new Set())
 
-watch(selectedYear, () => { selectedMonths.value = new Set() })
+watch(selectedYear, () => {
+  selectedMonths.value = new Set()
+  selectedDays.value = new Set()
+})
+watch(selectedMonths, () => { selectedDays.value = new Set() })
 
 const availableMonths = computed(() => {
   if (selectedYear.value === 'All') return new Set<number>()
@@ -32,11 +41,29 @@ const availableMonths = computed(() => {
   return set
 })
 
+// Days available: union of days across all selected months (or single active month)
+const availableDays = computed<number[]>(() => {
+  if (!props.dayData || selectedYear.value === 'All') return []
+  const activeMos = selectedMonths.value.size > 0
+    ? Array.from(selectedMonths.value)
+    : Array.from(availableMonths.value)
+  if (activeMos.length !== 1) return []  // only show days when exactly one month is active
+  const moKey = `${selectedYear.value}-${String(activeMos[0]).padStart(2, '0')}`
+  return props.dayData[moKey] ?? []
+})
+
 function toggleMonth(m: number) {
   const next = new Set(selectedMonths.value)
   if (next.has(m)) next.delete(m)
   else next.add(m)
   selectedMonths.value = next
+}
+
+function toggleDay(d: number) {
+  const next = new Set(selectedDays.value)
+  if (next.has(d)) next.delete(d)
+  else next.add(d)
+  selectedDays.value = next
 }
 
 const filtered = computed(() => {
@@ -46,10 +73,14 @@ const filtered = computed(() => {
   return result
 })
 
-watch(filtered, (v) => {
-  emit('update:filtered', v)
-  emit('change', { year: selectedYear.value, months: selectedMonths.value })
+watch(filtered, () => {
+  emit('update:filtered', filtered.value)
+  emit('change', { year: selectedYear.value, months: selectedMonths.value, days: selectedDays.value })
 }, { immediate: true })
+
+watch(selectedDays, () => {
+  emit('change', { year: selectedYear.value, months: selectedMonths.value, days: selectedDays.value })
+})
 </script>
 
 <template>
@@ -81,6 +112,19 @@ watch(filtered, (v) => {
           :disabled="!availableMonths.has(idx + 1)"
           @click="toggleMonth(idx + 1)"
         >{{ label }}</button>
+      </div>
+    </div>
+
+    <div v-if="availableDays.length" class="tl-filter__row">
+      <span class="tl-filter__label">Day</span>
+      <div class="tl-filter__chips tl-filter__chips--days">
+        <button
+          v-for="d in availableDays"
+          :key="d"
+          class="tl-filter__chip tl-filter__chip--day"
+          :class="{ 'tl-filter__chip--active': selectedDays.has(d) }"
+          @click="toggleDay(d)"
+        >{{ d }}</button>
       </div>
     </div>
   </div>
