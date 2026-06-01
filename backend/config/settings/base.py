@@ -242,44 +242,51 @@ def _detect_service_name() -> str:
 
     argv = ' '.join(_sys_logging.argv).lower()
     if 'flower' in argv:
-        return 'atlas-backend-flower'
+        return 'celery-flower'
     if 'celery' in argv and ' beat' in argv:
-        return 'atlas-backend-celery-beat'
+        return 'celery-workers'
     if 'celery' in argv:
-        return 'atlas-backend-celery-worker'
-    return 'atlas-backend-django'
+        return 'celery-workers'
+    return 'django'
 
 
 _sentry_service = _detect_service_name()
 
+# Add new Django app-level service buckets here.
+_DJANGO_APP_SERVICE_MAP = {
+    'analysis': 'django-analysis',
+    'api': 'django-api',
+    'repositories': 'django-repositories',
+    'users': 'django-users',
+    'utils': 'django-utils',
+}
+
 
 def _service_from_logger_name(logger_name: str) -> str:
     logger_name = (logger_name or '').strip()
-    if not logger_name:
-        return _sentry_service
+    if logger_name:
+        if logger_name.startswith('apps.'):
+            parts = logger_name.split('.')
+            app = parts[1] if len(parts) > 1 else ''
+            if app in _DJANGO_APP_SERVICE_MAP:
+                return _DJANGO_APP_SERVICE_MAP[app]
+            return 'django'
 
-    if logger_name.startswith('apps.'):
-        parts = logger_name.split('.')
-        app = parts[1] if len(parts) > 1 else 'app'
-        return f'atlas-backend-{app}'
-
-    root = logger_name.split('.')[0]
-    if root == 'django':
-        return 'atlas-backend-django'
-    if root == 'celery':
-        return 'atlas-backend-celery-worker'
-    if root == 'flower':
-        return 'atlas-backend-flower'
-    if root == 'kombu':
-        # Kombu logs can come from worker/beat/flower; keep process-specific fallback.
-        return _sentry_service
+        root = logger_name.split('.')[0]
+        if root == 'config':
+            return 'django-config'
+        if root == 'django':
+            return 'django'
+        if root in {'flower'}:
+            return 'celery-flower'
+        if root in {'celery', 'kombu'}:
+            return 'celery-workers'
     return _sentry_service
 
 class _SentryServiceFilter:
     def filter(self, record):
         service_name = _service_from_logger_name(getattr(record, 'name', ''))
         setattr(record, 'service', service_name)
-        setattr(record, 'sentry.service', service_name)
         return True
 
 LOGGING = {
@@ -365,7 +372,6 @@ LOGGING = {
 SENTRY_DSN = config('SENTRY_DSN', default='')
 if SENTRY_DSN:
     import logging as _logging
-    import sys as _sys
     import sentry_sdk
     from sentry_sdk.integrations.celery import CeleryIntegration
     from sentry_sdk.integrations.django import DjangoIntegration
@@ -379,8 +385,12 @@ if SENTRY_DSN:
         tx_name = (event.get('transaction') or '').strip()
         if tx_name.startswith('apps.'):
             parts = tx_name.split('.')
-            app = parts[1] if len(parts) > 1 else 'app'
-            return f'atlas-backend-{app}'
+            app = parts[1] if len(parts) > 1 else ''
+            if app in _DJANGO_APP_SERVICE_MAP:
+                return _DJANGO_APP_SERVICE_MAP[app]
+            return 'django'
+        if tx_name.startswith('config.'):
+            return 'django-config'
 
         return _sentry_service
 
@@ -418,11 +428,11 @@ if SENTRY_DSN:
             CeleryIntegration(),
             LoggingIntegration(
                 sentry_logs_level=_logging.INFO,
-                event_level=_logging.ERROR,
-                level=None,
+                event_level=None,
+                level=_logging.INFO,
             ),
         ],
-        _experiments={'enable_logs': True},
+        enable_logs=True,
     )
 
     with sentry_sdk.configure_scope() as scope:

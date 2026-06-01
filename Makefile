@@ -21,7 +21,8 @@ COMPOSE_BARE := docker compose -f $(ROOT_DIR)/docker-compose.yml
         start-postgres stop-postgres \
         start-redis    stop-redis \
         start-tunnel  stop-tunnel \
-        start-glitchtip stop-glitchtip logs-glitchtip configure-glitchtip \
+		start-glitchtip stop-glitchtip logs-glitchtip configure-glitchtip setup-glitchtip glitchtip-db-dump reset-glitchtip fresh-glitchtip \
+	sentry-test-services glitchtip-verify \
         migrate makemigrations createsuperuser shell dbshell collectstatic \
         test lint format build type-check \
 		logs-django logs-celery logs-beat logs-flower logs-vite \
@@ -34,7 +35,7 @@ help:
 	@echo "Atlas Insight — available targets"
 	@echo ""
 	@echo "  ── Full stack ───────────────────────────────────────────────────────"
-	@echo "    start              Start everything (Docker + Django + Celery + Flower + Vite)"
+	@echo "    start              Start everything (Docker + GlitchTip + Django + Celery + Beat + Flower + Vite)"
 	@echo "    stop               Stop everything"
 	@echo "    restart            stop then start"
 	@echo "    status             Full stack status"
@@ -51,6 +52,12 @@ help:
 	@echo "    start-tunnel   / stop-tunnel    Cloudflare tunnel  (requires CLOUDFLARE_TUNNEL_TOKEN)"
 	@echo "    start-glitchtip / stop-glitchtip  GlitchTip error tracking (port 4505)  (also runs in start/stop)"
 	@echo "    logs-glitchtip                    Tail GlitchTip logs"
+	@echo "    setup-glitchtip                   Bootstrap org/projects/oauth + refresh DSN"
+	@echo "    glitchtip-db-dump                 Dump GlitchTip DB to _running/backups/"
+	@echo "    reset-glitchtip                   Drop/recreate GlitchTip DB, then bootstrap"
+	@echo "    fresh-glitchtip                   Dump DB, then reset from scratch"
+	@echo "    sentry-test-services              Emit service-tagged test logs"
+	@echo "    glitchtip-verify                  Show projects + Backend log service buckets"
 	@echo ""
 	@echo "  ── Django management ────────────────────────────────────────────────"
 	@echo "    migrate            Run migrations  (ARGS=app_label)"
@@ -91,10 +98,10 @@ start: _ensure_running_dirs
 	@$(COMPOSE) up -d --quiet-pull 2>&1 | grep -v "^$$"
 	@echo "Waiting for Postgres..."
 	@until $(COMPOSE) exec -T postgres pg_isready -q 2>/dev/null; do sleep 1; done
+	@$(MAKE) --no-print-directory start-glitchtip
 	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend start
 	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/frontend start
 	@$(MAKE) --no-print-directory start-tunnel
-	@$(MAKE) --no-print-directory start-glitchtip
 	@echo ""
 	@echo "Atlas Insight running:"
 	@echo "  API:        http://localhost:4500/api/v1/docs"
@@ -111,9 +118,9 @@ start: _ensure_running_dirs
 
 stop:
 	@$(MAKE) --no-print-directory stop-tunnel
-	@$(MAKE) --no-print-directory stop-glitchtip
 	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/frontend stop
 	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend stop
+	@$(MAKE) --no-print-directory stop-glitchtip
 	@$(COMPOSE) stop 2>&1 | grep -v "^$$"
 
 restart: stop start
@@ -216,6 +223,10 @@ start-glitchtip:
 	@$(COMPOSE) --profile glitchtip up -d glitchtip-web glitchtip-worker 2>&1 | grep -v "^$$"
 	@echo "  Waiting for GlitchTip..."
 	@until curl -sf http://localhost:4505/api/0/ > /dev/null 2>&1; do sleep 2; done
+	@$(MAKE) --no-print-directory setup-glitchtip
+	@echo "  GlitchTip UI: https://glitch.dsyndicate.dev"
+
+setup-glitchtip:
 	@docker cp $(ROOT_DIR)/scripts/glitchtip_setup.py github-archaeologist-glitchtip-web-1:/tmp/glitchtip_setup.py
 	@_GT_DOMAIN="$(or $(GLITCHTIP_DOMAIN_VAL),https://glitch.dsyndicate.dev)"; \
 	_GT_DSN=$$(docker exec \
@@ -225,9 +236,8 @@ start-glitchtip:
 		sed -i "s|^SENTRY_DSN=.*|SENTRY_DSN=$$_GT_DSN|" $(ROOT_DIR)/backend/.env; \
 		echo "  DSN written to backend/.env: $$_GT_DSN"; \
 	else \
-		echo "  Sign in at https://glitch.dsyndicate.dev then run: make configure-glitchtip"; \
+		echo "  Could not parse DSN output from glitchtip_setup.py"; \
 	fi
-	@echo "  GlitchTip UI: https://glitch.dsyndicate.dev"
 
 configure-glitchtip:
 	@_GT_DOMAIN="$(or $(GLITCHTIP_DOMAIN_VAL),https://glitch.dsyndicate.dev)"; \
@@ -247,6 +257,27 @@ stop-glitchtip:
 
 logs-glitchtip:
 	@$(COMPOSE) --profile glitchtip logs -f glitchtip-web glitchtip-worker
+
+glitchtip-db-dump:
+	@mkdir -p $(RUNNING_DIR)/backups
+	@OUT_FILE="$(RUNNING_DIR)/backups/glitchtip_$$(date -u +%Y%m%dT%H%M%SZ).sql"; \
+	docker exec github-archaeologist-postgres-1 pg_dump -U "$(or $(POSTGRES_USER_VAL),atlas)" glitchtip > "$$OUT_FILE"; \
+	echo "  GlitchTip DB dump written: $$OUT_FILE"
+
+reset-glitchtip:
+	@echo "Resetting GlitchTip database from scratch..."
+	@$(MAKE) --no-print-directory stop-glitchtip
+	@docker exec github-archaeologist-postgres-1 psql -U "$(or $(POSTGRES_USER_VAL),atlas)" -d postgres \
+		-c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'glitchtip' AND pid <> pg_backend_pid();" > /dev/null
+	@docker exec github-archaeologist-postgres-1 psql -U "$(or $(POSTGRES_USER_VAL),atlas)" -d postgres \
+		-c "DROP DATABASE IF EXISTS glitchtip;" > /dev/null
+	@docker exec github-archaeologist-postgres-1 psql -U "$(or $(POSTGRES_USER_VAL),atlas)" -d postgres \
+		-c "CREATE DATABASE glitchtip;" > /dev/null
+	@$(MAKE) --no-print-directory start-glitchtip
+
+fresh-glitchtip:
+	@$(MAKE) --no-print-directory glitchtip-db-dump
+	@$(MAKE) --no-print-directory reset-glitchtip
 
 start-tunnel:
 	@if [ -z "$(CLOUDFLARE_TUNNEL_TOKEN)" ]; then \
@@ -312,6 +343,13 @@ logs-celery:
 
 logs-beat:
 	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend logs-beat
+
+sentry-test-services:
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend sentry-test-services
+
+glitchtip-verify:
+	@docker cp $(ROOT_DIR)/scripts/glitchtip_verify.py github-archaeologist-glitchtip-web-1:/tmp/glitchtip_verify.py
+	@docker exec github-archaeologist-glitchtip-web-1 python /tmp/glitchtip_verify.py
 
 logs-flower:
 	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend logs-flower

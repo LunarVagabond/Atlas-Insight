@@ -9,13 +9,14 @@ PYTHON  := $(VENV)/bin/python
 PIP     := $(VENV)/bin/pip
 CELERY  := $(VENV)/bin/celery
 
-DJANGO_ENV := DJANGO_SETTINGS_MODULE=config.settings.development
+DJANGO_ENV := env -u SENTRY_DSN DJANGO_SETTINGS_MODULE=config.settings.development
 
 .PHONY: setup start stop restart status \
         start-django stop-django \
         start-celery stop-celery \
 	start-beat stop-beat \
         start-flower stop-flower \
+	sentry-test-services \
         migrate makemigrations createsuperuser shell dbshell collectstatic \
         test lint format logs \
         _ensure_running_dirs _start_svc _stop_svc
@@ -52,7 +53,7 @@ start-django: _ensure_running_dirs
 	  echo "  django already running (PID $$(cat $$PID_FILE)), skipping"; \
 	else \
 	  rm -f "$$PID_FILE"; \
-	  (cd $(MAKEFILE_DIR) && exec env ATLAS_SERVICE=atlas-backend-django $(DJANGO_ENV) $(PYTHON) manage.py runserver 0.0.0.0:4500 --noreload) \
+	  (cd $(MAKEFILE_DIR) && exec env ATLAS_SERVICE=django $(DJANGO_ENV) $(PYTHON) manage.py runserver 0.0.0.0:4500 --noreload) \
 	    > $(RUNNING_DIR)/logs/django.log 2>&1 & echo $$! > $(RUNNING_DIR)/pids/django.pid; \
 	fi
 
@@ -81,7 +82,7 @@ start-celery: _ensure_running_dirs
 	  echo "  celery already running (PID $$(cat $$PID_FILE)), skipping"; \
 	else \
 	  rm -f "$$PID_FILE"; \
-	  cd $(MAKEFILE_DIR) && ATLAS_SERVICE=atlas-backend-celery-worker $(DJANGO_ENV) $(CELERY) -A config worker -l info -n worker@%h \
+	  cd $(MAKEFILE_DIR) && ATLAS_SERVICE=celery-workers $(DJANGO_ENV) $(CELERY) -A config worker -l info -n worker@%h \
 	    > $(RUNNING_DIR)/logs/celery.log 2>&1 & echo $$! > $(RUNNING_DIR)/pids/celery.pid; \
 	fi
 
@@ -108,7 +109,7 @@ start-beat: _ensure_running_dirs
 	  echo "  beat already running (PID $$(cat $$PID_FILE)), skipping"; \
 	else \
 	  rm -f "$$PID_FILE"; \
-	  cd $(MAKEFILE_DIR) && ATLAS_SERVICE=atlas-backend-celery-beat $(DJANGO_ENV) $(CELERY) -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler \
+	  cd $(MAKEFILE_DIR) && ATLAS_SERVICE=celery-workers $(DJANGO_ENV) $(CELERY) -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler \
 	    > $(RUNNING_DIR)/logs/beat.log 2>&1 & echo $$! > $(RUNNING_DIR)/pids/beat.pid; \
 	fi
 
@@ -136,7 +137,7 @@ start-flower: _ensure_running_dirs
 	else \
 	  rm -f "$$PID_FILE"; \
 	  sleep 2; \
-	  (cd $(MAKEFILE_DIR) && exec env ATLAS_SERVICE=atlas-backend-flower $(DJANGO_ENV) $(CELERY) -A config flower --port=4504) \
+	  (cd $(MAKEFILE_DIR) && exec env ATLAS_SERVICE=celery-flower $(DJANGO_ENV) $(CELERY) -A config flower --port=4504) \
 	    > $(RUNNING_DIR)/logs/flower.log 2>&1 & echo $$! > $(RUNNING_DIR)/pids/flower.pid; \
 	fi
 
@@ -222,6 +223,9 @@ logs-celery:
 
 logs-beat:
 	@tail -f $(RUNNING_DIR)/logs/beat.log 2>/dev/null || echo "No beat log — is beat running? (make start-beat)"
+
+sentry-test-services:
+	@cd $(MAKEFILE_DIR) && $(DJANGO_ENV) $(PYTHON) scripts/sentry_service_test.py
 
 logs-flower:
 	@tail -f $(RUNNING_DIR)/logs/flower.log 2>/dev/null || echo "No flower log — is Flower running? (make start-flower)"

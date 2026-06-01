@@ -11,6 +11,7 @@ Self-hosted deployment on a Linux server with Nginx, Postgres, Redis, and system
 - PostgreSQL 17
 - Redis 7+
 - Nginx
+- Docker + Docker Compose (required if running bundled GlitchTip stack)
 
 ---
 
@@ -68,6 +69,11 @@ cp backend/.env.example backend/.env
 | `CORS_ALLOWED_ORIGINS` | Comma-separated frontend origin(s) |
 | `CSRF_TRUSTED_ORIGINS` | Comma-separated trusted origins |
 | `FEATURED_REPO_URL` | GitHub URL of a public repo to feature on the home page |
+| `SENTRY_DSN` | DSN used by backend services for error/log capture |
+| `GLITCHTIP_GITHUB_CLIENT_ID` / `GLITCHTIP_GITHUB_SECRET` | GitHub OAuth app credentials for GlitchTip login |
+| `GLITCHTIP_DOMAIN` | Public GlitchTip URL (e.g. `https://glitch.yoursite.com`) |
+| `GLITCHTIP_PROJECTS` | Comma-separated GlitchTip projects to auto-provision |
+| `GLITCHTIP_PRIMARY_PROJECT` | Project name whose DSN is written back to `SENTRY_DSN` |
 
 **Generate the encryption key:**
 
@@ -96,6 +102,61 @@ DJANGO_SETTINGS_MODULE=config.settings.production .venv/bin/python manage.py col
 4. Copy Client ID and Client Secret into `.env`
 5. In Django admin → Sites → change domain to your production domain
 6. In Django admin → Social Applications → add GitHub with your credentials
+
+---
+
+## 4b. GlitchTip bootstrap (recommended)
+
+Atlas Insight includes a built-in GlitchTip bootstrap flow for local/dev and Docker-based environments.
+
+Commands:
+
+```bash
+make start-glitchtip
+make setup-glitchtip
+make glitchtip-db-dump
+make reset-glitchtip
+make fresh-glitchtip
+```
+
+`make setup-glitchtip` is idempotent and will:
+
+- create/update organization `atlas-insight`
+- create/update GitHub social login app for GlitchTip (when env vars are set)
+- create/update configured projects
+- write DSN for the primary project back into `backend/.env` as `SENTRY_DSN`
+
+Default auto-provisioned projects:
+
+- `Backend`
+- `Frontend`
+
+Recommended service model:
+
+- Keep only `Backend` and `Frontend` projects.
+- Use backend `service` tags (`django-api`, `django-analysis`, `celery-workers`, etc.) for granularity within `Backend`.
+
+Reset + recovery flow:
+
+```bash
+# 1) save snapshot
+make glitchtip-db-dump
+
+# 2) destructive rebuild from empty database
+make reset-glitchtip
+
+# 3) one-command backup + rebuild
+make fresh-glitchtip
+```
+
+Debug validation command:
+
+```bash
+make sentry-test-services
+make glitchtip-verify
+```
+
+This emits service-tagged test logs and then prints the effective project/service state from GlitchTip's database.
 
 ---
 
@@ -186,6 +247,34 @@ systemctl daemon-reload
 systemctl enable --now atlas-django atlas-celery atlas-celery-beat
 ```
 
+Optional Flower service:
+
+```ini
+# /etc/systemd/system/atlas-flower.service
+[Unit]
+Description=Atlas Insight Flower
+After=network.target redis.service
+
+[Service]
+User=www-data
+WorkingDirectory=/opt/atlas-insight/backend
+EnvironmentFile=/opt/atlas-insight/backend/.env
+Environment=DJANGO_SETTINGS_MODULE=config.settings.production
+ExecStart=/opt/atlas-insight/backend/.venv/bin/celery \
+    -A config flower \
+    --port=4504
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start:
+
+```bash
+systemctl enable --now atlas-flower
+```
+
 ---
 
 ## 8. Nginx
@@ -255,3 +344,22 @@ DJANGO_SETTINGS_MODULE=config.settings.production .venv/bin/python manage.py col
 cd ../frontend && npm ci && npm run build
 systemctl restart atlas-django atlas-celery atlas-celery-beat
 ```
+
+---
+
+## 11. Startup/Shutdown order (logging)
+
+If GlitchTip is your sink for startup/shutdown logs, order matters.
+
+Recommended order:
+
+1. Start Postgres + Redis
+2. Start GlitchTip (`glitchtip-web` + `glitchtip-worker`)
+3. Start Django/Celery/Beat/Flower/Vite
+
+Shutdown order:
+
+1. Stop app services (Django/Celery/Beat/Flower/Vite)
+2. Stop GlitchTip last
+
+The project `Makefile` follows this ordering so app startup and close-out logs have the best chance of being ingested.
