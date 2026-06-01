@@ -12,7 +12,7 @@ from ninja.errors import HttpError
 from apps.analysis.github_meta import fetch_contribution_data, fetch_latest_sha
 from apps.analysis.tasks import analyze_repository
 
-from .models import AnalysisRun, Repository, RepoOfTheWeek, UserFavorite
+from .models import AnalysisRun, Repository, RepoOfTheWeek, UserFavorite, WebhookDelivery
 
 logger = logging.getLogger(__name__)
 router = Router(tags=['repositories'])
@@ -1301,6 +1301,7 @@ def unwatch_repo(request, repo_id: uuid.UUID):
 def github_webhook(request):
     import hashlib
     import hmac
+    import json
 
     from django.conf import settings as django_settings
     from django.core.cache import cache
@@ -1316,24 +1317,33 @@ def github_webhook(request):
         if not hmac.compare_digest(sig_header, expected):
             raise HttpError(400, 'Invalid signature')
 
-    delivery_id = request.META.get('HTTP_X_GITHUB_DELIVERY', '')
-    if delivery_id:
-        dedup_key = f'gh_delivery_{delivery_id}'
+    raw_delivery_id = request.META.get('HTTP_X_GITHUB_DELIVERY', '')
+    if raw_delivery_id:
+        dedup_key = f'gh_delivery_{raw_delivery_id}'
         if cache.get(dedup_key):
             return 200, None
         cache.set(dedup_key, 1, 3600)
 
-    import json
     try:
         payload = json.loads(request.body)
     except Exception:
         raise HttpError(400, 'Invalid JSON')
 
-    event = request.META.get('HTTP_X_GITHUB_EVENT', '')
-    if event != 'push':
+    event_type = request.META.get('HTTP_X_GITHUB_EVENT', '')
+    repo_html_url = payload.get('repository', {}).get('html_url', '')
+    delivery_id = raw_delivery_id or f'no-id-{uuid.uuid4()}'
+
+    delivery = WebhookDelivery.objects.create(
+        delivery_id=delivery_id,
+        event_type=event_type,
+        repo_url=repo_html_url,
+        triggered_reanalysis=False,
+        raw_payload=payload,
+    )
+
+    if event_type != 'push':
         return 200, None
 
-    repo_html_url = payload.get('repository', {}).get('html_url', '')
     if not repo_html_url:
         return 200, None
 
@@ -1342,13 +1352,17 @@ def github_webhook(request):
     except Repository.DoesNotExist:
         return 200, None
 
-    from .models import AnalysisRun
     token = repo.auth_token or None
     run = AnalysisRun.objects.create(repo=repo, status='pending')
     from apps.analysis.tasks import analyze_repository
     task = analyze_repository.delay(str(run.id), pat=token)
     run.celery_task_id = task.id
     run.save(update_fields=['celery_task_id'])
+
+    delivery.triggered_reanalysis = True
+    delivery.run = run
+    delivery.save(update_fields=['triggered_reanalysis', 'run'])
+
     logger.info('Webhook triggered re-analysis for %s/%s (run %s)', repo.owner, repo.name, run.id)
     return 200, None
 

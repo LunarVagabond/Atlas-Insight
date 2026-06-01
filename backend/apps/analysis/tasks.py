@@ -1,8 +1,10 @@
 import logging
 import os
+import time
 from datetime import datetime, timezone as _tz
 
 from celery import shared_task
+from prometheus_client import Counter, Gauge, Histogram
 from django.db.models import Exists, OuterRef
 from django.utils import timezone
 
@@ -27,9 +29,37 @@ from .vuln_scan import scan_vulnerabilities
 
 logger = logging.getLogger(__name__)
 
+analysis_runs_total = Counter(
+    'analysis_runs_total',
+    'Total analysis runs by outcome',
+    ['status'],
+)
+analysis_duration_seconds = Histogram(
+    'analysis_duration_seconds',
+    'Wall-clock seconds for analyze_repository task',
+    buckets=[10, 30, 60, 120, 300, 600, 1200],
+)
+celery_queue_depth = Gauge(
+    'celery_queue_depth',
+    'Tasks pending in the Celery default queue',
+)
+
+
+def _update_queue_depth():
+    try:
+        import redis as _redis
+        from django.conf import settings as _s
+        r = _redis.Redis.from_url(_s.CELERY_BROKER_URL)
+        celery_queue_depth.set(r.llen('celery'))
+    except Exception:
+        pass
+
 
 @shared_task(bind=True)
 def analyze_repository(self, run_id: str, pat: str | None = None):
+    _update_queue_depth()
+    _start = time.monotonic()
+
     try:
         run = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
@@ -122,6 +152,7 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
             ),
         }
         run.status = 'completed'
+        analysis_runs_total.labels(status='completed').inc()
 
         from django.db.models import F
         repo = run.repo
@@ -168,7 +199,9 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
         else:
             friendly = 'An unexpected error occurred during analysis. Please try again.'
         run.result = {'error': friendly}
+        analysis_runs_total.labels(status='failed').inc()
 
+    analysis_duration_seconds.observe(time.monotonic() - _start)
     run.completed_at = timezone.now()
     run.save(update_fields=['status', 'result', 'completed_at'])
 

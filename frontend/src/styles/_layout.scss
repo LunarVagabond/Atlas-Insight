@@ -36,6 +36,9 @@
   padding: 0 $space-6;
 
   &__brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-weight: 700;
     font-size: 1rem;
     color: var(--color-text);
@@ -44,6 +47,12 @@
     span {
       color: var(--color-accent);
     }
+  }
+
+  &__logo {
+    height: 28px;
+    width: auto;
+    display: block;
   }
 
   &__spacer {

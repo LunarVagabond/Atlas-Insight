@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import ShortcutsModal from './components/ui/ShortcutsModal.vue'
+import logoUrl from './assets/logo.png'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -62,6 +63,7 @@ const menuOpen = ref(false)
   <div class="page">
     <nav class="navbar">
       <RouterLink to="/" class="navbar__brand">
+        <img :src="logoUrl" alt="" class="navbar__logo" />
         Atlas <span>Insight</span>
       </RouterLink>
       <div class="navbar__spacer" />

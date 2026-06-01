@@ -1,7 +1,7 @@
 from django.contrib import admin, messages
 from django.utils.html import format_html
 
-from .models import AnalysisRun, Repository, RepoOfTheWeek, UserFavorite
+from .models import AnalysisRun, FeatureFlag, Repository, RepoOfTheWeek, UserFavorite, WebhookDelivery
 
 
 def _trigger(task_path, request, label):
@@ -132,3 +132,22 @@ class RepoOfTheWeekAdmin(admin.ModelAdmin):
     readonly_fields = ('selected_at',)
     ordering = ('-week_start',)
     actions = [action_select_rotw]
+
+
+@admin.register(WebhookDelivery)
+class WebhookDeliveryAdmin(admin.ModelAdmin):
+    list_display = ('delivery_id', 'event_type', 'repo_url', 'triggered_reanalysis', 'run', 'received_at')
+    list_filter = ('event_type', 'triggered_reanalysis')
+    search_fields = ('delivery_id', 'repo_url')
+    readonly_fields = ('id', 'delivery_id', 'event_type', 'repo_url', 'triggered_reanalysis', 'run', 'received_at', 'raw_payload')
+    raw_id_fields = ('run',)
+    ordering = ('-received_at',)
+
+
+@admin.register(FeatureFlag)
+class FeatureFlagAdmin(admin.ModelAdmin):
+    list_display = ('name', 'enabled', 'description', 'updated_at')
+    list_filter = ('enabled',)
+    search_fields = ('name', 'description')
+    readonly_fields = ('created_at', 'updated_at')
+    ordering = ('name',)

@@ -80,3 +80,35 @@ class RepoOfTheWeek(models.Model):
 
     def __str__(self):
         return f'{self.repo} — week of {self.week_start}'
+
+
+class WebhookDelivery(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
+    delivery_id = models.CharField(max_length=255, unique=True)
+    event_type = models.CharField(max_length=100)
+    repo_url = models.CharField(max_length=500, blank=True, default='')
+    triggered_reanalysis = models.BooleanField(default=False)
+    run = models.ForeignKey(
+        'AnalysisRun', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='webhook_deliveries',
+    )
+    received_at = models.DateTimeField(auto_now_add=True)
+    raw_payload = models.JSONField(blank=True, default=dict)
+
+    class Meta:
+        ordering = ['-received_at']
+        verbose_name_plural = 'webhook deliveries'
+
+    def __str__(self):
+        return f'{self.event_type} {self.delivery_id[:8]} ({self.received_at:%Y-%m-%d %H:%M})'
+
+
+class FeatureFlag(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    enabled = models.BooleanField(default=False)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'{self.name} ({"on" if self.enabled else "off"})'

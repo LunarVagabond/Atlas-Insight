@@ -21,5 +21,6 @@ urlpatterns = [
     path('favicon.ico', lambda r: HttpResponse(status=204)),
     path('admin/', admin.site.urls),
     path('accounts/', include('allauth.urls')),
+    path('', include('django_prometheus.urls')),
     path('api/', api.urls),
 ]

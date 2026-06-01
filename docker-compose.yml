@@ -1,3 +1,22 @@
+x-glitchtip-env: &glitchtip-env
+  SECRET_KEY: ${GLITCHTIP_SECRET_KEY:-changeme-glitchtip-dev-secret}
+  DATABASE_URL: postgresql://${POSTGRES_USER:-atlas}:${POSTGRES_PASSWORD:-atlas_secret}@postgres:5432/glitchtip
+  REDIS_URL: redis://redis:6379/2
+  PORT: 8080
+  EMAIL_URL: consolemail://
+  GLITCHTIP_DOMAIN: ${GLITCHTIP_DOMAIN:-http://localhost:4505}
+  GITHUB_CLIENT_ID: ${GLITCHTIP_GITHUB_CLIENT_ID}
+  GITHUB_SECRET: ${GLITCHTIP_GITHUB_SECRET}
+  USE_X_FORWARDED_HOST: "True"
+  SECURE_PROXY_SSL_HEADER: "HTTP_X_FORWARDED_PROTO,https"
+  # Use explicit origins (scheme + host only) to avoid CSRF failures on OAuth redirect flows.
+  CSRF_TRUSTED_ORIGINS: ${GLITCHTIP_CSRF_TRUSTED_ORIGINS:-https://glitch.dsyndicate.dev,http://localhost:4505}
+  SESSION_COOKIE_SECURE: "True"
+  CSRF_COOKIE_SECURE: "True"
+  SESSION_COOKIE_SAMESITE: "Lax"
+  CSRF_COOKIE_SAMESITE: "Lax"
+  CELERY_WORKER_CONCURRENCY: 2
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -9,6 +28,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-atlas_secret}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-glitchtip-db.sql:/docker-entrypoint-initdb.d/02-glitchtip.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-atlas}"]
       interval: 5s
@@ -24,6 +44,47 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  glitchtip-web:
+    image: glitchtip/glitchtip:latest
+    ports:
+      - "4505:8080"
+    environment:
+      <<: *glitchtip-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - glitchtip
+
+  glitchtip-worker:
+    image: glitchtip/glitchtip:latest
+    command: ./bin/run-celery-with-beat.sh
+    environment:
+      <<: *glitchtip-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - glitchtip
+
+  glitchtip-migrate:
+    image: glitchtip/glitchtip:latest
+    command: ./bin/run-migrate.sh
+    environment:
+      <<: *glitchtip-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    profiles:
+      - glitchtip
 
   cloudflared:
     image: cloudflare/cloudflared:latest

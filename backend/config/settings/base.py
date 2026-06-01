@@ -50,11 +50,13 @@ INSTALLED_APPS = [
     'django_celery_results',
     'django_celery_beat',
     'django_ratelimit',
+    'django_prometheus',
 ]
 
 SILENCED_SYSTEM_CHECKS = ['django_ratelimit.W001']
 
 MIDDLEWARE = [
+    'django_prometheus.middleware.PrometheusBeforeMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'apps.users.middleware.OAuthCallbackHostMiddleware',
@@ -65,6 +67,7 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_prometheus.middleware.PrometheusAfterMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -229,9 +232,64 @@ LOG_RETENTION_DAYS = config('LOG_RETENTION_DAYS', default=30, cast=int)
 LOG_DIR = REPO_ROOT / '_running' / 'logs'
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
+import sys as _sys_logging
+
+
+def _detect_service_name() -> str:
+    explicit = config('ATLAS_SERVICE', default='').strip()
+    if explicit:
+        return explicit
+
+    argv = ' '.join(_sys_logging.argv).lower()
+    if 'flower' in argv:
+        return 'atlas-backend-flower'
+    if 'celery' in argv and ' beat' in argv:
+        return 'atlas-backend-celery-beat'
+    if 'celery' in argv:
+        return 'atlas-backend-celery-worker'
+    return 'atlas-backend-django'
+
+
+_sentry_service = _detect_service_name()
+
+
+def _service_from_logger_name(logger_name: str) -> str:
+    logger_name = (logger_name or '').strip()
+    if not logger_name:
+        return _sentry_service
+
+    if logger_name.startswith('apps.'):
+        parts = logger_name.split('.')
+        app = parts[1] if len(parts) > 1 else 'app'
+        return f'atlas-backend-{app}'
+
+    root = logger_name.split('.')[0]
+    if root == 'django':
+        return 'atlas-backend-django'
+    if root == 'celery':
+        return 'atlas-backend-celery-worker'
+    if root == 'flower':
+        return 'atlas-backend-flower'
+    if root == 'kombu':
+        # Kombu logs can come from worker/beat/flower; keep process-specific fallback.
+        return _sentry_service
+    return _sentry_service
+
+class _SentryServiceFilter:
+    def filter(self, record):
+        service_name = _service_from_logger_name(getattr(record, 'name', ''))
+        setattr(record, 'service', service_name)
+        setattr(record, 'sentry.service', service_name)
+        return True
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'filters': {
+        'sentry_service': {
+            '()': _SentryServiceFilter,
+        },
+    },
     'formatters': {
         'verbose': {
             'format': '{asctime} {levelname:<8} {name} — {message}',
@@ -243,6 +301,7 @@ LOGGING = {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
+            'filters': ['sentry_service'],
         },
         'django_file': {
             'class': 'logging.handlers.RotatingFileHandler',
@@ -301,3 +360,71 @@ LOGGING = {
         'level': LOG_LEVEL,
     },
 }
+
+# ── Sentry / GlitchTip ───────────────────────────────────────────────────────
+SENTRY_DSN = config('SENTRY_DSN', default='')
+if SENTRY_DSN:
+    import logging as _logging
+    import sys as _sys
+    import sentry_sdk
+    from sentry_sdk.integrations.celery import CeleryIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.logging import LoggingIntegration
+
+    def _derive_sentry_service(event: dict) -> str:
+        logger_name = (event.get('logger') or '').strip()
+        if logger_name:
+            return _service_from_logger_name(logger_name)
+
+        tx_name = (event.get('transaction') or '').strip()
+        if tx_name.startswith('apps.'):
+            parts = tx_name.split('.')
+            app = parts[1] if len(parts) > 1 else 'app'
+            return f'atlas-backend-{app}'
+
+        return _sentry_service
+
+    def _attach_service_fields(event: dict) -> dict:
+        service_name = _derive_sentry_service(event)
+
+        tags = dict(event.get('tags') or {})
+        tags['service'] = service_name
+        event['tags'] = tags
+
+        contexts = dict(event.get('contexts') or {})
+        service_ctx = dict(contexts.get('service') or {})
+        service_ctx['name'] = service_name
+        contexts['service'] = service_ctx
+        event['contexts'] = contexts
+
+        return event
+
+    def _before_send(event, hint):
+        return _attach_service_fields(event)
+
+    def _before_send_transaction(event, hint):
+        return _attach_service_fields(event)
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        environment=config('DJANGO_SETTINGS_MODULE', default='development').split('.')[-1],
+        server_name=_sentry_service,
+        traces_sample_rate=0.1,
+        send_default_pii=False,
+        before_send=_before_send,
+        before_send_transaction=_before_send_transaction,
+        integrations=[
+            DjangoIntegration(),
+            CeleryIntegration(),
+            LoggingIntegration(
+                sentry_logs_level=_logging.INFO,
+                event_level=_logging.ERROR,
+                level=None,
+            ),
+        ],
+        _experiments={'enable_logs': True},
+    )
+
+    with sentry_sdk.configure_scope() as scope:
+        scope.set_tag('service', _sentry_service)
+        scope.set_context('service', {'name': _sentry_service})

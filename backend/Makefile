@@ -14,6 +14,7 @@ DJANGO_ENV := DJANGO_SETTINGS_MODULE=config.settings.development
 .PHONY: setup start stop restart status \
         start-django stop-django \
         start-celery stop-celery \
+	start-beat stop-beat \
         start-flower stop-flower \
         migrate makemigrations createsuperuser shell dbshell collectstatic \
         test lint format logs \
@@ -30,9 +31,9 @@ setup:
 
 # ── Stack lifecycle ────────────────────────────────────────────────────────────
 
-start: _ensure_running_dirs start-django start-celery start-flower
+start: _ensure_running_dirs start-django start-celery start-beat start-flower
 
-stop: stop-django stop-celery stop-flower
+stop: stop-django stop-celery stop-beat stop-flower
 	@for port in 4500 4504; do \
 	  for pid in $$(ss -tlnp "sport = :$$port" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | sort -u); do \
 	    echo "  Killing stale process on port $$port (PID $$pid)..."; \
@@ -51,7 +52,7 @@ start-django: _ensure_running_dirs
 	  echo "  django already running (PID $$(cat $$PID_FILE)), skipping"; \
 	else \
 	  rm -f "$$PID_FILE"; \
-	  (cd $(MAKEFILE_DIR) && exec env $(DJANGO_ENV) $(PYTHON) manage.py runserver 0.0.0.0:4500 --noreload) \
+	  (cd $(MAKEFILE_DIR) && exec env ATLAS_SERVICE=atlas-backend-django $(DJANGO_ENV) $(PYTHON) manage.py runserver 0.0.0.0:4500 --noreload) \
 	    > $(RUNNING_DIR)/logs/django.log 2>&1 & echo $$! > $(RUNNING_DIR)/pids/django.pid; \
 	fi
 
@@ -80,7 +81,7 @@ start-celery: _ensure_running_dirs
 	  echo "  celery already running (PID $$(cat $$PID_FILE)), skipping"; \
 	else \
 	  rm -f "$$PID_FILE"; \
-	  cd $(MAKEFILE_DIR) && $(DJANGO_ENV) $(CELERY) -A config worker -l info -n worker@%h \
+	  cd $(MAKEFILE_DIR) && ATLAS_SERVICE=atlas-backend-celery-worker $(DJANGO_ENV) $(CELERY) -A config worker -l info -n worker@%h \
 	    > $(RUNNING_DIR)/logs/celery.log 2>&1 & echo $$! > $(RUNNING_DIR)/pids/celery.pid; \
 	fi
 
@@ -100,6 +101,33 @@ stop-celery:
 	  echo "  celery not running"; \
 	fi
 
+start-beat: _ensure_running_dirs
+	@echo "Starting Celery beat scheduler..."
+	@PID_FILE=$(RUNNING_DIR)/pids/beat.pid; \
+	if [ -f "$$PID_FILE" ] && kill -0 "$$(cat $$PID_FILE)" 2>/dev/null; then \
+	  echo "  beat already running (PID $$(cat $$PID_FILE)), skipping"; \
+	else \
+	  rm -f "$$PID_FILE"; \
+	  cd $(MAKEFILE_DIR) && ATLAS_SERVICE=atlas-backend-celery-beat $(DJANGO_ENV) $(CELERY) -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler \
+	    > $(RUNNING_DIR)/logs/beat.log 2>&1 & echo $$! > $(RUNNING_DIR)/pids/beat.pid; \
+	fi
+
+stop-beat:
+	@PID_FILE=$(RUNNING_DIR)/pids/beat.pid; \
+	if [ -f "$$PID_FILE" ]; then \
+	  PID=$$(cat "$$PID_FILE"); \
+	  echo "Stopping beat (PID $$PID)..."; \
+	  PGID=$$(ps -o pgid= $$PID 2>/dev/null | tr -d ' '); \
+	  if [ -n "$$PGID" ] && [ "$$PGID" != "0" ]; then \
+	    kill -TERM -$$PGID 2>/dev/null || kill $$PID 2>/dev/null || true; \
+	  else \
+	    kill $$PID 2>/dev/null || true; \
+	  fi; \
+	  rm -f "$$PID_FILE"; \
+	else \
+	  echo "  beat not running"; \
+	fi
+
 start-flower: _ensure_running_dirs
 	@echo "Starting Flower (port 4504)..."
 	@PID_FILE=$(RUNNING_DIR)/pids/flower.pid; \
@@ -108,7 +136,7 @@ start-flower: _ensure_running_dirs
 	else \
 	  rm -f "$$PID_FILE"; \
 	  sleep 2; \
-	  (cd $(MAKEFILE_DIR) && exec env $(DJANGO_ENV) $(CELERY) -A config flower --port=4504) \
+	  (cd $(MAKEFILE_DIR) && exec env ATLAS_SERVICE=atlas-backend-flower $(DJANGO_ENV) $(CELERY) -A config flower --port=4504) \
 	    > $(RUNNING_DIR)/logs/flower.log 2>&1 & echo $$! > $(RUNNING_DIR)/pids/flower.pid; \
 	fi
 
@@ -164,7 +192,7 @@ format:
 # ── Status & logs ─────────────────────────────────────────────────────────────
 
 status:
-	@for svc in django celery flower; do \
+	@for svc in django celery beat flower; do \
 	  PID_FILE=$(RUNNING_DIR)/pids/$$svc.pid; \
 	  if [ -f "$$PID_FILE" ]; then \
 	    PID=$$(cat "$$PID_FILE"); \
@@ -183,6 +211,7 @@ logs:
 	@tail -f \
 	  $(RUNNING_DIR)/logs/django.log \
 	  $(RUNNING_DIR)/logs/celery.log \
+	  $(RUNNING_DIR)/logs/beat.log \
 	  $(RUNNING_DIR)/logs/flower.log
 
 logs-django:
@@ -190,6 +219,9 @@ logs-django:
 
 logs-celery:
 	@tail -f $(RUNNING_DIR)/logs/celery.log 2>/dev/null || echo "No celery log — is Celery running? (make start-celery)"
+
+logs-beat:
+	@tail -f $(RUNNING_DIR)/logs/beat.log 2>/dev/null || echo "No beat log — is beat running? (make start-beat)"
 
 logs-flower:
 	@tail -f $(RUNNING_DIR)/logs/flower.log 2>/dev/null || echo "No flower log — is Flower running? (make start-flower)"
