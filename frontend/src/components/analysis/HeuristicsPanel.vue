@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import AppCard from '../ui/AppCard.vue'
 import HeuristicDrawer from './HeuristicDrawer.vue'
 import type { HeuristicSignal, HeuristicSignalKey } from '../../stores/analysis'
 
-defineProps<{ signals: HeuristicSignal[] }>()
+const props = defineProps<{ signals: HeuristicSignal[] }>()
 
 const active = ref<HeuristicSignal | null>(null)
 const activeHint = ref<HeuristicSignalKey | null>(null)
@@ -44,6 +44,24 @@ function riskLabel(score: number): string {
   return 'Needs attention'
 }
 
+// Weighted score breakdown
+const overallScore = computed(() => {
+  if (!props.signals.length) return null
+  const total = props.signals.reduce((sum, s) => sum + s.score, 0)
+  return Math.round(total / props.signals.length)
+})
+
+const scoreBreakdown = computed(() =>
+  [...props.signals]
+    .sort((a, b) => b.score - a.score)
+    .map(s => ({
+      label: s.label,
+      score: s.score,
+      pct: s.score, // each signal is 0–100; bar width = score
+      level: level(s.score),
+    }))
+)
+
 const SIGNAL_DESCRIPTIONS: Partial<Record<HeuristicSignalKey, string>> = {
   burnout:               'Is one person doing most of the work? High scores mean too much depends on a single contributor.',
   abandonment_risk:      'How likely is it that this project is no longer being actively maintained.',
@@ -63,6 +81,27 @@ const SIGNAL_DESCRIPTIONS: Partial<Record<HeuristicSignalKey, string>> = {
   <div class="panel">
     <h2 class="panel__title">Health Signals</h2>
     <p class="panel__subtitle">Automated signals about this project's activity, health, and contributor patterns — click any card for details.</p>
+
+    <!-- Score Breakdown -->
+    <div v-if="overallScore !== null" class="score-breakdown">
+      <div class="score-breakdown__header">
+        <span class="score-breakdown__title">Composite Score</span>
+        <span :class="['score-breakdown__total', `score-breakdown__total--${level(overallScore)}`]">{{ overallScore }}<span style="font-size:0.75em;opacity:0.6">/100</span></span>
+      </div>
+      <div class="score-breakdown__bars">
+        <div v-for="item in scoreBreakdown" :key="item.label" class="score-breakdown__row">
+          <span class="score-breakdown__label">{{ item.label }}</span>
+          <div class="score-breakdown__track">
+            <div
+              :class="['score-breakdown__fill', `score-breakdown__fill--${item.level}`]"
+              :style="{ width: `${item.pct}%` }"
+            />
+          </div>
+          <span :class="['score-breakdown__val', `score-breakdown__val--${item.level}`]">{{ item.score }}</span>
+        </div>
+      </div>
+    </div>
+
     <div class="heuristics-grid">
       <AppCard
         v-for="signal in signals"

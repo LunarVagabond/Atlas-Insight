@@ -13,6 +13,7 @@ export interface AnalysisRun {
   is_stale: boolean
   last_fetched_at: string | null
   auth_token_warning: string
+  cooldown_until: string | null
 }
 
 export interface RoadmapMilestone {
@@ -218,6 +219,18 @@ export interface StructureData {
   hot_files: { file: string; commit_count: number }[]
   tech_stack?: string[]
   all_files?: string[]
+  stale_branches?: { name: string; last_commit: string; days_ago: number }[]
+  stale_branch_count?: number
+}
+
+export interface VulnFinding {
+  name: string
+  version: string
+  ecosystem: string
+  vuln_id: string
+  summary: string
+  severity: string | null
+  url: string
 }
 
 export interface SecurityData {
@@ -226,6 +239,7 @@ export interface SecurityData {
   score: number
   gitignore_exists: boolean
   gitignore_gaps: string[]
+  vulnerabilities?: VulnFinding[]
 }
 
 export interface GitHubContributor {
@@ -362,11 +376,12 @@ export interface GraphData {
 }
 
 export interface DepsData {
-  dependencies: { name: string; version_spec: string; source: string; dev?: boolean }[]
+  dependencies: { name: string; version_spec: string; source: string; dev?: boolean; version?: string; ecosystem?: string }[]
   dependency_count: number
   docker_issues: { file: string; issue: string }[]
   missing_lockfile_warnings: string[]
 }
+
 
 export type HeuristicSignalKey =
   | 'burnout'

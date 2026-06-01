@@ -5,6 +5,35 @@ from pathlib import Path
 
 from git import Repo
 
+STALE_BRANCH_DAYS = 90
+
+
+def detect_stale_branches(repo_obj: Repo) -> tuple[list[dict], int]:
+    """Return (stale_branches, stale_count) — remote branches with no commits in 90+ days."""
+    now = datetime.now(tz=timezone.utc)
+    stale: list[dict] = []
+    try:
+        for ref in repo_obj.remote().refs:
+            branch_name = ref.name
+            if branch_name.endswith('/HEAD'):
+                continue
+            try:
+                commit = ref.commit
+                committed_dt = datetime.fromtimestamp(commit.committed_date, tz=timezone.utc)
+                days_ago = (now - committed_dt).days
+                if days_ago >= STALE_BRANCH_DAYS:
+                    stale.append({
+                        'name': branch_name.split('/', 1)[-1],
+                        'last_commit': committed_dt.isoformat(),
+                        'days_ago': days_ago,
+                    })
+            except Exception:
+                continue
+    except Exception:
+        pass
+    stale.sort(key=lambda b: -b['days_ago'])
+    return stale, len(stale)
+
 EXT_LANG: dict[str, str] = {
     '.py': 'Python', '.pyw': 'Python',
     '.js': 'JavaScript', '.mjs': 'JavaScript', '.cjs': 'JavaScript',
@@ -304,6 +333,8 @@ def analyze_structure(repo_obj: Repo, repo_dir: str, deps: dict | None = None) -
     )
     test_ratio = round(test_files / max(source_files, 1), 3)
 
+    stale_branches, stale_branch_count = detect_stale_branches(repo_obj)
+
     return {
         'total_files': total_files,
         'total_lines': total_lines,
@@ -337,6 +368,8 @@ def analyze_structure(repo_obj: Repo, repo_dir: str, deps: dict | None = None) -
         'hot_files': hot_files,
         'tech_stack': tech_stack,
         'all_files': all_file_paths,
+        'stale_branches': stale_branches,
+        'stale_branch_count': stale_branch_count,
     }
 
 

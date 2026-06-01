@@ -22,6 +22,7 @@ from .arch_tours import generate_arch_tours
 from .ownership_analysis import analyze_ownership
 from .security_scan import scan_security
 from .todo_scan import scan_todos
+from .vuln_scan import scan_vulnerabilities
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,7 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
         readme = parse_readme(repo_dir)
         structure = analyze_structure(repo_obj, repo_dir, deps=deps)
         security = scan_security(repo_obj, repo_dir)
+        security['vulnerabilities'] = scan_vulnerabilities(deps)
         todos = scan_todos(repo_dir)
         github_meta = fetch_github_meta(run.repo.owner, run.repo.name, token=pat)
         contribution_data = github_meta.pop('contribution_data', None)
@@ -368,6 +370,39 @@ def select_repo_of_week():
         'Repo of the Week selected: %s/%s (pick #%d)',
         chosen.owner, chosen.name, current_picks + 1,
     )
+
+
+@shared_task
+def reanalyze_watched_repos():
+    """Daily task: re-analyze watched repos when new commits are detected."""
+    from apps.repositories.models import AnalysisRun, Repository
+
+    from .github_meta import fetch_latest_sha as _fetch_sha
+
+    watched = list(Repository.objects.filter(is_watched=True))
+    if not watched:
+        logger.info('No watched repos to re-analyze')
+        return
+
+    queued = 0
+    for repo in watched:
+        try:
+            latest_sha = _fetch_sha(repo.owner, repo.name, token=repo.auth_token or None)
+        except Exception:
+            logger.warning('Could not fetch SHA for watched repo %s/%s', repo.owner, repo.name)
+            continue
+
+        if latest_sha and latest_sha == repo.last_commit_sha and repo.last_analyzed_at:
+            continue
+
+        run = AnalysisRun.objects.create(repo=repo, status='pending')
+        task = analyze_repository.delay(str(run.id), pat=repo.auth_token or None)
+        run.celery_task_id = task.id
+        run.save(update_fields=['celery_task_id'])
+        queued += 1
+        logger.info('Queued re-analysis for watched repo %s/%s (run %s)', repo.owner, repo.name, run.id)
+
+    logger.info('Watched repo re-analysis: %d/%d repos queued', queued, len(watched))
 
 
 @shared_task

@@ -41,6 +41,8 @@ class UserSchema(Schema):
     github_login: str
     avatar_url: str
     github_connected: bool
+    is_staff: bool
+    is_superuser: bool
 
 
 @router.get('/me', response={200: UserSchema, 401: dict})
@@ -59,6 +61,8 @@ def me(request):
         github_login=request.user.github_login,
         avatar_url=request.user.avatar_url,
         github_connected=has_token,
+        is_staff=request.user.is_staff,
+        is_superuser=request.user.is_superuser,
     )
 
 

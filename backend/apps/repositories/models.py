@@ -18,6 +18,7 @@ class Repository(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     view_count = models.IntegerField(default=0)
     scan_count = models.IntegerField(default=0)
+    is_watched = models.BooleanField(default=False)
 
     class Meta:
         verbose_name_plural = 'repositories'

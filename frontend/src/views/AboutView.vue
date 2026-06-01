@@ -103,7 +103,7 @@
         <h2 class="about-view__section-title">Limitations</h2>
         <ul class="about-view__feature-list">
           <li>Analysis runs on a point-in-time clone — results reflect the repo at fetch time.</li>
-          <li>Import graph analysis covers Python, TypeScript, and JavaScript. Other languages show dependency reports only.</li>
+          <li>Import graph analysis covers Python, TypeScript, JavaScript, Go, Ruby, Rust, Java, Kotlin, C#, and PHP. Other languages show dependency reports only. We're always working to expand language support.</li>
           <li>Very large repositories (&gt;500 MB) may time out.</li>
           <li>GitHub API rate limits apply; some JIT data (issues, PRs) may be unavailable under load.</li>
         </ul>

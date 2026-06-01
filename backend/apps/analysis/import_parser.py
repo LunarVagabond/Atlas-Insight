@@ -10,6 +10,11 @@ JS_IMPORT = re.compile(
     r"""(?:import\s+.*?\s+from\s+['"]([^'"]+)['"]|require\s*\(\s*['"]([^'"]+)['"]\s*\))"""
 )
 GO_IMPORT = re.compile(r'"([^"]+)"')
+RUBY_REQUIRE = re.compile(r"""^\s*require(?:_relative)?\s+['"]([^'"]+)['"]""", re.MULTILINE)
+RUST_USE = re.compile(r'^\s*use\s+((?:super|self|crate)(?:::\w+)+)', re.MULTILINE)
+JAVA_IMPORT = re.compile(r'^\s*import\s+(?:static\s+)?([\w.]+(?:\.\w+)+)\s*;', re.MULTILINE)
+CS_USING = re.compile(r'^\s*using\s+([\w.]+)\s*;', re.MULTILINE)
+PHP_USE = re.compile(r'^\s*(?:use|require(?:_once)?|include(?:_once)?)\s+[\\\'"]?([\w\\/.]+)[\'"]?\s*[;(]', re.MULTILINE)
 
 MAX_FILE_SIZE = 500_000  # 500KB
 
@@ -59,6 +64,23 @@ _PY_STDLIB: frozenset[str] = (
 # Go: known external/stdlib prefixes to skip
 _GO_EXTERNAL_PREFIXES = ('golang.org/', 'google.golang.org/', 'gopkg.in/')
 
+_JAVA_STDLIB_PREFIXES = ('java.', 'javax.', 'sun.', 'com.sun.', 'org.w3c.', 'org.xml.')
+_CS_STDLIB_PREFIXES = ('System', 'Microsoft', 'Newtonsoft', 'NUnit', 'Xunit')
+_RUBY_STDLIB = frozenset({
+    'abbrev', 'base64', 'benchmark', 'bigdecimal', 'cgi', 'cmath', 'complex',
+    'csv', 'date', 'dbm', 'debug', 'delegate', 'digest', 'dl', 'drb', 'e2mmap',
+    'English', 'erb', 'etc', 'expect', 'fcntl', 'fiber', 'fileutils', 'find',
+    'forwardable', 'gdbm', 'getoptlong', 'io', 'ipaddr', 'irb', 'json', 'logger',
+    'matrix', 'minitest', 'monitor', 'mutex_m', 'net', 'nkf', 'observer', 'open-uri',
+    'open3', 'openssl', 'optparse', 'ostruct', 'pathname', 'pp', 'prettyprint',
+    'prime', 'profiler', 'pstore', 'psych', 'pty', 'rake', 'rational', 'rbconfig',
+    'readline', 'resolv', 'rexml', 'rinda', 'ripper', 'rss', 'rubygems', 'scanf',
+    'sdbm', 'set', 'shell', 'shellwords', 'singleton', 'socket', 'stringio',
+    'strscan', 'sync', 'syslog', 'tempfile', 'test', 'thread', 'thwait', 'time',
+    'timeout', 'tmpdir', 'tracer', 'tsort', 'un', 'unicode_normalize', 'uri',
+    'weakref', 'webrick', 'win32ole', 'yaml', 'zlib',
+})
+
 
 def _read_go_module_path(base: str) -> str | None:
     gomod = os.path.join(base, 'go.mod')
@@ -79,6 +101,19 @@ def _is_external_python(dep: str) -> bool:
 
 def _is_external_js(dep: str) -> bool:
     return not dep.startswith('.')
+
+
+def _is_external_java(dep: str) -> bool:
+    return any(dep.startswith(p) for p in _JAVA_STDLIB_PREFIXES)
+
+
+def _is_external_cs(dep: str) -> bool:
+    return any(dep.startswith(p) for p in _CS_STDLIB_PREFIXES)
+
+
+def _is_external_ruby(dep: str) -> bool:
+    top = dep.split('/')[0]
+    return top in _RUBY_STDLIB
 
 
 def _is_external_go(dep: str, module_path: str | None) -> bool:
@@ -151,4 +186,35 @@ def parse_imports(repo_dir: str) -> list[dict]:
                         m = GO_IMPORT.search(stripped)
                         if m and not _is_external_go(m.group(1), go_module_path):
                             edges.append({'source': source, 'target': m.group(1), 'lang': 'go'})
+            elif ext == '.rb':
+                for m in RUBY_REQUIRE.finditer(content):
+                    dep = m.group(1)
+                    if dep and not _is_external_ruby(dep):
+                        edges.append({'source': source, 'target': dep, 'lang': 'ruby'})
+            elif ext == '.rs':
+                for m in RUST_USE.finditer(content):
+                    dep = m.group(1)
+                    if dep:
+                        edges.append({'source': source, 'target': dep, 'lang': 'rust'})
+            elif ext in {'.java'}:
+                for m in JAVA_IMPORT.finditer(content):
+                    dep = m.group(1)
+                    if dep and not _is_external_java(dep):
+                        edges.append({'source': source, 'target': dep, 'lang': 'java'})
+            elif ext == '.kt':
+                for m in JAVA_IMPORT.finditer(content):
+                    dep = m.group(1)
+                    if dep and not _is_external_java(dep):
+                        edges.append({'source': source, 'target': dep, 'lang': 'kotlin'})
+            elif ext == '.cs':
+                for m in CS_USING.finditer(content):
+                    dep = m.group(1)
+                    if dep and not _is_external_cs(dep):
+                        edges.append({'source': source, 'target': dep, 'lang': 'csharp'})
+            elif ext == '.php':
+                for m in PHP_USE.finditer(content):
+                    dep = m.group(1)
+                    # skip relative path-style includes that look like stdlib
+                    if dep and not dep.startswith('/'):
+                        edges.append({'source': source, 'target': dep, 'lang': 'php'})
     return edges

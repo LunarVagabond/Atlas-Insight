@@ -162,6 +162,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 GITHUB_TOKEN = config('GITHUB_TOKEN', default='')
+GITHUB_WEBHOOK_SECRET = config('GITHUB_WEBHOOK_SECRET', default='')
 FEATURED_REPO_URL = config('FEATURED_REPO_URL', default='')
 REPO_CACHE_DIR = BASE_DIR.parent / config('REPO_CACHE_DIR', default='_running/repo_cache')
 STALE_AFTER_DAYS = config('STALE_AFTER_DAYS', default=7, cast=int)
@@ -208,6 +209,10 @@ CELERY_BEAT_SCHEDULE = {
     'select-repo-of-week': {
         'task': 'apps.analysis.tasks.select_repo_of_week',
         'schedule': crontab(minute=0, hour=0, day_of_week=1),  # Monday 00:00 UTC
+    },
+    'reanalyze-watched-repos': {
+        'task': 'apps.analysis.tasks.reanalyze_watched_repos',
+        'schedule': crontab(minute=0, hour=4),  # daily at 04:00 UTC
     },
 }
 

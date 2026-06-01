@@ -8,6 +8,8 @@ export interface AuthUser {
   github_login: string
   avatar_url: string
   github_connected: boolean
+  is_staff: boolean
+  is_superuser: boolean
 }
 
 export const useAuthStore = defineStore('auth', {

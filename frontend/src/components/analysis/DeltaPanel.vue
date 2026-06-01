@@ -118,33 +118,50 @@ function clsChanged(cls?: { changed: boolean; before_label: string; after_label:
         </div>
       </div>
 
-      <!-- Structure -->
-      <div class="delta-section delta-section--metrics">
-        <div class="delta-metric">
-          <span class="delta-metric__label">Files</span>
-          <span class="delta-metric__before">{{ diffData.structure?.files_before }}</span>
-          <span class="delta-metric__arrow">→</span>
-          <span class="delta-metric__after">{{ diffData.structure?.files_after }}</span>
-          <span v-if="diffData.structure?.files_delta !== 0" :class="['delta-pill', diffData.structure!.files_delta > 0 ? 'delta-pill--neutral' : 'delta-pill--neutral']">{{ deltaSign(diffData.structure!.files_delta) }}</span>
-        </div>
-        <div class="delta-metric">
-          <span class="delta-metric__label">Contributors</span>
-          <span class="delta-metric__before">{{ diffData.contributors?.before }}</span>
-          <span class="delta-metric__arrow">→</span>
-          <span class="delta-metric__after">{{ diffData.contributors?.after }}</span>
-        </div>
-        <div class="delta-metric">
-          <span class="delta-metric__label">Graph nodes</span>
-          <span class="delta-metric__before">{{ diffData.graph?.nodes_before }}</span>
-          <span class="delta-metric__arrow">→</span>
-          <span class="delta-metric__after">{{ diffData.graph?.nodes_after }}</span>
-        </div>
-        <div v-if="diffData.graph?.god_modules_delta !== 0" class="delta-metric">
-          <span class="delta-metric__label">God modules</span>
-          <span class="delta-metric__before">{{ diffData.graph?.god_modules_before }}</span>
-          <span class="delta-metric__arrow">→</span>
-          <span class="delta-metric__after">{{ diffData.graph?.god_modules_after }}</span>
-          <span :class="['delta-pill', diffData.graph!.god_modules_delta > 0 ? 'delta-pill--down' : 'delta-pill--up']">{{ deltaSign(diffData.graph!.god_modules_delta) }}</span>
+      <!-- Structure side-by-side -->
+      <div class="delta-section">
+        <div class="delta-section__title">Before / After</div>
+        <div class="delta-sbs">
+          <div class="delta-sbs__col delta-sbs__col--header">
+            <span>Metric</span>
+            <span>Previous</span>
+            <span>Current</span>
+            <span>Change</span>
+          </div>
+          <div class="delta-sbs__col delta-sbs__col--row">
+            <span>Files</span>
+            <span class="delta-sbs__val">{{ diffData.structure?.files_before }}</span>
+            <span class="delta-sbs__val">{{ diffData.structure?.files_after }}</span>
+            <span :class="['delta-pill', 'delta-pill--neutral']" v-if="diffData.structure?.files_delta !== 0">{{ deltaSign(diffData.structure!.files_delta) }}</span>
+            <span v-else class="delta-sbs__neutral">—</span>
+          </div>
+          <div class="delta-sbs__col delta-sbs__col--row">
+            <span>Test ratio</span>
+            <span class="delta-sbs__val">{{ ((diffData.structure?.test_ratio_before ?? 0) * 100).toFixed(1) }}%</span>
+            <span class="delta-sbs__val">{{ ((diffData.structure?.test_ratio_after ?? 0) * 100).toFixed(1) }}%</span>
+            <span class="delta-sbs__neutral">—</span>
+          </div>
+          <div class="delta-sbs__col delta-sbs__col--row">
+            <span>Contributors</span>
+            <span class="delta-sbs__val">{{ diffData.contributors?.before }}</span>
+            <span class="delta-sbs__val">{{ diffData.contributors?.after }}</span>
+            <span v-if="diffData.contributors?.delta !== 0" :class="['delta-pill', diffData.contributors!.delta > 0 ? 'delta-pill--up' : 'delta-pill--down']">{{ deltaSign(diffData.contributors!.delta) }}</span>
+            <span v-else class="delta-sbs__neutral">—</span>
+          </div>
+          <div class="delta-sbs__col delta-sbs__col--row">
+            <span>Graph nodes</span>
+            <span class="delta-sbs__val">{{ diffData.graph?.nodes_before }}</span>
+            <span class="delta-sbs__val">{{ diffData.graph?.nodes_after }}</span>
+            <span v-if="diffData.graph?.nodes_delta !== 0" :class="['delta-pill', 'delta-pill--neutral']">{{ deltaSign(diffData.graph!.nodes_delta) }}</span>
+            <span v-else class="delta-sbs__neutral">—</span>
+          </div>
+          <div class="delta-sbs__col delta-sbs__col--row">
+            <span>God modules</span>
+            <span class="delta-sbs__val">{{ diffData.graph?.god_modules_before }}</span>
+            <span class="delta-sbs__val">{{ diffData.graph?.god_modules_after }}</span>
+            <span v-if="diffData.graph?.god_modules_delta !== 0" :class="['delta-pill', diffData.graph!.god_modules_delta > 0 ? 'delta-pill--down' : 'delta-pill--up']">{{ deltaSign(diffData.graph!.god_modules_delta) }}</span>
+            <span v-else class="delta-sbs__neutral">—</span>
+          </div>
         </div>
       </div>
     </div>

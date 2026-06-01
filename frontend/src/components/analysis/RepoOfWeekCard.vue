@@ -50,9 +50,17 @@ const pickLabel = computed(() => {
 
 <template>
   <div class="rotw-card">
-    <div class="rotw-card__eyebrow">Repo of the Week</div>
-    <div class="rotw-card__week">Week of {{ weekLabel }}</div>
-    <span class="rotw-card__pick-badge">{{ pickLabel }}</span>
+    <div class="rotw-card__bg-glow" />
+    <div class="rotw-card__header">
+      <div class="rotw-card__eyebrow-row">
+        <span class="rotw-card__tagline">★ Repo of the Week</span>
+        <span class="rotw-card__week-badge">Week of {{ weekLabel }}</span>
+        <span v-if="spotlight.pick_number > 1" class="rotw-card__pick-badge">{{ pickLabel }}</span>
+      </div>
+      <div class="rotw-card__congrats">
+        Congratulations to <span class="rotw-card__author">{{ spotlight.repo_owner }}</span>
+      </div>
+    </div>
     <div class="rotw-card__content">
       <div class="rotw-card__left">
         <h3 class="rotw-card__name">

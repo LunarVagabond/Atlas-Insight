@@ -18,6 +18,8 @@ import SecurityPanel from '../components/analysis/SecurityPanel.vue'
 import ArchitectureToursPanel from '../components/analysis/ArchitectureToursPanel.vue'
 import OwnershipPanel from '../components/analysis/OwnershipPanel.vue'
 import DeltaPanel from '../components/analysis/DeltaPanel.vue'
+import ContributorGraph from '../components/analysis/ContributorGraph.vue'
+import StaleBranchesPanel from '../components/analysis/StaleBranchesPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -103,10 +105,28 @@ onUnmounted(() => {
   if (stepTimer) { clearInterval(stepTimer); stepTimer = null }
 })
 
-// Re-analyze
+// Re-analyze with cooldown
 const reanalyzing = ref(false)
+
+const cooldownUntil = computed(() => {
+  const cu = store.run?.cooldown_until
+  if (!cu) return null
+  const d = new Date(cu)
+  if (d <= new Date()) return null
+  return d
+})
+
+const cooldownLabel = computed(() => {
+  if (!cooldownUntil.value) return null
+  const diffMs = cooldownUntil.value.getTime() - Date.now()
+  const hours = Math.floor(diffMs / 3_600_000)
+  const mins = Math.floor((diffMs % 3_600_000) / 60_000)
+  if (hours > 0) return `Available in ${hours}h ${mins}m`
+  return `Available in ${mins}m`
+})
+
 async function reanalyze() {
-  if (!runId.value) return
+  if (!runId.value || cooldownUntil.value) return
   reanalyzing.value = true
   try {
     const newId = await store.retryRun(runId.value)
@@ -128,6 +148,10 @@ function exportJson() {
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
+}
+
+function printPage() {
+  window.print()
 }
 
 // Copy permalink
@@ -157,9 +181,15 @@ function copyLink() {
           <AppButton v-if="result" variant="secondary" @click="exportJson" style="font-size:0.8125rem;padding:4px 12px">
             ↓ Export JSON
           </AppButton>
-          <AppButton v-if="store.run?.status === 'completed'" variant="secondary" :disabled="reanalyzing" @click="reanalyze" style="font-size:0.8125rem;padding:4px 12px">
-            {{ reanalyzing ? 'Queuing…' : '↻ Re-analyze' }}
+          <AppButton v-if="result" variant="secondary" @click="printPage" style="font-size:0.8125rem;padding:4px 12px">
+            ⎙ Print / PDF
           </AppButton>
+          <template v-if="store.run?.status === 'completed'">
+            <AppButton v-if="!cooldownUntil" variant="secondary" :disabled="reanalyzing" @click="reanalyze" style="font-size:0.8125rem;padding:4px 12px">
+              {{ reanalyzing ? 'Queuing…' : '↻ Re-analyze' }}
+            </AppButton>
+            <span v-else class="cooldown-label" :title="'Re-analysis ' + cooldownLabel">{{ cooldownLabel }}</span>
+          </template>
           <a href="/" class="btn btn--secondary" style="font-size:0.875rem">← New Analysis</a>
         </div>
       </div>
@@ -220,9 +250,20 @@ function copyLink() {
       <AppTabs :tabs="TABS" v-model="activeTab" />
       <div style="margin-top: 1.5rem">
         <OverviewPanel v-if="activeTab === 'Overview'" :result="result" />
-        <ProjectPanel v-if="activeTab === 'Project'" :result="result" />
+        <template v-if="activeTab === 'Project'">
+          <ProjectPanel :result="result" />
+          <div v-if="result.structure" style="margin-top: 1.5rem" class="panel">
+            <StaleBranchesPanel
+              :stale-branches="result.structure.stale_branches ?? []"
+              :stale-branch-count="result.structure.stale_branch_count ?? 0"
+            />
+          </div>
+        </template>
         <template v-if="activeTab === 'History'">
           <CommitTimelineChart :commits="result.commits" :repo-url="store.run?.repo_url" :github-contributors="result.github_meta?.contributors" />
+          <div style="margin-top: 1.5rem">
+            <ContributorGraph :commits="result.commits" />
+          </div>
           <div v-if="hasRoadmap && result.structure?.roadmap_parsed" style="margin-top: 1.5rem" class="panel">
             <RoadmapTimeline
               :milestones="result.structure.roadmap_parsed.milestones"
@@ -245,7 +286,7 @@ function copyLink() {
           :github-contributors="result.github_meta?.contributors"
           :run-id="runId"
         />
-        <DependenciesPanel v-if="activeTab === 'Dependencies'" :deps="result.dependencies" />
+        <DependenciesPanel v-if="activeTab === 'Dependencies'" :deps="result.dependencies" :security="result.security" />
         <SecurityPanel v-if="activeTab === 'Security'" :security="result.security" :heuristics="result.heuristics" :structure="result.structure" />
         <HeuristicsPanel v-if="activeTab === 'Heuristics'" :signals="result.heuristics" />
         <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" :structure="result.structure" :todos="result.todos" :arch-tours="result.arch_tours ?? []" />

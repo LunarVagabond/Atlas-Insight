@@ -2,13 +2,13 @@
 import { computed, ref } from 'vue'
 import AppBadge from '../ui/AppBadge.vue'
 import AppCard from '../ui/AppCard.vue'
-import type { DepsData } from '../../stores/analysis'
+import type { DepsData, SecurityData } from '../../stores/analysis'
 import { useTableFilter } from '../../composables/useTableFilter'
 import { KNOWN_FRAMEWORKS } from '../../composables/frameworkSignals'
 
 type DevFilter = 'all' | 'prod' | 'dev'
 
-const props = defineProps<{ deps: DepsData }>()
+const props = defineProps<{ deps: DepsData; security?: SecurityData }>()
 
 const devFilter = ref<DevFilter>('all')
 const showAllDeps = ref(false)
@@ -32,6 +32,18 @@ const dockerSource = computed(() => props.deps.docker_issues as Record<string, u
 
 const depsFilter = useTableFilter(depsSource, ['name', 'source'], 'name', 'asc')
 const dockerFilter = useTableFilter(dockerSource, ['file', 'issue'], 'file', 'asc')
+
+// Vulnerable package names from at-scan-time OSV results
+const vulnerableNames = computed<Set<string>>(() => {
+  const vulns = props.security?.vulnerabilities ?? []
+  return new Set(vulns.map(v => v.name.toLowerCase()))
+})
+
+const vulnCount = computed(() => props.security?.vulnerabilities?.length ?? 0)
+
+function isVulnerable(name: unknown): boolean {
+  return vulnerableNames.value.has(String(name).toLowerCase())
+}
 
 function versionDisplay(spec: unknown): string {
   if (!spec) return '—'
@@ -58,6 +70,11 @@ function versionDisplay(spec: unknown): string {
           <div class="stat__label">Docker Issues</div>
         </div>
       </AppCard>
+    </div>
+
+    <div v-if="vulnCount > 0" class="warning-row" style="margin-bottom: 1rem">
+      <AppBadge variant="failed">{{ vulnCount }} CVE{{ vulnCount === 1 ? '' : 's' }} found</AppBadge>
+      <span>Vulnerable packages are highlighted below — see the <strong>Security</strong> tab for full details.</span>
     </div>
 
     <div v-if="deps.missing_lockfile_warnings.length" style="margin-bottom: 1.5rem">
@@ -140,8 +157,11 @@ function versionDisplay(spec: unknown): string {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(dep, i) in depsFilter.filtered.value" :key="i">
-            <td>{{ dep.name }}</td>
+          <tr v-for="(dep, i) in depsFilter.filtered.value" :key="i" :class="{ 'data-table__row--vuln': isVulnerable(dep.name) }">
+            <td>
+              <span>{{ dep.name }}</span>
+              <AppBadge v-if="isVulnerable(dep.name)" variant="failed" style="margin-left:0.5rem">CVE</AppBadge>
+            </td>
             <td>{{ versionDisplay(dep.version_spec) }}</td>
             <td>{{ dep.source }}</td>
             <td>

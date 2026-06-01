@@ -1,7 +1,7 @@
 from django.contrib import admin, messages
 from django.utils.html import format_html
 
-from .models import AnalysisRun, Repository
+from .models import AnalysisRun, Repository, RepoOfTheWeek, UserFavorite
 
 
 def _trigger(task_path, request, label):
@@ -10,6 +10,11 @@ def _trigger(task_path, request, label):
     task = getattr(import_module(mod), attr)
     result = task.delay()
     messages.success(request, f'{label} queued (task id: {result.id})')
+
+
+@admin.action(description='[Maintenance] Select Repo of the Week (now)')
+def action_select_rotw(modeladmin, request, queryset):
+    _trigger('apps.analysis.tasks.select_repo_of_week', request, 'select_repo_of_week')
 
 
 # ---------------------------------------------------------------------------
@@ -61,6 +66,7 @@ class RepositoryAdmin(admin.ModelAdmin):
         action_cleanup_logs,
         action_mark_stale,
         action_clear_stale,
+        action_select_rotw,
     ]
 
     @admin.display(description='URL')
@@ -105,4 +111,24 @@ class AnalysisRunAdmin(admin.ModelAdmin):
         action_cleanup_runs,
         action_evict_clones,
         action_cleanup_logs,
+        action_select_rotw,
     ]
+
+
+@admin.register(UserFavorite)
+class UserFavoriteAdmin(admin.ModelAdmin):
+    list_display = ('user', 'repo', 'created_at')
+    search_fields = ('user__username', 'repo__owner', 'repo__name')
+    raw_id_fields = ('user', 'repo')
+    readonly_fields = ('created_at',)
+
+
+@admin.register(RepoOfTheWeek)
+class RepoOfTheWeekAdmin(admin.ModelAdmin):
+    list_display = ('repo', 'week_start', 'pick_number', 'selected_at')
+    list_filter = ('week_start',)
+    search_fields = ('repo__owner', 'repo__name')
+    raw_id_fields = ('repo',)
+    readonly_fields = ('selected_at',)
+    ordering = ('-week_start',)
+    actions = [action_select_rotw]

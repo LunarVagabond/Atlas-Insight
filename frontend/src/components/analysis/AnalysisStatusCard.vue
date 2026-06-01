@@ -98,6 +98,22 @@ async function reanalyze() {
   router.push(`/results/${newRunId}`)
 }
 
+const cooldownUntil = computed(() => {
+  const cu = props.run.cooldown_until
+  if (!cu) return null
+  const d = new Date(cu)
+  return d > new Date() ? d : null
+})
+
+const cooldownLabel = computed(() => {
+  if (!cooldownUntil.value) return null
+  const diffMs = cooldownUntil.value.getTime() - Date.now()
+  const hours = Math.floor(diffMs / 3_600_000)
+  const mins = Math.floor((diffMs % 3_600_000) / 60_000)
+  if (hours > 0) return `${hours}h ${mins}m`
+  return `${mins}m`
+})
+
 const collapsed = ref(false)
 </script>
 
@@ -132,7 +148,8 @@ const collapsed = ref(false)
             <span class="status-card__label">Freshness</span>
             <div class="status-card__stale">
               <AppBadge variant="warning">Stale</AppBadge>
-              <AppButton variant="secondary" @click="reanalyze">Refresh Project</AppButton>
+              <AppButton v-if="!cooldownUntil" variant="secondary" @click="reanalyze">Refresh Project</AppButton>
+              <span v-else class="cooldown-label" :title="`Re-analysis available in ${cooldownLabel}`">↻ in {{ cooldownLabel }}</span>
             </div>
           </div>
         </div>

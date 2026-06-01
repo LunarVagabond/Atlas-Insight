@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import AppCard from '../ui/AppCard.vue'
+import AppBadge from '../ui/AppBadge.vue'
 import HeuristicDrawer from './HeuristicDrawer.vue'
 import type { HeuristicSignal, SecurityData, StructureData } from '../../stores/analysis'
 
@@ -34,6 +35,16 @@ const sortedIssues = computed(() =>
     (a, b) => (severityOrder[a.severity] ?? 9) - (severityOrder[b.severity] ?? 9)
   )
 )
+
+const vulns = computed(() => props.security?.vulnerabilities ?? [])
+
+function vulnSeverityVariant(sev: string | null): 'failed' | 'warning' | 'info' {
+  if (!sev) return 'info'
+  const s = sev.toLowerCase()
+  if (s.includes('critical') || s.includes('high') || s.includes('9.') || s.includes('10.')) return 'failed'
+  if (s.includes('medium') || s.includes('moderate')) return 'warning'
+  return 'info'
+}
 </script>
 
 <template>
@@ -128,6 +139,48 @@ const sortedIssues = computed(() =>
     </div>
     <div v-else class="security-panel__clear">
       <span>✓</span> No common security patterns detected — this doesn't guarantee the code is secure, but no automated red flags were found.
+    </div>
+
+    <!-- Dependency Vulnerabilities (from OSV.dev scan at analysis time) -->
+    <div class="security-panel__vulns" style="margin-top: 1.5rem">
+      <h3 class="panel__subtitle" style="margin-bottom:0.5rem">
+        Dependency Vulnerabilities (OSV.dev)
+        <template v-if="vulns.length > 0">
+          — <span style="color:var(--color-error);font-weight:600">{{ vulns.length }} found</span>
+        </template>
+      </h3>
+      <p style="font-size:0.8125rem;color:var(--color-text-muted);margin:0 0 0.75rem">
+        Scanned at analysis time against the OSV vulnerability database. Results reflect the version specs found in dependency files — pinned lockfile versions are more accurate.
+      </p>
+
+      <div v-if="vulns.length === 0" class="security-panel__clear">
+        <span>✓</span> No known CVEs detected in scanned dependencies.
+      </div>
+
+      <table v-else class="data-table">
+        <thead>
+          <tr>
+            <th>Package</th>
+            <th>Version</th>
+            <th>CVE ID</th>
+            <th>Summary</th>
+            <th>Severity</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="v in vulns" :key="v.vuln_id + v.name">
+            <td><strong>{{ v.name }}</strong></td>
+            <td><code>{{ v.version }}</code></td>
+            <td>
+              <a :href="v.url" target="_blank" rel="noopener noreferrer" class="table-link">{{ v.vuln_id }}</a>
+            </td>
+            <td>{{ v.summary }}</td>
+            <td>
+              <AppBadge :variant="vulnSeverityVariant(v.severity)">{{ v.severity ?? 'unknown' }}</AppBadge>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <p class="panel__disclaimer">⚠️ This analysis is based on repository metadata and file patterns only. It does not inspect code for vulnerabilities. A positive score here does not mean the code is secure — never rely on this as a substitute for a proper security audit or penetration test.</p>

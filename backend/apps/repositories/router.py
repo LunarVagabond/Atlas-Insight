@@ -51,6 +51,21 @@ class AnalyzeRequest(Schema):
     notification_email: Optional[str] = None
 
 
+RERUN_COOLDOWN_HOURS = 4
+
+
+def _cooldown_until(repo) -> Optional[str]:
+    """Return ISO timestamp when re-run is available, or None if available now."""
+    from datetime import timedelta
+    if not repo.last_analyzed_at:
+        return None
+    from django.utils import timezone
+    cutoff = repo.last_analyzed_at + timedelta(hours=RERUN_COOLDOWN_HOURS)
+    if timezone.now() < cutoff:
+        return cutoff.isoformat()
+    return None
+
+
 class RunStatusSchema(Schema):
     id: uuid.UUID
     status: str
@@ -63,6 +78,7 @@ class RunStatusSchema(Schema):
     is_stale: bool
     last_fetched_at: Optional[str]
     auth_token_warning: str
+    cooldown_until: Optional[str] = None
 
 
 class AnalyzeResponse(Schema):
@@ -294,16 +310,23 @@ def get_run(request, run_id: uuid.UUID):
         is_stale=run.repo.is_stale,
         last_fetched_at=run.repo.last_fetched_at.isoformat() if run.repo.last_fetched_at else None,
         auth_token_warning=run.repo.auth_token_warning,
+        cooldown_until=_cooldown_until(run.repo),
     )
 
 
 @router.post('/runs/{run_id}/retry', response=AnalyzeResponse)
 def retry_run(request, run_id: uuid.UUID):
-    """Force a fresh analysis regardless of cached SHA — testing only."""
+    """Force a fresh analysis. Blocked if repo was analyzed within RERUN_COOLDOWN_HOURS."""
     try:
         original = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
         raise HttpError(404, 'Run not found')
+    cooldown = _cooldown_until(original.repo)
+    if cooldown:
+        raise HttpError(
+            429,
+            f'This repository was analyzed recently. Re-analysis available after {cooldown}.',
+        )
     token = _resolve_token(request, None) or original.repo.auth_token or None
     user = request.user if request.user.is_authenticated else None
     run = AnalysisRun.objects.create(repo=original.repo, status='pending', user=user)
@@ -556,9 +579,12 @@ def get_spotlight_current(request):
     from datetime import date, timedelta
     today = date.today()
     week_start = today - timedelta(days=today.weekday())
-    try:
-        spot = RepoOfTheWeek.objects.select_related('repo').get(week_start=week_start)
-    except RepoOfTheWeek.DoesNotExist:
+    # Try current week first, fall back to most recent pick if task hasn't run yet
+    spot = (
+        RepoOfTheWeek.objects.select_related('repo').filter(week_start=week_start).first()
+        or RepoOfTheWeek.objects.select_related('repo').order_by('-week_start').first()
+    )
+    if not spot:
         return 200, None
     schema = _spotlight_to_schema(spot)
     return 200, schema
@@ -862,6 +888,212 @@ def admin_stats(request):
         'repo_clone_count': repo_clone_count,
         'cache_size_gb': round(cache_size_bytes / (1024 ** 3), 2),
     }
+
+
+@router.get('/runs/{run_id}/vulnerabilities')
+def get_run_vulnerabilities(request, run_id: uuid.UUID):
+    """JIT dependency vulnerability scan via OSV.dev batch API."""
+    import requests as _requests
+
+    try:
+        run = AnalysisRun.objects.select_related('repo').get(id=run_id)
+    except AnalysisRun.DoesNotExist:
+        raise HttpError(404, 'Run not found')
+    if run.repo.is_private and not request.user.is_authenticated:
+        raise HttpError(403, 'Access denied')
+    if run.status != 'completed' or not run.result:
+        return {'checked': 0, 'vulnerable': []}
+
+    from django.core.cache import cache
+    cache_key = f'jit_{run_id}_vulns'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    deps = run.result.get('dependencies', {}).get('dependencies', [])
+    queries = []
+    for dep in deps:
+        name = dep.get('name', '')
+        version = dep.get('version', '')
+        ecosystem = dep.get('ecosystem', '')
+        if not name or not version or not ecosystem:
+            continue
+        # OSV ecosystem names
+        osv_eco = {'npm': 'npm', 'pip': 'PyPI', 'cargo': 'crates.io', 'gem': 'RubyGems'}.get(ecosystem, ecosystem)
+        queries.append({'package': {'name': name, 'ecosystem': osv_eco}, 'version': version})
+
+    if not queries:
+        result = {'checked': 0, 'vulnerable': []}
+        cache.set(cache_key, result, 900)
+        return result
+
+    try:
+        resp = _requests.post(
+            'https://api.osv.dev/v1/querybatch',
+            json={'queries': queries},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        batch_results = resp.json().get('results', [])
+    except Exception:
+        raise HttpError(502, 'Failed to reach OSV vulnerability database')
+
+    vulnerable = []
+    for query, batch_result in zip(queries, batch_results):
+        vulns = batch_result.get('vulns', [])
+        for v in vulns:
+            severity = None
+            for sev in v.get('severity', []):
+                if sev.get('type') == 'CVSS_V3':
+                    severity = sev.get('score')
+                    break
+            vulnerable.append({
+                'name': query['package']['name'],
+                'version': query['version'],
+                'ecosystem': query['package']['ecosystem'],
+                'vuln_id': v.get('id', ''),
+                'summary': v.get('summary', '')[:200],
+                'severity': severity,
+                'url': f"https://osv.dev/vulnerability/{v.get('id', '')}",
+            })
+
+    result = {'checked': len(queries), 'vulnerable': vulnerable}
+    cache.set(cache_key, result, 900)
+    return result
+
+
+@router.get('/admin/rate-limit')
+def admin_rate_limit(request):
+    """Live GitHub API rate limit status for the server token."""
+    import requests as _requests
+    from django.conf import settings as django_settings
+
+    if not request.user.is_staff:
+        raise HttpError(403, 'Staff only')
+    token = getattr(django_settings, 'GITHUB_TOKEN', '')
+    headers = {'Accept': 'application/vnd.github+json'}
+    if token:
+        headers['Authorization'] = f'Bearer {token}'
+    try:
+        resp = _requests.get('https://api.github.com/rate_limit', headers=headers, timeout=8)
+        resp.raise_for_status()
+        data = resp.json().get('resources', {})
+    except Exception:
+        raise HttpError(502, 'Failed to fetch rate limit from GitHub')
+
+    def fmt(r: dict) -> dict:
+        from datetime import datetime, timezone as _tz
+        reset_at = datetime.fromtimestamp(r.get('reset', 0), tz=_tz.utc).isoformat() if r.get('reset') else None
+        return {'limit': r.get('limit', 0), 'remaining': r.get('remaining', 0), 'reset_at': reset_at}
+
+    return {
+        'core': fmt(data.get('core', {})),
+        'search': fmt(data.get('search', {})),
+        'graphql': fmt(data.get('graphql', {})),
+    }
+
+
+class WatchedRepoSchema(Schema):
+    id: uuid.UUID
+    url: str
+    owner: str
+    name: str
+    is_stale: bool
+    last_analyzed_at: Optional[str] = None
+
+
+@router.get('/watched', response=list[WatchedRepoSchema])
+def list_watched(request):
+    if not request.user.is_staff:
+        raise HttpError(403, 'Staff only')
+    repos = Repository.objects.filter(is_watched=True).order_by('owner', 'name')
+    return [
+        WatchedRepoSchema(
+            id=r.id,
+            url=r.url,
+            owner=r.owner,
+            name=r.name,
+            is_stale=r.is_stale,
+            last_analyzed_at=r.last_analyzed_at.isoformat() if r.last_analyzed_at else None,
+        )
+        for r in repos
+    ]
+
+
+@router.post('/repos/{repo_id}/watch', response={200: None})
+def watch_repo(request, repo_id: uuid.UUID):
+    if not request.user.is_superuser:
+        raise HttpError(403, 'Superuser only')
+    try:
+        repo = Repository.objects.get(id=repo_id)
+    except Repository.DoesNotExist:
+        raise HttpError(404, 'Repository not found')
+    repo.is_watched = True
+    repo.save(update_fields=['is_watched'])
+    return 200, None
+
+
+@router.delete('/repos/{repo_id}/watch', response={204: None})
+def unwatch_repo(request, repo_id: uuid.UUID):
+    if not request.user.is_superuser:
+        raise HttpError(403, 'Superuser only')
+    try:
+        repo = Repository.objects.get(id=repo_id)
+    except Repository.DoesNotExist:
+        raise HttpError(404, 'Repository not found')
+    repo.is_watched = False
+    repo.save(update_fields=['is_watched'])
+    return 204, None
+
+
+@router.post('/webhooks/github', response={200: None})
+def github_webhook(request):
+    """Inbound GitHub push webhook — triggers re-analysis when a watched repo gets new commits."""
+    import hashlib
+    import hmac
+
+    from django.conf import settings as django_settings
+
+    secret = getattr(django_settings, 'GITHUB_WEBHOOK_SECRET', '')
+    sig_header = request.META.get('HTTP_X_HUB_SIGNATURE_256', '')
+    if secret:
+        body = request.body
+        expected = 'sha256=' + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig_header, expected):
+            raise HttpError(400, 'Invalid signature')
+
+    import json
+    try:
+        payload = json.loads(request.body)
+    except Exception:
+        raise HttpError(400, 'Invalid JSON')
+
+    event = request.META.get('HTTP_X_GITHUB_EVENT', '')
+    if event != 'push':
+        return 200, None
+
+    repo_html_url = payload.get('repository', {}).get('html_url', '')
+    if not repo_html_url:
+        return 200, None
+
+    try:
+        repo = Repository.objects.get(url=repo_html_url.rstrip('/'))
+    except Repository.DoesNotExist:
+        return 200, None
+
+    latest_run = repo.runs.filter(status='completed').order_by('-triggered_at').first()
+    if not latest_run:
+        return 200, None
+
+    from .models import AnalysisRun
+    token = repo.auth_token or None
+    run = AnalysisRun.objects.create(repo=repo, status='pending')
+    from apps.analysis.tasks import analyze_repository
+    task = analyze_repository.delay(str(run.id), pat=token)
+    run.celery_task_id = task.id
+    run.save(update_fields=['celery_task_id'])
+    logger.info('Webhook triggered re-analysis for %s/%s (run %s)', repo.owner, repo.name, run.id)
+    return 200, None
 
 
 @router.get('/badge/{owner}/{name}.svg')
