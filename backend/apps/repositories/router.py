@@ -1081,10 +1081,6 @@ def github_webhook(request):
     except Repository.DoesNotExist:
         return 200, None
 
-    latest_run = repo.runs.filter(status='completed').order_by('-triggered_at').first()
-    if not latest_run:
-        return 200, None
-
     from .models import AnalysisRun
     token = repo.auth_token or None
     run = AnalysisRun.objects.create(repo=repo, status='pending')

@@ -36,7 +36,7 @@ If `GITHUB_WEBHOOK_SECRET` is empty, signature verification is skipped (not reco
 
 ### Behavior
 
-- Atlas Insight only re-analyzes repos that already have a completed analysis run
+- Atlas Insight triggers analysis for any repo that exists in the system, regardless of prior run history
 - The inbound webhook does **not** create new repository records — the repo must already exist in the system
 - Push events to repos not tracked by Atlas Insight are silently ignored (200 OK returned)
 
