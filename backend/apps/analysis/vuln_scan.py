@@ -1,5 +1,6 @@
 import re
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger(__name__)
 
@@ -19,16 +20,20 @@ _ECOSYSTEM_MAP = {
 
 _OP_RE = re.compile(r'^[^0-9]*')
 
+_SEVERITY_SCORE = {
+    'critical': 9.5,
+    'high': 7.5,
+    'moderate': 5.5,
+    'medium': 5.5,
+    'low': 2.5,
+}
+
 
 def _extract_version(spec: str) -> str:
-    """Strip leading version operators to get an approximate pinned version."""
     if not spec:
         return ''
-    # Take the first constraint before any comma or semicolon
     first = spec.split(',')[0].split(';')[0].strip()
-    # Strip operators like ^, ~, >=, <=, >, <, !=, ==, ~=
     clean = _OP_RE.sub('', first).strip()
-    # Skip wildcard / workspace specs
     if not clean or clean in ('*', 'latest'):
         return ''
     return clean
@@ -41,11 +46,56 @@ def _source_ecosystem(source: str) -> str:
     return ''
 
 
-def scan_vulnerabilities(deps: dict) -> list[dict]:
-    """Query OSV.dev batch API for known CVEs in the dependency list.
+def _fetch_vuln_detail(vuln_id: str) -> dict:
+    import requests as _requests
+    try:
+        r = _requests.get(
+            f'https://api.osv.dev/v1/vulns/{vuln_id}',
+            timeout=10,
+        )
+        if not r.ok:
+            return {}
+        v = r.json()
+        summary = (v.get('summary') or v.get('details') or '')[:200]
+        # Prefer database_specific.severity (GitHub Advisory string label)
+        db_sev = (v.get('database_specific') or {}).get('severity', '')
+        severity_label = db_sev.upper() if db_sev else None
+        # Numeric score for heuristic use — map label or parse CVSS vector
+        severity_score = _SEVERITY_SCORE.get((db_sev or '').lower())
+        if severity_score is None:
+            for sev in v.get('severity') or []:
+                score_str = sev.get('score', '')
+                # CVSS vector string → skip numeric parse; use label fallback
+                if sev.get('type') in ('CVSS_V3', 'CVSS_V4') and score_str:
+                    # Try raw float first (unlikely but handle it)
+                    try:
+                        severity_score = float(score_str)
+                        break
+                    except ValueError:
+                        pass
+        return {
+            'summary': summary,
+            'severity': severity_label,
+            'severity_score': severity_score,
+        }
+    except Exception:
+        return {}
 
-    Returns list of vulnerability dicts. Empty list on any failure.
-    """
+
+def _enrich_vulns(vuln_ids: list[str]) -> dict[str, dict]:
+    unique_ids = list(dict.fromkeys(vuln_ids))[:30]
+    details: dict[str, dict] = {}
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        futures = {pool.submit(_fetch_vuln_detail, vid): vid for vid in unique_ids}
+        for future in as_completed(futures):
+            vid = futures[future]
+            result = future.result()
+            if result:
+                details[vid] = result
+    return details
+
+
+def scan_vulnerabilities(deps: dict) -> list[dict]:
     import requests as _requests
 
     dep_list = deps.get('dependencies', [])
@@ -76,22 +126,33 @@ def scan_vulnerabilities(deps: dict) -> list[dict]:
         logger.warning('OSV.dev vulnerability scan failed — skipping')
         return []
 
-    results = []
+    # Collect all vuln IDs first, then enrich in parallel
+    raw: list[dict] = []
+    all_ids: list[str] = []
     for meta, result in zip(query_meta, batch):
         for v in result.get('vulns', []):
-            severity = None
-            for sev in v.get('severity', []):
-                if sev.get('type') == 'CVSS_V3':
-                    severity = sev.get('score')
-                    break
-            results.append({
-                'name': meta['name'],
-                'version': meta['version'],
-                'ecosystem': meta['ecosystem'],
-                'vuln_id': v.get('id', ''),
-                'summary': v.get('summary', '')[:200],
-                'severity': severity,
-                'url': f"https://osv.dev/vulnerability/{v.get('id', '')}",
-            })
+            vid = v.get('id', '')
+            if not vid:
+                continue
+            raw.append({'meta': meta, 'id': vid})
+            all_ids.append(vid)
+
+    details = _enrich_vulns(all_ids)
+
+    results = []
+    for item in raw:
+        vid = item['id']
+        meta = item['meta']
+        d = details.get(vid, {})
+        results.append({
+            'name': meta['name'],
+            'version': meta['version'],
+            'ecosystem': meta['ecosystem'],
+            'vuln_id': vid,
+            'summary': d.get('summary', ''),
+            'severity': d.get('severity'),
+            'severity_score': d.get('severity_score'),
+            'url': f'https://osv.dev/vulnerability/{vid}',
+        })
 
     return results

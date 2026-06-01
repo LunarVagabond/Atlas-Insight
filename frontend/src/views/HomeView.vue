@@ -19,6 +19,19 @@ const auth = useAuthStore()
 const featured = ref<FeaturedRepo | null>(null)
 const spotlight = ref<any>(null)
 
+interface TrendingRepo {
+  run_id: string
+  repo_url: string
+  repo_owner: string
+  repo_name: string
+  analysis_count: number
+  health_label: string | null
+  health_key: string | null
+  primary_language: string | null
+  stars: number | null
+}
+const trending = ref<TrendingRepo[]>([])
+
 type BadgeVariant = 'pending' | 'running' | 'completed' | 'failed' | 'warning' | 'info'
 const HEALTH_COLORS: Record<string, BadgeVariant> = {
   thriving: 'completed',
@@ -46,10 +59,20 @@ async function fetchSpotlight() {
   }
 }
 
+async function fetchTrending() {
+  try {
+    const { data } = await axios.get('/api/v1/repositories/trending')
+    trending.value = data
+  } catch {
+    trending.value = []
+  }
+}
+
 onMounted(() => {
   store.error = null
   fetchFeatured()
   fetchSpotlight()
+  fetchTrending()
 })
 
 async function handleSubmit(url: string, pat?: string, email?: string) {
@@ -214,6 +237,35 @@ const ghostRows = computed(() => Math.max(0, perPage - items.value.length))
             <AppButton variant="primary" @click="router.push(`/results/${featured.run_id}`)">
               Explore full analysis →
             </AppButton>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="trending.length" class="trending-section">
+      <h2 class="trending-section__title">Trending This Week</h2>
+      <div class="trending-section__grid">
+        <div
+          v-for="repo in trending"
+          :key="repo.run_id"
+          class="trending-card"
+          @click="router.push(`/results/${repo.run_id}`)"
+        >
+          <div class="trending-card__header">
+            <span class="trending-card__owner">{{ repo.repo_owner }}</span>
+            <span class="trending-card__sep">/</span>
+            <span class="trending-card__name">{{ repo.repo_name }}</span>
+          </div>
+          <div class="trending-card__meta">
+            <span v-if="repo.primary_language" class="trending-card__lang">{{ repo.primary_language }}</span>
+            <span v-if="repo.stars !== null" class="trending-card__stars">★ {{ repo.stars?.toLocaleString() }}</span>
+          </div>
+          <div class="trending-card__footer">
+            <AppBadge
+              v-if="repo.health_label && repo.health_key"
+              :variant="(HEALTH_COLORS[repo.health_key] ?? 'info') as BadgeVariant"
+            >{{ repo.health_label }}</AppBadge>
+            <span class="trending-card__count">{{ repo.analysis_count }}× this week</span>
           </div>
         </div>
       </div>

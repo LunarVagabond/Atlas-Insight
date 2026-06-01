@@ -54,6 +54,7 @@ const menuOpen = ref(false)
       <div class="navbar__nav-links">
         <RouterLink to="/runs" class="navbar__nav-link">Browse</RouterLink>
         <RouterLink to="/spotlight" class="navbar__nav-link">Spotlight</RouterLink>
+        <RouterLink to="/trending" class="navbar__nav-link">Trending</RouterLink>
         <RouterLink v-if="authStore.isAuthenticated" to="/dashboard" class="navbar__nav-link">My Analyses</RouterLink>
         <RouterLink to="/about" class="navbar__nav-link">About</RouterLink>
         <RouterLink v-if="authStore.user?.is_staff || authStore.user?.is_superuser" to="/admin" class="navbar__nav-link navbar__nav-link--admin">Ops</RouterLink>

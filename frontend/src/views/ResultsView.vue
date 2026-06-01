@@ -2,6 +2,7 @@
 import { ref, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAnalysisStore } from '../stores/analysis'
+import { useAuthStore } from '../stores/auth'
 import AppTabs from '../components/ui/AppTabs.vue'
 import AppButton from '../components/ui/AppButton.vue'
 import AnalysisStatusCard from '../components/analysis/AnalysisStatusCard.vue'
@@ -24,6 +25,7 @@ import StaleBranchesPanel from '../components/analysis/StaleBranchesPanel.vue'
 const route = useRoute()
 const router = useRouter()
 const store = useAnalysisStore()
+const auth = useAuthStore()
 const runId = computed(() => route.params.runId as string)
 const result = computed(() => {
   const r = store.run?.result
@@ -182,6 +184,35 @@ function copyLink() {
   copied.value = true
   setTimeout(() => { copied.value = false }, 2000)
 }
+
+// Embed / badge snippet
+const showEmbed = ref(false)
+const embedCopied = ref(false)
+const _apiBase = computed(() =>
+  (import.meta.env.VITE_API_BASE_URL as string).replace(/\/api$/, '')
+)
+const badgeUrl = computed(() => {
+  if (!store.run) return ''
+  const { repo_owner: o, repo_name: n } = store.run
+  return `${_apiBase.value}/api/v1/repositories/badge/${o}/${n}.svg`
+})
+const embedMarkdown = computed(() => {
+  if (!store.run) return ''
+  const { repo_owner: o, repo_name: n } = store.run
+  const link = `${window.location.origin}/r/${o}/${n}`
+  return `[![Atlas Insight](${badgeUrl.value})](${link})`
+})
+const cardUrl = computed(() => {
+  if (!store.run) return ''
+  return `${_apiBase.value}/api/v1/repositories/runs/${store.run.id}/card.svg`
+})
+function copyEmbed() {
+  navigator.clipboard.writeText(embedMarkdown.value)
+  embedCopied.value = true
+  setTimeout(() => { embedCopied.value = false }, 2000)
+}
+
+const isArchived = computed(() => result.value?.github_meta?.archived === true)
 </script>
 
 <template>
@@ -196,6 +227,9 @@ function copyLink() {
           <AppButton v-if="result" variant="secondary" @click="copyLink" style="font-size:0.8125rem;padding:4px 12px">
             {{ copied ? '✓ Copied' : '🔗 Share' }}
           </AppButton>
+          <AppButton v-if="result" variant="secondary" @click="showEmbed = !showEmbed" style="font-size:0.8125rem;padding:4px 12px">
+            {{ showEmbed ? '✕ Embed' : '&lt;/&gt; Embed' }}
+          </AppButton>
           <AppButton v-if="result" variant="secondary" @click="exportJson" style="font-size:0.8125rem;padding:4px 12px">
             ↓ Export JSON
           </AppButton>
@@ -206,7 +240,12 @@ function copyLink() {
             <AppButton v-if="!cooldownUntil" variant="secondary" :disabled="reanalyzing" @click="reanalyze" style="font-size:0.8125rem;padding:4px 12px">
               {{ reanalyzing ? 'Queuing…' : '↻ Re-analyze' }}
             </AppButton>
-            <span v-else class="cooldown-label" :title="'Re-analysis ' + cooldownLabel">{{ cooldownLabel }}</span>
+            <template v-else>
+              <span class="cooldown-label" :title="'Re-analysis ' + cooldownLabel">{{ cooldownLabel }}</span>
+              <AppButton v-if="auth.user?.is_superuser" variant="secondary" :disabled="reanalyzing" @click="reanalyze" style="font-size:0.8125rem;padding:4px 12px;border-color:var(--color-warning,#dfb317);color:var(--color-warning,#dfb317)" title="Superuser: bypass cooldown">
+                {{ reanalyzing ? 'Queuing…' : '⚡ Force Re-scan' }}
+              </AppButton>
+            </template>
           </template>
           <a href="/" class="btn btn--secondary" style="font-size:0.875rem">← New Analysis</a>
         </div>
@@ -256,6 +295,35 @@ function copyLink() {
       <div v-if="store.run?.auth_token_warning" class="analysis-token-warning">
         {{ store.run.auth_token_warning }}
       </div>
+      <div v-if="isArchived" class="archived-banner" role="alert">
+        <span class="archived-banner__icon">📦</span>
+        <span class="archived-banner__text">This repository is <strong>archived</strong> — read-only, no longer accepting contributions.</span>
+      </div>
+      <Transition name="fade">
+        <div v-if="showEmbed" class="embed-panel">
+          <div class="embed-panel__header">
+            <span class="embed-panel__title">Embed in README</span>
+            <button class="embed-panel__close" @click="showEmbed = false" aria-label="Close embed panel">✕</button>
+          </div>
+          <p class="embed-panel__hint">Paste this markdown into your repository's README to add an Atlas Insight badge:</p>
+          <div class="embed-panel__snippet">
+            <code class="embed-panel__code">{{ embedMarkdown }}</code>
+            <button class="btn btn--secondary embed-panel__copy" @click="copyEmbed">
+              {{ embedCopied ? '✓ Copied' : 'Copy' }}
+            </button>
+          </div>
+          <div class="embed-panel__previews">
+            <div class="embed-panel__preview-item">
+              <span class="embed-panel__preview-label">Badge</span>
+              <img :src="badgeUrl" alt="Atlas Insight badge" class="embed-panel__badge-img" loading="lazy" />
+            </div>
+            <div class="embed-panel__preview-item">
+              <span class="embed-panel__preview-label">Card</span>
+              <img :src="cardUrl" alt="Atlas Insight health card" class="embed-panel__card-img" loading="lazy" />
+            </div>
+          </div>
+        </div>
+      </Transition>
       <AppTabs :tabs="TABS" v-model="activeTab" :badges="tabBadges" />
       <div style="margin-top: 1.5rem">
         <template v-if="activeTab === 'Overview'">

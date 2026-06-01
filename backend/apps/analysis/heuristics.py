@@ -219,17 +219,46 @@ def compute_heuristics(
     if security is not None:
         sec_score = security.get('score', 0)
         issues = security.get('issues', [])
+        vulns = security.get('vulnerabilities', [])
+        vuln_count = len(vulns)
+
+        # Weight CVEs by CVSS severity; cap contribution at 60 points
+        cve_score = 0
+        for v in vulns:
+            cvss = v.get('severity_score')
+            if cvss is None:
+                cvss = 5.0  # default medium when no score available
+            if cvss >= 9.0:
+                cve_score += 25
+            elif cvss >= 7.0:
+                cve_score += 15
+            elif cvss >= 4.0:
+                cve_score += 8
+            else:
+                cve_score += 3
+        cve_score = min(60, cve_score)
+
+        combined = min(100, sec_score + cve_score)
+
         sec_items = [_fmt_sec_item(i) for i in issues[:5]] if issues else []
+        if vuln_count:
+            sec_items.append(f'{vuln_count} known CVE{"s" if vuln_count != 1 else ""} in dependencies')
+
+        if issues and vuln_count:
+            desc = f'{len(issues)} security issue{"s" if len(issues) != 1 else ""} and {vuln_count} CVE{"s" if vuln_count != 1 else ""} detected'
+        elif vuln_count:
+            desc = f'{vuln_count} known CVE{"s" if vuln_count != 1 else ""} in dependencies'
+        elif issues:
+            desc = f'{len(issues)} security issue{"s" if len(issues) != 1 else ""} detected'
+        else:
+            desc = 'No obvious security issues or known CVEs detected'
+
         signals.append({
             'signal': 'security_hygiene',
             'label': 'Security Hygiene',
-            'score': sec_score,
+            'score': combined,
             'confidence': 'medium',
-            'description': (
-                f'{len(issues)} security issue{"s" if len(issues) != 1 else ""} detected'
-                if issues
-                else 'No obvious security issues detected'
-            ),
+            'description': desc,
             'items': sec_items,
         })
 

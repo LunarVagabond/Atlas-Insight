@@ -56,6 +56,11 @@ const router = createRouter({
       component: () => import('../views/SpotlightView.vue'),
     },
     {
+      path: '/trending',
+      name: 'trending',
+      component: () => import('../views/TrendingView.vue'),
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('../views/NotFoundView.vue'),

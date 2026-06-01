@@ -332,12 +332,14 @@ def retry_run(request, run_id: uuid.UUID):
         original = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
         raise HttpError(404, 'Run not found')
-    cooldown = _cooldown_until(original.repo)
-    if cooldown:
-        raise HttpError(
-            429,
-            f'This repository was analyzed recently. Re-analysis available after {cooldown}.',
-        )
+    is_super = request.user.is_authenticated and request.user.is_superuser
+    if not is_super:
+        cooldown = _cooldown_until(original.repo)
+        if cooldown:
+            raise HttpError(
+                429,
+                f'This repository was analyzed recently. Re-analysis available after {cooldown}.',
+            )
     token = _resolve_token(request, None) or original.repo.auth_token or None
     user = request.user if request.user.is_authenticated else None
     run = AnalysisRun.objects.create(repo=original.repo, status='pending', user=user)
@@ -434,6 +436,34 @@ def _svg_escape(text: str) -> str:
     )
 
 
+def _make_card_svg(
+    owner: str, name: str, health_label: str, color: str,
+    oss_score, total_commits: int, total_files: int, contributors: int,
+) -> str:
+    owner = _svg_escape(owner[:30])
+    name = _svg_escape(name[:40])
+    health_label = _svg_escape(health_label)
+    score_str = str(oss_score) if oss_score is not None else '—'
+    pill_w = max(len(health_label) * 7 + 22, 70)
+    pill_cx = 22 + pill_w // 2
+    stats = f'{total_commits:,} commits  ·  {total_files:,} files  ·  {contributors} contributor{"s" if contributors != 1 else ""}'
+    f = 'DejaVu Sans,Verdana,Geneva,sans-serif'
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="480" height="130">'
+        f'<rect width="480" height="130" rx="10" fill="#0d1117"/>'
+        f'<rect width="5" height="130" rx="2" fill="{color}"/>'
+        f'<text x="22" y="22" font-family="{f}" font-size="11" fill="#8b949e">atlas insight</text>'
+        f'<text x="22" y="52" font-family="{f}" font-size="18" font-weight="bold" fill="#e6edf3">{owner}/{name}</text>'
+        f'<rect x="22" y="60" width="{pill_w}" height="20" rx="10" fill="{color}" fill-opacity="0.18" stroke="{color}" stroke-width="1"/>'
+        f'<text x="{pill_cx}" y="74" font-family="{f}" font-size="11" fill="{color}" text-anchor="middle">{health_label}</text>'
+        f'<text x="22" y="108" font-family="{f}" font-size="38" font-weight="bold" fill="{color}">{score_str}</text>'
+        f'<text x="72" y="98" font-family="{f}" font-size="11" fill="#8b949e">/10</text>'
+        f'<text x="72" y="112" font-family="{f}" font-size="10" fill="#6e7681">OSS Score</text>'
+        f'<text x="22" y="124" font-family="{f}" font-size="10" fill="#6e7681">{stats}</text>'
+        f'</svg>'
+    )
+
+
 def _make_svg(label: str, value: str, color: str) -> str:
     label = _svg_escape(label)
     value = _svg_escape(value)
@@ -458,6 +488,43 @@ def _make_svg(label: str, value: str, color: str) -> str:
         f'<text x="{vx}" y="14">{value}</text>'
         f'</g></svg>'
     )
+
+
+@router.get('/runs/{run_id}/card.svg')
+@ratelimit(key='ip', rate='30/m', method='GET', block=False)
+def run_card(request, run_id: uuid.UUID):
+    if getattr(request, 'limited', False):
+        return HttpResponse('Rate limit exceeded', status=429)
+    try:
+        run = AnalysisRun.objects.select_related('repo').get(id=run_id)
+    except AnalysisRun.DoesNotExist:
+        return HttpResponse('Not found', status=404)
+    if run.repo.is_private:
+        return HttpResponse('Private', status=403)
+    if run.status != 'completed' or not run.result:
+        return HttpResponse('Not ready', status=404)
+
+    res = run.result
+    cls = res.get('classification', {})
+    health = cls.get('project_health', {})
+    oss = res.get('oss_score', {})
+    oss_score = oss.get('score') if isinstance(oss, dict) else None
+    commits = res.get('commits', {})
+    structure = res.get('structure', {})
+
+    svg = _make_card_svg(
+        owner=run.repo.owner,
+        name=run.repo.name,
+        health_label=health.get('label', 'analyzed'),
+        color=_BADGE_COLORS.get(health.get('key', ''), '#555'),
+        oss_score=oss_score,
+        total_commits=commits.get('total_commits', 0),
+        total_files=structure.get('total_files', 0),
+        contributors=commits.get('total_contributors', 0),
+    )
+    resp = HttpResponse(svg, content_type='image/svg+xml')
+    resp['Cache-Control'] = 'max-age=3600'
+    return resp
 
 
 class MyRepoSchema(Schema):
@@ -538,6 +605,62 @@ def get_featured(request):
         topics=meta.get('topics', []),
         github_description=meta.get('github_description'),
     )
+
+
+class TrendingRepoSchema(Schema):
+    run_id: uuid.UUID
+    repo_url: str
+    repo_owner: str
+    repo_name: str
+    analysis_count: int
+    health_label: Optional[str] = None
+    health_key: Optional[str] = None
+    primary_language: Optional[str] = None
+    stars: Optional[int] = None
+
+
+@router.get('/trending', response=list[TrendingRepoSchema])
+@ratelimit(key='user_or_ip', rate='60/h', method='GET', block=False)
+def trending(request):
+    _assert_not_limited(request)
+    from datetime import timedelta
+
+    from django.db.models import Count
+    from django.utils import timezone
+
+    since = timezone.now() - timedelta(days=7)
+    repo_counts = (
+        AnalysisRun.objects
+        .filter(status='completed', triggered_at__gte=since, repo__is_private=False)
+        .values('repo_id')
+        .annotate(count=Count('id'))
+        .order_by('-count')[:5]
+    )
+    result = []
+    for rc in repo_counts:
+        run = (
+            AnalysisRun.objects
+            .filter(repo_id=rc['repo_id'], status='completed')
+            .select_related('repo')
+            .order_by('-triggered_at')
+            .first()
+        )
+        if not run:
+            continue
+        meta = run.result.get('github_meta', {}) if run.result else {}
+        health = run.result.get('classification', {}).get('project_health', {}) if run.result else {}
+        result.append(TrendingRepoSchema(
+            run_id=run.id,
+            repo_url=run.repo.url,
+            repo_owner=run.repo.owner,
+            repo_name=run.repo.name,
+            analysis_count=rc['count'],
+            health_label=health.get('label'),
+            health_key=health.get('key'),
+            primary_language=meta.get('primary_language'),
+            stars=meta.get('stars'),
+        ))
+    return result
 
 
 class SpotlightSchema(Schema):
@@ -974,24 +1097,35 @@ def get_run_vulnerabilities(request, run_id: uuid.UUID):
     except Exception:
         raise HttpError(502, 'Failed to reach OSV vulnerability database')
 
-    vulnerable = []
+    from apps.analysis.vuln_scan import _enrich_vulns
+
+    raw_vulns = []
+    all_ids = []
     for query, batch_result in zip(queries, batch_results):
-        vulns = batch_result.get('vulns', [])
-        for v in vulns:
-            severity = None
-            for sev in v.get('severity', []):
-                if sev.get('type') == 'CVSS_V3':
-                    severity = sev.get('score')
-                    break
-            vulnerable.append({
-                'name': query['package']['name'],
-                'version': query['version'],
-                'ecosystem': query['package']['ecosystem'],
-                'vuln_id': v.get('id', ''),
-                'summary': v.get('summary', '')[:200],
-                'severity': severity,
-                'url': f"https://osv.dev/vulnerability/{v.get('id', '')}",
-            })
+        for v in batch_result.get('vulns', []):
+            vid = v.get('id', '')
+            if not vid:
+                continue
+            raw_vulns.append({'query': query, 'id': vid})
+            all_ids.append(vid)
+
+    details = _enrich_vulns(all_ids)
+
+    vulnerable = []
+    for item in raw_vulns:
+        vid = item['id']
+        q = item['query']
+        d = details.get(vid, {})
+        vulnerable.append({
+            'name': q['package']['name'],
+            'version': q['version'],
+            'ecosystem': q['package']['ecosystem'],
+            'vuln_id': vid,
+            'summary': d.get('summary', ''),
+            'severity': d.get('severity'),
+            'severity_score': d.get('severity_score'),
+            'url': f'https://osv.dev/vulnerability/{vid}',
+        })
 
     result = {'checked': len(queries), 'vulnerable': vulnerable}
     cache.set(cache_key, result, 900)
