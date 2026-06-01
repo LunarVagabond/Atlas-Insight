@@ -365,7 +365,6 @@ function clearSearch() {
       <section class="about-view__section about-view__section--support">
         <p class="about-view__support-text">
           Atlas Insight is free and always will be.
-          If it's been useful, <a href="https://ko-fi.com/chrisconlon" target="_blank" rel="noopener noreferrer" class="about-view__kofi-link">☕ buy me a coffee</a> — it keeps the servers running.
         </p>
       </section>
 

@@ -553,12 +553,31 @@
     font-size: 0.9375rem;
   }
 
-  &__kofi-link {
-    color: var(--color-accent);
-    text-decoration: none;
-    font-weight: 500;
+  &__bmc {
+    margin-top: $space-3;
 
-    &:hover { text-decoration: underline; }
+    .bmc-button {
+      display: inline-flex;
+      align-items: center;
+      gap: $space-2;
+      padding: 0.5rem 1rem;
+      background: #40DCA5;
+      border: 1px solid #000;
+      border-radius: $radius-md;
+      color: #fff;
+      font-family: 'Comic Sans MS', 'Comic Sans', cursive;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: opacity $transition-fast;
+
+      img {
+        height: 1.25rem;
+        width: auto;
+      }
+
+      &:hover { opacity: 0.85; }
+    }
   }
 
   &__disclaimer {
@@ -803,29 +822,51 @@
   left: 0;
   right: 0;
   z-index: 40;
-  text-align: center;
   padding: $space-3 $space-6;
   border-top: 1px solid var(--color-border);
   font-size: 0.8125rem;
   color: var(--color-text-muted);
   background: var(--color-surface);
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: center;
-  gap: $space-2;
-  flex-wrap: wrap;
 
-  &__sep {
-    opacity: 0.4;
+  &__spacer {
+    // intentionally empty — mirrors __support width to keep __copy centered
   }
 
-  &__kofi {
-    color: var(--color-text-muted);
+  &__copy {
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  &__support {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: $space-2;
+    white-space: nowrap;
+  }
+
+  &__bmc {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    padding: 0.2rem 0.65rem;
+    background: #2da572;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: $radius-md;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
     text-decoration: none;
-    transition: color $transition-fast;
+    letter-spacing: 0.01em;
+    transition: opacity $transition-fast, transform $transition-fast;
+    white-space: nowrap;
 
     &:hover {
-      color: var(--color-accent);
+      opacity: 0.85;
+      transform: translateY(-1px);
     }
   }
 }

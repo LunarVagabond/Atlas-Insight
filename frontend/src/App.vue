@@ -110,9 +110,12 @@ const menuOpen = ref(false)
       <RouterView />
     </div>
     <footer class="app-footer">
-      © {{ new Date().getFullYear() }} Lunar Vagabond. All rights reserved.
-      <span class="app-footer__sep">·</span>
-      <a href="https://ko-fi.com/chrisconlon" target="_blank" rel="noopener noreferrer" class="app-footer__kofi">☕ Buy me a coffee</a>
+      <span class="app-footer__spacer"></span>
+      <span class="app-footer__copy">© {{ new Date().getFullYear() }} Lunar Vagabond. All rights reserved.</span>
+      <span class="app-footer__support">
+        If you enjoy Atlas Insight, consider
+        <a href="https://www.buymeacoffee.com/lunarvagabond" target="_blank" rel="noopener noreferrer" class="app-footer__bmc">☕ buying me a coffee</a>
+      </span>
     </footer>
   </div>
 </template>
