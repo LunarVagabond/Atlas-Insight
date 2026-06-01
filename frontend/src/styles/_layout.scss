@@ -655,6 +655,35 @@
     flex-shrink: 0;
     margin-top: 2px;
   }
+
+  &__code {
+    font-family: $font-mono;
+    font-size: 0.8125rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: $radius-md;
+    padding: $space-3 $space-4;
+    margin: 0;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--color-text-secondary);
+  }
+
+  &__bookmarklet {
+    display: inline-block;
+    padding: $space-2 $space-4;
+    background: var(--color-accent);
+    color: #fff;
+    border-radius: $radius-md;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: grab;
+    user-select: none;
+    transition: opacity $transition-fast;
+
+    &:hover { opacity: 0.85; }
+  }
 }
 
 // Guide tab styles

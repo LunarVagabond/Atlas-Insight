@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import AppBadge from '../components/ui/AppBadge.vue'
@@ -36,7 +36,88 @@ interface SpotlightCurrent {
   pick_number: number
 }
 
+const QUIPS: Record<string, string[]> = {
+  thriving: [
+    "This repo is absolutely poppin' 🔥",
+    "Velocity? Astronomical.",
+    "Chef's kiss level of active",
+    "The commit history is immaculate fr",
+    "Ship it, ship it, ship it",
+    "Actually cooked — and we mean that in a good way",
+    "Core devs are eating good rn",
+    "If this repo were a restaurant, there'd be a line around the block",
+    "Main branch basically lives rent-free in our heads",
+    "High throughput. Low drama. Respect.",
+  ],
+  active: [
+    "Healthy commits, healthy vibes",
+    "Doing the lord's work, consistently",
+    "Solid. No notes.",
+    "PRs merged, bugs squashed, vibes maintained",
+    "This project hits the gym regularly",
+    "Consistent energy. Respect.",
+    "Reliable as a Swiss watch, but open source",
+    "The kind of project your parents would be proud of",
+    "Showing up every week like a pro",
+    "Active and thriving — the dream",
+  ],
+  stable: [
+    "Not dead, just resting",
+    "Fewer commits, but make 'em count",
+    "The strong and silent type of repo",
+    "Like a government building — not exciting, but it works",
+    "Mature, seasoned, a little gray around the edges",
+    "Not chasing hype. Respectable.",
+    "The kind of project that just works and you forget it exists. High praise.",
+    "\"Battle-tested\" is one way to put it",
+    "Slow and steady wins the race... probably",
+    "It's giving: dependable legacy codebase energy",
+  ],
+  declining: [
+    "The commits have left the building",
+    "One motivated contributor away from a comeback",
+    "Could use some love. Any love. Really.",
+    "Calling all contributors — we're not crying, you're crying",
+    "Still alive! (Barely, but still)",
+    "A PR a day keeps the abandonment away",
+    "Vibes: end-of-life but make it fashion",
+    "This one needs a hug and maybe a maintainer",
+    "Somewhere out there, the original author is going \"I should probably push that fix\"",
+    "The issue tracker has seen better days",
+  ],
+  abandoned: [
+    "It would be really cool if someone revived this",
+    "The last commit is a timestamp of a simpler time",
+    "Maintainer said \"I'll be right back\" in 2019",
+    "Frozen in time, like a codebase in amber",
+    "Not dead, just in cryogenic stasis",
+    "A moment of silence... then maybe fork it?",
+    "The GitHub equivalent of a ghost town",
+    "Every unmaintained repo is just a fork waiting to happen",
+    "Somewhere, a star-giver is still hoping",
+    "Last seen: a while ago. Reward if found.",
+  ],
+}
+
+const FALLBACK_QUIPS = [
+  "Worth a look",
+  "Chosen by the algorithm, blessed by the community",
+  "Your weekly dose of open source",
+  "We see you, we appreciate you",
+  "Atlas Insight approved",
+]
+
+function pickQuip(key: string | null): string {
+  const pool = (key && QUIPS[key]) ? QUIPS[key] : FALLBACK_QUIPS
+  return pool[Math.floor(Math.random() * pool.length)]
+}
+
 const current = ref<SpotlightCurrent | null>(null)
+const quip = ref('')
+
+watch(current, (val) => {
+  quip.value = pickQuip(val?.health_key ?? null)
+})
 const history = ref<SpotlightItem[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -164,6 +245,8 @@ onMounted(() => {
             View on GitHub ↗
           </a>
         </div>
+
+        <p v-if="quip" class="spotlight-hero__quip">{{ quip }}</p>
       </template>
     </div>
 

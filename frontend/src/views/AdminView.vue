@@ -154,6 +154,32 @@ function resetAt(iso: string | null): string {
   return d.toLocaleTimeString()
 }
 
+interface SpotlightResult {
+  owner: string
+  name: string
+  url: string
+  week_start: string
+  pick_number: number
+}
+
+const spotlightLoading = ref(false)
+const spotlightResult = ref<SpotlightResult | null>(null)
+const spotlightError = ref<string | null>(null)
+
+async function pickSpotlight() {
+  spotlightLoading.value = true
+  spotlightError.value = null
+  spotlightResult.value = null
+  try {
+    const { data } = await axios.post<SpotlightResult>('/api/v1/repositories/admin/pick-spotlight')
+    spotlightResult.value = data
+  } catch (err: any) {
+    spotlightError.value = err?.response?.data?.detail ?? 'Failed to pick spotlight'
+  } finally {
+    spotlightLoading.value = false
+  }
+}
+
 function ratePct(r: RateLimit): number {
   if (!r.limit) return 0
   return Math.round((r.remaining / r.limit) * 100)
@@ -323,6 +349,33 @@ onMounted(fetchStats)
                 <div class="watched-search__empty">No unmatched repos found</div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Repo of the Week (superuser only) -->
+        <div v-if="isSuperuser" class="panel" style="margin-top:1.5rem">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+            <div>
+              <p class="panel__title" style="margin:0">Repo of the Week</p>
+              <p class="panel__subtitle" style="margin:0.25rem 0 0">
+                Picks a public repo for the home page spotlight. Replaces this week's pick if one exists.
+              </p>
+            </div>
+            <AppButton variant="primary" :loading="spotlightLoading" @click="pickSpotlight">
+              {{ spotlightLoading ? 'Picking…' : 'Pick Now' }}
+            </AppButton>
+          </div>
+          <div v-if="spotlightError" class="empty-state" style="padding:0.5rem 0;color:var(--color-error)">
+            {{ spotlightError }}
+          </div>
+          <div v-if="spotlightResult" style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem;background:var(--color-surface);border:1px solid var(--color-border);border-radius:6px">
+            <AppBadge variant="completed">Selected</AppBadge>
+            <a :href="spotlightResult.url" target="_blank" rel="noopener noreferrer" class="table-link" style="font-weight:600">
+              {{ spotlightResult.owner }}/{{ spotlightResult.name }}
+            </a>
+            <span style="color:var(--color-text-muted);font-size:0.8125rem">
+              week of {{ spotlightResult.week_start }} · pick #{{ spotlightResult.pick_number }}
+            </span>
           </div>
         </div>
 

@@ -11,6 +11,7 @@ export default defineConfig({
   },
   server: {
     port: 4501,
+    fs: { strict: false },
     allowedHosts: [
       'atlas.dsyndicate.dev',
       'ai-api.dsyndicate.dev',

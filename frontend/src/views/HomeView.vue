@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import URLInputForm from '../components/analysis/URLInputForm.vue'
 import RepoOfWeekCard from '../components/analysis/RepoOfWeekCard.vue'
@@ -13,8 +13,12 @@ import type { RunListItem, FeaturedRepo } from '../stores/analysis'
 import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
+const route = useRoute()
 const store = useAnalysisStore()
 const auth = useAuthStore()
+
+const GITHUB_RE = /^https?:\/\/github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+\/?$/
+const initialUrl = ref('')
 
 const featured = ref<FeaturedRepo | null>(null)
 const spotlight = ref<any>(null)
@@ -73,11 +77,17 @@ onMounted(() => {
   fetchFeatured()
   fetchSpotlight()
   fetchTrending()
+
+  const qUrl = route.query.url as string | undefined
+  if (qUrl && GITHUB_RE.test(qUrl.trim())) {
+    initialUrl.value = qUrl.trim()
+    handleSubmit(qUrl.trim())
+  }
 })
 
-async function handleSubmit(url: string, pat?: string, email?: string) {
+async function handleSubmit(url: string, pat?: string) {
   try {
-    const runId = await store.submitUrl(url, pat, email)
+    const runId = await store.submitUrl(url, pat)
     router.push(`/results/${runId}`)
   } catch {
     // error shown in form
@@ -192,6 +202,7 @@ const ghostRows = computed(() => Math.max(0, perPage - items.value.length))
       <URLInputForm
         :loading="store.status === 'submitting'"
         :error="store.error"
+        :initial-url="initialUrl"
         @submitted="handleSubmit"
       />
     </main>

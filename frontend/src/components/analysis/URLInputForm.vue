@@ -4,15 +4,18 @@ import axios from 'axios'
 import AppButton from '../ui/AppButton.vue'
 import { useAuthStore } from '../../stores/auth'
 
-const emit = defineEmits<{ submitted: [url: string, pat?: string, email?: string] }>()
-defineProps<{ loading?: boolean; error?: string | null }>()
+const props = withDefaults(defineProps<{ loading?: boolean; error?: string | null; initialUrl?: string }>(), {
+  loading: false,
+  error: null,
+  initialUrl: '',
+})
+
+const emit = defineEmits<{ submitted: [url: string, pat?: string] }>()
 
 const auth = useAuthStore()
-const url = ref('')
+const url = ref(props.initialUrl || '')
 const pat = ref('')
 const showPat = ref(false)
-const notifyEmail = ref('')
-const showNotify = ref(false)
 const localError = ref('')
 
 interface GhRepo { full_name: string; html_url: string; private: boolean }
@@ -80,17 +83,12 @@ function submit() {
     localError.value = 'Must be a valid GitHub repository URL (e.g. https://github.com/owner/repo)'
     return
   }
-  emit('submitted', trimmed, pat.value.trim() || undefined, notifyEmail.value.trim() || undefined)
+  emit('submitted', trimmed, pat.value.trim() || undefined)
 }
 
 function togglePat() {
   showPat.value = !showPat.value
   if (!showPat.value) pat.value = ''
-}
-
-function toggleNotify() {
-  showNotify.value = !showNotify.value
-  if (!showNotify.value) notifyEmail.value = ''
 }
 </script>
 
@@ -145,15 +143,6 @@ function toggleNotify() {
           <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 8a4 4 0 1 1 8 0A4 4 0 0 1 4 8zm4-5a5 5 0 1 0 2.546 9.31L13.854 15.6a.75.75 0 1 0 1.061-1.061l-2.903-2.903A5 5 0 0 0 8 3z"/></svg>
           PAT
         </button>
-        <button
-          type="button"
-          class="url-form__opt-btn"
-          :class="{ 'url-form__opt-btn--active': showNotify }"
-          @click="toggleNotify"
-        >
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 16a2 2 0 0 0 1.985-1.75c.017-.137-.097-.25-.235-.25h-3.5c-.138 0-.252.113-.235.25A2 2 0 0 0 8 16ZM1.5 11.5A1.5 1.5 0 0 0 3 13h10a1.5 1.5 0 0 0 1.5-1.5v-.5a.5.5 0 0 0-.146-.354L13 9.293V6a5 5 0 0 0-10 0v3.293L1.646 10.646A.5.5 0 0 0 1.5 11Z"/></svg>
-          Notify
-        </button>
       </div>
     </div>
 
@@ -175,20 +164,6 @@ function toggleNotify() {
         placeholder="ghp_••••••••••••••••••••••••••••••••••••••"
         autocomplete="off"
         spellcheck="false"
-      />
-    </div>
-
-    <div v-if="showNotify" class="url-form__pat-panel">
-      <p class="url-form__pat-why">
-        Enter your email and we'll notify you when the analysis finishes.
-        Useful for large repositories that take a minute or two.
-      </p>
-      <input
-        v-model="notifyEmail"
-        type="email"
-        class="url-form__input url-form__pat-input"
-        placeholder="you@example.com"
-        autocomplete="email"
       />
     </div>
 

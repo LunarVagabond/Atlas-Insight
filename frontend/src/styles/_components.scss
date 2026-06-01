@@ -6317,6 +6317,14 @@
     font-weight: 400;
   }
 
+  &__quip {
+    position: relative;
+    margin-top: $space-1;
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+
   &__author {
     font-weight: 700;
     color: var(--color-accent);
@@ -6517,8 +6525,17 @@
     position: relative;
     font-size: 1.125rem;
     color: var(--color-text-secondary);
-    margin-bottom: $space-2;
+    margin-bottom: $space-1;
     font-weight: 400;
+  }
+
+  &__quip {
+    position: relative;
+    font-size: 0.9375rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+    margin-top: $space-4;
+    margin-bottom: 0;
   }
 
   &__author {

@@ -200,25 +200,27 @@ const showEmbed = ref(false)
 const embedCopied = ref(false)
 const cardCopied = ref(false)
 const cardTheme = ref<'dark' | 'light'>('dark')
-const _origin = window.location.origin
+// API origin for badge/card SVGs (backend domain in prod); public origin for clickable links (frontend)
+const _apiOrigin = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/api\/?$/, '') || window.location.origin
+const _publicOrigin = (import.meta.env.VITE_PUBLIC_BASE_URL as string | undefined) || window.location.origin
 const badgeUrl = computed(() => {
   if (!store.run) return ''
   const { repo_owner: o, repo_name: n } = store.run
-  return `${_origin}/api/v1/repositories/badge/${o}/${n}.svg`
+  return `${_apiOrigin}/api/v1/repositories/badge/${o}/${n}.svg`
 })
 const embedMarkdown = computed(() => {
   if (!store.run) return ''
   const { repo_owner: o, repo_name: n } = store.run
-  return `[![Atlas Insight](${badgeUrl.value})](${_origin}/r/${o}/${n})`
+  return `[![Atlas Insight](${badgeUrl.value})](${_publicOrigin}/r/${o}/${n})`
 })
 const cardUrl = computed(() => {
   if (!store.run) return ''
-  return `${_origin}/api/v1/repositories/runs/${store.run.id}/card.svg?theme=${cardTheme.value}`
+  return `${_apiOrigin}/api/v1/repositories/runs/${store.run.id}/card.svg?theme=${cardTheme.value}`
 })
 const cardMarkdown = computed(() => {
   if (!store.run) return ''
   const { repo_owner: o, repo_name: n } = store.run
-  return `[![Atlas Insight](${cardUrl.value})](${_origin}/r/${o}/${n})`
+  return `[![Atlas Insight](${cardUrl.value})](${_publicOrigin}/r/${o}/${n})`
 })
 function copyEmbed() {
   navigator.clipboard.writeText(embedMarkdown.value)
@@ -240,8 +242,8 @@ function onTabKey(e: KeyboardEvent) {
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return
   if ((e.target as HTMLElement).isContentEditable) return
   const idx = CHAPTER_TABS.indexOf(activeTab.value)
-  if (e.key === 'j') activeTab.value = CHAPTER_TABS[Math.min(idx + 1, CHAPTER_TABS.length - 1)]
-  else if (e.key === 'k') activeTab.value = CHAPTER_TABS[Math.max(idx - 1, 0)]
+  if (e.key === 'j') activeTab.value = CHAPTER_TABS[Math.max(idx - 1, 0)]
+  else if (e.key === 'k') activeTab.value = CHAPTER_TABS[Math.min(idx + 1, CHAPTER_TABS.length - 1)]
 }
 
 onMounted(() => window.addEventListener('keydown', onTabKey))

@@ -1297,6 +1297,55 @@ def admin_rate_limit(request):
     }
 
 
+@router.post('/admin/pick-spotlight')
+@ratelimit(key='user', rate='10/h', method='POST', block=True)
+def admin_pick_spotlight(request):
+    import random
+    from datetime import date, timedelta
+    from django.db.models import Count
+
+    if not request.user.is_superuser:
+        raise HttpError(403, 'Superuser only')
+
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+
+    # Delete current week's pick so we can re-pick freely
+    RepoOfTheWeek.objects.filter(week_start=week_start).delete()
+
+    eligible = list(
+        Repository.objects.filter(is_private=False, runs__status='completed').distinct()
+    )
+    if not eligible:
+        raise HttpError(409, 'No eligible public repos with completed analyses')
+
+    pick_counts = dict(
+        RepoOfTheWeek.objects.filter(repo__in=eligible)
+        .values('repo_id')
+        .annotate(n=Count('id'))
+        .values_list('repo_id', 'n')
+    )
+    min_picks = min((pick_counts.get(r.pk, 0) for r in eligible), default=0)
+    candidates = [r for r in eligible if pick_counts.get(r.pk, 0) <= min_picks]
+    weights = [r.scan_count * 0.6 + r.view_count * 0.4 + 1 for r in candidates]
+    chosen = random.choices(candidates, weights=weights, k=1)[0]
+    current_picks = pick_counts.get(chosen.pk, 0)
+
+    RepoOfTheWeek.objects.create(
+        repo=chosen,
+        week_start=week_start,
+        pick_number=current_picks + 1,
+    )
+    logger.info('Admin manually picked Repo of Week: %s/%s', chosen.owner, chosen.name)
+    return {
+        'owner': chosen.owner,
+        'name': chosen.name,
+        'url': chosen.url,
+        'week_start': week_start.isoformat(),
+        'pick_number': current_picks + 1,
+    }
+
+
 class WatchedRepoSchema(Schema):
     id: uuid.UUID
     url: str

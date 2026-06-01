@@ -5,6 +5,10 @@ import AppTabs from '../components/ui/AppTabs.vue'
 const TABS = ['About', 'Guide']
 const activeTab = ref('About')
 
+const _rawPublicBase = (import.meta.env.VITE_PUBLIC_BASE_URL as string | undefined) || window.location.origin
+const publicBase = _rawPublicBase.includes('localhost') ? 'https://atlas.dsyndicate.dev' : _rawPublicBase
+const bookmarklet = `javascript:(function(){window.open('${publicBase}/?url='+encodeURIComponent(location.href),'_blank')})()`
+
 const searchQuery = ref('')
 
 interface GuideEntry {
@@ -360,6 +364,20 @@ function clearSearch() {
           </div>
         </div>
         <p class="about-view__note">Score weights: Community health 25% · Documentation 20% · CI/testing 20% · Release cadence 15% · Activity 10% · Bus factor 10%.</p>
+      </section>
+
+      <section class="about-view__section">
+        <h2 class="about-view__section-title">Quick access</h2>
+        <p><strong>Direct link:</strong> append <code>?url=</code> to the home page URL to pre-fill and auto-analyze any repo:</p>
+        <pre class="about-view__code">{{ `${publicBase}/?url=https://github.com/owner/repo` }}</pre>
+        <p style="margin-top: 1.25rem"><strong>Bookmarklet:</strong> drag this to your bookmarks bar. Click it on any GitHub repo page to open an instant analysis.</p>
+        <a
+          :href="bookmarklet"
+          class="about-view__bookmarklet"
+          @click.prevent
+          draggable="true"
+        >⚡ Analyze on Atlas</a>
+        <p class="about-view__note">Drag the button above to your bookmarks bar. Clicking it on a <code>github.com</code> page opens Atlas Insight with that repo pre-loaded.</p>
       </section>
 
       <section class="about-view__section about-view__section--support">

@@ -454,7 +454,7 @@ export const useAnalysisStore = defineStore('analysis', {
   }),
 
   actions: {
-    async submitUrl(url: string, pat?: string, notificationEmail?: string) {
+    async submitUrl(url: string, pat?: string) {
       this.url = url
       this.status = 'submitting'
       this.error = null
@@ -464,7 +464,6 @@ export const useAnalysisStore = defineStore('analysis', {
         const { data } = await axios.post('/api/v1/repositories/analyze', {
           url,
           pat: pat || undefined,
-          notification_email: notificationEmail || undefined,
         })
         this.currentRunId = data.run_id
         this.status = 'polling'
