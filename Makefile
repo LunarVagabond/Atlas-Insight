@@ -12,7 +12,7 @@ POSTGRES_USER_VAL ?= $(shell grep '^POSTGRES_USER=' $(ROOT_DIR)/backend/.env 2>/
 GLITCHTIP_DOMAIN_VAL ?= $(shell grep '^GLITCHTIP_DOMAIN=' $(ROOT_DIR)/backend/.env 2>/dev/null | cut -d= -f2- | tr -d '[:space:]')
 COMPOSE_BARE := docker compose -f $(ROOT_DIR)/docker-compose.yml
 
-.PHONY: help setup start stop restart status logs \
+.PHONY: help setup init teardown start stop restart status logs \
         start-django  stop-django \
         start-celery  stop-celery \
 	start-beat    stop-beat \
@@ -22,7 +22,7 @@ COMPOSE_BARE := docker compose -f $(ROOT_DIR)/docker-compose.yml
         start-redis    stop-redis \
         start-tunnel  stop-tunnel \
 		start-glitchtip stop-glitchtip logs-glitchtip configure-glitchtip setup-glitchtip glitchtip-db-dump reset-glitchtip fresh-glitchtip \
-	sentry-test-services glitchtip-verify \
+	glitchtip-create-admin sentry-test-services glitchtip-verify \
         migrate makemigrations createsuperuser shell dbshell collectstatic \
         test lint format build type-check \
 		logs-django logs-celery logs-beat logs-flower logs-vite \
@@ -52,12 +52,14 @@ help:
 	@echo "    start-tunnel   / stop-tunnel    Cloudflare tunnel  (requires CLOUDFLARE_TUNNEL_TOKEN)"
 	@echo "    start-glitchtip / stop-glitchtip  GlitchTip error tracking (port 4505)  (also runs in start/stop)"
 	@echo "    logs-glitchtip                    Tail GlitchTip logs"
-	@echo "    setup-glitchtip                   Bootstrap org/projects/oauth + refresh DSN"
+	@echo "    setup-glitchtip                   Bootstrap org/projects + refresh DSN"
+	@echo "    glitchtip-create-admin            Create GlitchTip admin (EMAIL=... PASSWORD=...)"
 	@echo "    glitchtip-db-dump                 Dump GlitchTip DB to _running/backups/"
 	@echo "    reset-glitchtip                   Drop/recreate GlitchTip DB, then bootstrap"
 	@echo "    fresh-glitchtip                   Dump DB, then reset from scratch"
 	@echo "    sentry-test-services              Emit service-tagged test logs"
 	@echo "    glitchtip-verify                  Show projects + Backend log service buckets"
+	@echo "    promote-user                      Promote a Django user to superuser (EMAIL=... optional)"
 	@echo ""
 	@echo "  ── Django management ────────────────────────────────────────────────"
 	@echo "    migrate            Run migrations  (ARGS=app_label)"
@@ -78,8 +80,14 @@ help:
 	@echo "    logs               Tail all logs"
 	@echo "    logs-django / logs-celery / logs-flower / logs-vite"
 	@echo ""
-	@echo "  ── First time ───────────────────────────────────────────────────────"
-	@echo "    make setup && make start && make migrate"
+	@echo "  ── First time / fresh deploy ────────────────────────────────────────"
+	@echo "    1. cp backend/.env.example backend/.env  (fill in secrets)"
+	@echo "    2. make init         (venv + npm + postgres + migrate)"
+	@echo "    3. make start        (full stack)"
+	@echo "    4. make promote-user EMAIL=you@example.com"
+	@echo ""
+	@echo "  ── Clean wipe (dev) ─────────────────────────────────────────────────"
+	@echo "    make teardown        (stop + docker down -v + rm _running/.venv/node_modules)"
 	@echo ""
 
 # ── Full stack ─────────────────────────────────────────────────────────────────
@@ -88,13 +96,24 @@ setup:
 	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend setup
 	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/frontend setup
 
+init: setup
+	@echo "Starting Postgres and Redis..."
+	@$(COMPOSE) up -d postgres redis 2>&1 | grep -v "^$$"
+	@echo "Waiting for Postgres..."
+	@until $(COMPOSE) exec -T postgres pg_isready -q 2>/dev/null; do sleep 1; done
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend migrate
+	@echo ""
+	@echo "Init complete. Next: make start && make promote-user EMAIL=you@example.com"
+
+teardown:
+	@$(MAKE) --no-print-directory stop || true
+	@$(COMPOSE) down -v 2>&1 | grep -v "^$$"
+	@rm -rf $(ROOT_DIR)/_running $(ROOT_DIR)/backend/.venv $(ROOT_DIR)/frontend/node_modules
+	@echo ""
+	@echo "Torn down. Next: make init && make start"
+
 
 start: _ensure_running_dirs
-	@> $(RUNNING_DIR)/logs/django.log
-	@> $(RUNNING_DIR)/logs/celery.log
-	@> $(RUNNING_DIR)/logs/beat.log
-	@> $(RUNNING_DIR)/logs/flower.log
-	@> $(RUNNING_DIR)/logs/vite.log
 	@$(COMPOSE) up -d --quiet-pull 2>&1 | grep -v "^$$"
 	@echo "Waiting for Postgres..."
 	@until $(COMPOSE) exec -T postgres pg_isready -q 2>/dev/null; do sleep 1; done
@@ -104,7 +123,7 @@ start: _ensure_running_dirs
 	@$(MAKE) --no-print-directory start-tunnel
 	@echo ""
 	@echo "Atlas Insight running:"
-	@echo "  API:        http://localhost:4500/api/v1/docs"
+	@echo "  API:        http://localhost:4500/api/docs"
 	@echo "  App:        http://localhost:4501"
 	@echo "  Flower:     http://localhost:4504"
 	@echo "  GlitchTip:  https://glitch.dsyndicate.dev"
@@ -157,7 +176,7 @@ status:
 	fi
 	@echo ""
 	@echo "━━━ URLs ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@printf "  %-14s %s\n" "Django API:"  "http://localhost:4500/api/v1/docs"
+	@printf "  %-14s %s\n" "Django API:"  "http://localhost:4500/api/docs"
 	@printf "  %-14s %s\n" "Vite app:"    "http://localhost:4501"
 	@printf "  %-14s %s\n" "Flower:"      "http://localhost:4504"
 	@printf "  %-14s %s\n" "Redis:"       "localhost:4502"
@@ -225,6 +244,7 @@ start-glitchtip:
 	@until curl -sf http://localhost:4505/api/0/ > /dev/null 2>&1; do sleep 2; done
 	@$(MAKE) --no-print-directory setup-glitchtip
 	@echo "  GlitchTip UI: https://glitch.dsyndicate.dev"
+	@echo "  First time? Run: make glitchtip-create-admin EMAIL=you@example.com PASSWORD=yourpassword"
 
 setup-glitchtip:
 	@docker cp $(ROOT_DIR)/scripts/glitchtip_setup.py github-archaeologist-glitchtip-web-1:/tmp/glitchtip_setup.py
@@ -333,7 +353,7 @@ type-check:
 # ── Logs ───────────────────────────────────────────────────────────────────────
 
 logs:
-	@tail -f $(RUNNING_DIR)/logs/*.log
+	@echo "Local _running/logs files are disabled. Use make logs-glitchtip and GlitchTip UI logs."
 
 logs-django:
 	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend logs-django
@@ -346,6 +366,23 @@ logs-beat:
 
 sentry-test-services:
 	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend sentry-test-services
+
+promote-user:
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend promote-user EMAIL="$(EMAIL)" USERNAME="$(USERNAME)"
+
+glitchtip-create-admin:
+	@if [ -z "$(EMAIL)" ] || [ -z "$(PASSWORD)" ]; then \
+	  echo "Usage: make glitchtip-create-admin EMAIL=you@example.com PASSWORD=yourpassword"; \
+	  exit 1; \
+	fi
+	@docker exec \
+	  -e DJANGO_SUPERUSER_EMAIL="$(EMAIL)" \
+	  -e DJANGO_SUPERUSER_USERNAME="$(EMAIL)" \
+	  -e DJANGO_SUPERUSER_PASSWORD="$(PASSWORD)" \
+	  github-archaeologist-glitchtip-web-1 \
+	  python manage.py createsuperuser --noinput 2>&1 | grep -v "already exists" || true
+	@$(MAKE) --no-print-directory setup-glitchtip
+	@echo "  GlitchTip admin ready: $(EMAIL)"
 
 glitchtip-verify:
 	@docker cp $(ROOT_DIR)/scripts/glitchtip_verify.py github-archaeologist-glitchtip-web-1:/tmp/glitchtip_verify.py

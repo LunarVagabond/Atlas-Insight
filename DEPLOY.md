@@ -1,6 +1,6 @@
 # Deployment Guide — Atlas Insight
 
-Self-hosted deployment on a Linux server with Nginx, Postgres, Redis, and systemd (or Docker Compose).
+Self-hosted deployment on a Linux server with Nginx, Postgres, Redis, and systemd (or Docker Compose). Works identically for local dev and prod — the only difference is `backend/.env`.
 
 ---
 
@@ -8,169 +8,184 @@ Self-hosted deployment on a Linux server with Nginx, Postgres, Redis, and system
 
 - Python 3.12+
 - Node.js 20+
-- PostgreSQL 17
-- Redis 7+
-- Nginx
-- Docker + Docker Compose (required if running bundled GlitchTip stack)
+- Docker + Docker Compose (runs Postgres, Redis, GlitchTip)
+- Nginx (production only — for TLS termination)
 
 ---
 
-## 1. Clone and install
+## Fresh deploy (dev or prod) — 4 steps
 
 ```bash
+# 1. Clone
 git clone https://github.com/youruser/atlas-insight.git
 cd atlas-insight
 
-# Python virtualenv
-cd backend
-python3.12 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+# 2. Configure
+cp backend/.env.example backend/.env
+# Edit backend/.env — see "Environment variables" below
 
-# Frontend build
-cd ../frontend
-npm ci
-npm run build
+# 3. Bootstrap (venv + npm + postgres + migrate)
+make init
+
+# 4. Start full stack
+make start
+# Then promote your first user:
+make promote-user EMAIL=you@example.com
 ```
+
+`make start` handles the rest automatically:
+- Starts Postgres + Redis
+- Starts GlitchTip, waits for health, provisions org/projects, writes `SENTRY_DSN` to `backend/.env`
+- Starts Django, Celery worker, Celery beat, Flower, Vite (dev) or serves static build (prod)
+- Starts Cloudflare tunnel if `CLOUDFLARE_TUNNEL_TOKEN` is set
 
 ---
 
-## 2. Environment variables
-
-Copy and populate the env file:
+## Environment variables
 
 ```bash
 cp backend/.env.example backend/.env
 ```
 
-**Required in production** (missing vars will crash on startup):
+**Change for production** (dev defaults are fine locally):
+
+| Variable | Dev default | Prod value |
+|---|---|---|
+| `DJANGO_SETTINGS_MODULE` | `config.settings.development` | `config.settings.production` |
+| `SECRET_KEY` | insecure placeholder | long random string |
+| `DEBUG` | `True` | `False` (or omit — prod settings force it) |
+| `ALLOWED_HOSTS` | `localhost,127.0.0.1` | your domain(s) |
+| `SECURE_SSL_REDIRECT` | `False` | `False` (keep False — nginx handles TLS) |
+
+**Required in production** (missing vars crash on startup):
 
 | Variable | Description |
 |---|---|
-| `SECRET_KEY` | Long random string — `python -c "import secrets; print(secrets.token_hex(50))"` |
-| `POSTGRES_DB` | Database name |
-| `POSTGRES_USER` | Database user |
-| `POSTGRES_PASSWORD` | Database password |
-| `POSTGRES_HOST` | Postgres host |
-| `POSTGRES_PORT` | Postgres port (default 5432) |
+| `SECRET_KEY` | `python -c "import secrets; print(secrets.token_hex(50))"` |
+| `POSTGRES_DB` / `USER` / `PASSWORD` / `HOST` / `PORT` | Postgres connection |
 | `REDIS_URL` | `redis://localhost:6379/1` |
 | `CELERY_BROKER_URL` | `redis://localhost:6379/0` |
 | `GITHUB_WEBHOOK_SECRET` | Secret for GitHub push webhooks |
-| `FIELD_ENCRYPTION_KEY` | Fernet key for PAT storage — see below |
+| `FIELD_ENCRYPTION_KEY` | Fernet key for PAT storage (see below) |
+
+**Generate the Fernet key:**
+```bash
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
 
 **Optional but recommended:**
 
 | Variable | Description |
 |---|---|
-| `GITHUB_TOKEN` | Server-level token — raises GitHub API rate limit to 5000/hr |
-| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth app credentials |
-| `FRONTEND_URL` | Public URL of your frontend (e.g. `https://yoursite.com`) |
-| `BACKEND_URL` | Public URL of your API (e.g. `https://api.yoursite.com`) |
-| `ALLOWED_HOSTS` | Comma-separated list of allowed Django hostnames |
-| `CORS_ALLOWED_ORIGINS` | Comma-separated frontend origin(s) |
+| `GITHUB_TOKEN` | Server-level token — raises GitHub rate limit to 5000/hr |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth for Atlas login |
+| `FRONTEND_URL` | Public URL of frontend (e.g. `https://yoursite.com`) |
+| `BACKEND_URL` | Public URL of API (e.g. `https://api.yoursite.com`) |
+| `CORS_ALLOWED_ORIGINS` | Frontend origin(s) |
 | `CSRF_TRUSTED_ORIGINS` | Comma-separated trusted origins |
+| `CLOUDFLARE_TUNNEL_TOKEN` | Enables Cloudflare tunnel on `make start` |
 | `FEATURED_REPO_URL` | GitHub URL of a public repo to feature on the home page |
-| `SENTRY_DSN` | DSN used by backend services for error/log capture |
-| `GLITCHTIP_GITHUB_CLIENT_ID` / `GLITCHTIP_GITHUB_SECRET` | GitHub OAuth app credentials for GlitchTip login |
+
+**GlitchTip variables:**
+
+| Variable | Description |
+|---|---|
+| `GLITCHTIP_SECRET_KEY` | Strong random string for GlitchTip (required in prod) |
 | `GLITCHTIP_DOMAIN` | Public GlitchTip URL (e.g. `https://glitch.yoursite.com`) |
-| `GLITCHTIP_PROJECTS` | Comma-separated GlitchTip projects to auto-provision |
-| `GLITCHTIP_PRIMARY_PROJECT` | Project name whose DSN is written back to `SENTRY_DSN` |
+| `GLITCHTIP_CSRF_TRUSTED_ORIGINS` | **Must include every scheme+host users access GlitchTip from.** Missing entries cause 403 on GitHub OAuth login. Example: `https://glitch.yoursite.com,http://localhost:4505` |
+| `GLITCHTIP_GITHUB_CLIENT_ID` / `GLITCHTIP_GITHUB_SECRET` | GitHub OAuth app for GlitchTip login |
+| `SENTRY_DSN` | Written automatically by `make start` — do not edit manually |
 
-**Generate the encryption key:**
-
-```bash
-python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-```
+> **`SECURE_SSL_REDIRECT` must stay `False`** when running behind nginx or Cloudflare. Both terminate TLS and forward HTTP to Django. Setting it `True` causes an infinite redirect loop (Cloudflare → Django redirects to HTTPS → Cloudflare → ...).
 
 ---
 
-## 3. Database setup
+## GlitchTip GitHub OAuth app
 
-```bash
-cd backend
-DJANGO_SETTINGS_MODULE=config.settings.production .venv/bin/python manage.py migrate
-DJANGO_SETTINGS_MODULE=config.settings.production .venv/bin/python manage.py createsuperuser
-DJANGO_SETTINGS_MODULE=config.settings.production .venv/bin/python manage.py collectstatic --no-input
-```
+GlitchTip needs its **own** GitHub OAuth app (separate from Atlas's app).
+
+1. GitHub → Settings → Developer settings → OAuth Apps → New OAuth App
+2. Homepage URL: your GlitchTip domain (e.g. `https://glitch.yoursite.com`)
+3. Authorization callback URL: `https://glitch.yoursite.com/accounts/github/login/callback/`
+4. Copy Client ID and Secret into `.env` as `GLITCHTIP_GITHUB_CLIENT_ID` / `GLITCHTIP_GITHUB_SECRET`
+5. Ensure `GLITCHTIP_CSRF_TRUSTED_ORIGINS` includes `https://glitch.yoursite.com`
+
+> Common 403 cause: `GLITCHTIP_CSRF_TRUSTED_ORIGINS` missing the GlitchTip domain, or wrong callback URL in the GitHub app.
 
 ---
 
-## 4. GitHub OAuth app (optional — for private repo access)
+## Atlas GitHub OAuth app (optional — for private repo access)
 
-1. Go to GitHub → Settings → Developer settings → OAuth Apps → New OAuth App
-2. Set **Homepage URL** to your frontend URL
-3. Set **Authorization callback URL** to `https://api.yoursite.com/accounts/github/login/callback/`
-4. Copy Client ID and Client Secret into `.env`
+1. GitHub → Settings → Developer settings → OAuth Apps → New OAuth App
+2. Homepage URL: your Atlas frontend URL
+3. Authorization callback URL: `https://api.yoursite.com/accounts/github/login/callback/`
+4. Copy Client ID and Secret into `.env` as `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`
 5. In Django admin → Sites → change domain to your production domain
 6. In Django admin → Social Applications → add GitHub with your credentials
 
 ---
 
-## 4b. GlitchTip bootstrap (recommended)
-
-Atlas Insight includes a built-in GlitchTip bootstrap flow for local/dev and Docker-based environments.
-
-Commands:
+## GlitchTip operations
 
 ```bash
-make start-glitchtip
-make setup-glitchtip
-make glitchtip-db-dump
-make reset-glitchtip
-make fresh-glitchtip
+make start-glitchtip    # start + provision org/projects + write SENTRY_DSN (called by make start)
+make setup-glitchtip    # re-run provisioning + refresh DSN (idempotent)
+make glitchtip-verify   # show projects + service tag inventory
+make sentry-test-services  # emit test logs to all service buckets
+make logs-glitchtip     # tail GlitchTip container logs
+
+make glitchtip-db-dump  # backup → _running/backups/
+make reset-glitchtip    # drop + recreate GlitchTip DB, re-provision
+make fresh-glitchtip    # dump, then reset
 ```
 
-`make setup-glitchtip` is idempotent and will:
+**Projects:** Backend + Frontend (auto-provisioned).
 
-- create/update organization `atlas-insight`
-- create/update GitHub social login app for GlitchTip (when env vars are set)
-- create/update configured projects
-- write DSN for the primary project back into `backend/.env` as `SENTRY_DSN`
+**Service tags** — all Django sub-apps route to the `Backend` project, distinguished by `service` tag:
 
-Default auto-provisioned projects:
+| Service tag | What it covers |
+|---|---|
+| `django` | Django web process |
+| `django-api` | `apps.api` |
+| `django-analysis` | `apps.analysis` |
+| `django-repositories` | `apps.repositories` |
+| `django-users` | `apps.users` |
+| `django-config` | `config.*` modules |
+| `celery-workers` | Celery worker |
+| `celery-beat` | Celery beat scheduler |
+| `celery-flower` | Flower |
 
-- `Backend`
-- `Frontend`
-
-Recommended service model:
-
-- Keep only `Backend` and `Frontend` projects.
-- Use backend `service` tags (`django-api`, `django-analysis`, `celery-workers`, etc.) for granularity within `Backend`.
-
-Reset + recovery flow:
-
-```bash
-# 1) save snapshot
-make glitchtip-db-dump
-
-# 2) destructive rebuild from empty database
-make reset-glitchtip
-
-# 3) one-command backup + rebuild
-make fresh-glitchtip
-```
-
-Debug validation command:
-
-```bash
-make sentry-test-services
-make glitchtip-verify
-```
-
-This emits service-tagged test logs and then prints the effective project/service state from GlitchTip's database.
+Filter by service in GlitchTip Issues/Logs: add tag filter `service = django-analysis` etc.
 
 ---
 
-## 5. GitHub webhook (optional — for auto-re-analysis on push)
+## Dev teardown + rebuild
 
-1. In GitHub repo settings → Webhooks → Add webhook
-2. Payload URL: `https://api.yoursite.com/api/v1/repositories/webhooks/github`
-3. Content type: `application/json`
-4. Secret: the value of `GITHUB_WEBHOOK_SECRET`
-5. Events: **Just the push event**
+Full clean wipe and fresh start:
+
+```bash
+make teardown           # stop everything, docker down -v, rm _running/.venv/node_modules
+make init               # re-setup from scratch
+make start
+make promote-user EMAIL=you@example.com
+```
 
 ---
 
-## 6. Gunicorn (Django)
+## Startup/shutdown order
+
+`make start` and `make stop` follow the correct order automatically.
+
+Manual order if needed:
+1. Start Postgres + Redis
+2. Start GlitchTip (`glitchtip-web` + `glitchtip-worker`)
+3. Start Django / Celery / Beat / Flower / Vite
+
+Shutdown reverse order — GlitchTip last so app shutdown logs are captured.
+
+---
+
+## Production: Gunicorn systemd service
 
 ```ini
 # /etc/systemd/system/atlas-django.service
@@ -194,9 +209,7 @@ Restart=always
 WantedBy=multi-user.target
 ```
 
----
-
-## 7. Celery worker + beat
+## Production: Celery worker
 
 ```ini
 # /etc/systemd/system/atlas-celery.service
@@ -209,6 +222,7 @@ User=www-data
 WorkingDirectory=/opt/atlas-insight/backend
 EnvironmentFile=/opt/atlas-insight/backend/.env
 Environment=DJANGO_SETTINGS_MODULE=config.settings.production
+Environment=ATLAS_SERVICE=celery-workers
 ExecStart=/opt/atlas-insight/backend/.venv/bin/celery \
     -A config worker \
     --loglevel=info \
@@ -218,6 +232,8 @@ Restart=always
 [Install]
 WantedBy=multi-user.target
 ```
+
+## Production: Celery beat
 
 ```ini
 # /etc/systemd/system/atlas-celery-beat.service
@@ -230,6 +246,7 @@ User=www-data
 WorkingDirectory=/opt/atlas-insight/backend
 EnvironmentFile=/opt/atlas-insight/backend/.env
 Environment=DJANGO_SETTINGS_MODULE=config.settings.production
+Environment=ATLAS_SERVICE=celery-beat
 ExecStart=/opt/atlas-insight/backend/.venv/bin/celery \
     -A config beat \
     --loglevel=info \
@@ -260,6 +277,7 @@ User=www-data
 WorkingDirectory=/opt/atlas-insight/backend
 EnvironmentFile=/opt/atlas-insight/backend/.env
 Environment=DJANGO_SETTINGS_MODULE=config.settings.production
+Environment=ATLAS_SERVICE=celery-flower
 ExecStart=/opt/atlas-insight/backend/.venv/bin/celery \
     -A config flower \
     --port=4504
@@ -269,15 +287,9 @@ Restart=always
 WantedBy=multi-user.target
 ```
 
-Enable and start:
-
-```bash
-systemctl enable --now atlas-flower
-```
-
 ---
 
-## 8. Nginx
+## Production: Nginx
 
 ```nginx
 # /etc/nginx/sites-available/atlas-insight
@@ -285,7 +297,6 @@ server {
     listen 443 ssl;
     server_name api.yoursite.com;
 
-    # SSL certs (e.g. from certbot)
     ssl_certificate     /etc/letsencrypt/live/api.yoursite.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/api.yoursite.com/privkey.pem;
 
@@ -323,18 +334,7 @@ server {
 
 ---
 
-## 9. Disk considerations
-
-Cloned repos are cached in `_running/repo_cache/`. On busy instances this can grow large.
-
-- `EVICT_AFTER_DAYS` (default 30) — deletes clones not accessed in N days
-- `RUNS_TO_KEEP_PER_REPO` (default 10) — trims old analysis result rows
-
-Monitor with `make -C backend shell` → Django admin → Admin stats panel.
-
----
-
-## 10. Updates
+## Updates
 
 ```bash
 git pull
@@ -347,19 +347,9 @@ systemctl restart atlas-django atlas-celery atlas-celery-beat
 
 ---
 
-## 11. Startup/Shutdown order (logging)
+## Disk considerations
 
-If GlitchTip is your sink for startup/shutdown logs, order matters.
+Cloned repos are cached in `_running/repo_cache/`. On busy instances this can grow large.
 
-Recommended order:
-
-1. Start Postgres + Redis
-2. Start GlitchTip (`glitchtip-web` + `glitchtip-worker`)
-3. Start Django/Celery/Beat/Flower/Vite
-
-Shutdown order:
-
-1. Stop app services (Django/Celery/Beat/Flower/Vite)
-2. Stop GlitchTip last
-
-The project `Makefile` follows this ordering so app startup and close-out logs have the best chance of being ingested.
+- `EVICT_AFTER_DAYS` (default 30) — deletes clones not accessed in N days
+- `RUNS_TO_KEEP_PER_REPO` (default 10) — trims old analysis result rows

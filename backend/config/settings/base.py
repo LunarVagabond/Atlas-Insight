@@ -229,9 +229,6 @@ EVICT_AFTER_DAYS = config('EVICT_AFTER_DAYS', default=30, cast=int)
 LOG_RETENTION_DAYS = config('LOG_RETENTION_DAYS', default=30, cast=int)
 
 # Logging
-LOG_DIR = REPO_ROOT / '_running' / 'logs'
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-
 import sys as _sys_logging
 
 
@@ -244,7 +241,7 @@ def _detect_service_name() -> str:
     if 'flower' in argv:
         return 'celery-flower'
     if 'celery' in argv and ' beat' in argv:
-        return 'celery-workers'
+        return 'celery-beat'
     if 'celery' in argv:
         return 'celery-workers'
     return 'django'
@@ -287,6 +284,24 @@ class _SentryServiceFilter:
     def filter(self, record):
         service_name = _service_from_logger_name(getattr(record, 'name', ''))
         setattr(record, 'service', service_name)
+        # Forward to Sentry/GlitchTip if DSN is configured
+        if SENTRY_DSN:
+            try:
+                import sentry_sdk
+                message = record.getMessage()
+                # Attach service context and send as explicit log capture
+                with sentry_sdk.configure_scope() as scope:
+                    scope.set_tag('service', service_name)
+                    scope.set_context('service', {'name': service_name})
+                    # Capture at appropriate level
+                    if record.levelno >= 40:
+                        sentry_sdk.capture_message(message, level='error')
+                    elif record.levelno >= 30:
+                        sentry_sdk.capture_message(message, level='warning')
+                    else:
+                        sentry_sdk.capture_message(message, level='info')
+            except Exception:
+                pass
         return True
 
 LOGGING = {
@@ -310,54 +325,40 @@ LOGGING = {
             'formatter': 'verbose',
             'filters': ['sentry_service'],
         },
-        'django_file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': LOG_DIR / 'django.log',
-            'maxBytes': 10 * 1024 * 1024,
-            'backupCount': 5,
-            'formatter': 'verbose',
-        },
-        'celery_file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': LOG_DIR / 'celery.log',
-            'maxBytes': 10 * 1024 * 1024,
-            'backupCount': 5,
-            'formatter': 'verbose',
-        },
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'django_file'],
+            'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
         },
         'django.request': {
-            'handlers': ['console', 'django_file'],
+            'handlers': ['console'],
             'level': 'ERROR',
             'propagate': False,
         },
         'django.server': {
-            'handlers': ['django_file'],
+            'handlers': ['console'],
             'level': 'ERROR',
             'propagate': False,
         },
         'django.template': {
-            'handlers': ['django_file'],
+            'handlers': ['console'],
             'level': 'ERROR',
             'propagate': False,
         },
         'django.db.backends': {
-            'handlers': ['django_file'],
+            'handlers': ['console'],
             'level': 'WARNING',
             'propagate': False,
         },
         'celery': {
-            'handlers': ['console', 'celery_file'],
+            'handlers': ['console'],
             'level': LOG_LEVEL,
             'propagate': False,
         },
         'apps': {
-            'handlers': ['console', 'django_file'],
+            'handlers': ['console'],
             'level': LOG_LEVEL,
             'propagate': False,
         },
@@ -426,11 +427,12 @@ if SENTRY_DSN:
         integrations=[
             DjangoIntegration(),
             CeleryIntegration(),
-            LoggingIntegration(
-                sentry_logs_level=_logging.INFO,
-                event_level=None,
-                level=_logging.INFO,
-            ),
+            # Disabled: LoggingIntegration may interfere with handler filters
+            # LoggingIntegration(
+            #     sentry_logs_level=_logging.INFO,
+            #     event_level=None,
+            #     level=_logging.INFO,
+            # ),
         ],
         enable_logs=True,
     )

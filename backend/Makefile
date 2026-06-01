@@ -9,14 +9,16 @@ PYTHON  := $(VENV)/bin/python
 PIP     := $(VENV)/bin/pip
 CELERY  := $(VENV)/bin/celery
 
-DJANGO_ENV := env -u SENTRY_DSN DJANGO_SETTINGS_MODULE=config.settings.development
+_SETTINGS_FROM_ENV := $(shell grep '^DJANGO_SETTINGS_MODULE=' $(MAKEFILE_DIR).env 2>/dev/null | cut -d= -f2-)
+DJANGO_SETTINGS_MODULE ?= $(_SETTINGS_FROM_ENV)
+DJANGO_ENV := DJANGO_SETTINGS_MODULE=$(or $(DJANGO_SETTINGS_MODULE),config.settings.development)
 
 .PHONY: setup start stop restart status \
         start-django stop-django \
         start-celery stop-celery \
 	start-beat stop-beat \
         start-flower stop-flower \
-	sentry-test-services \
+	sentry-test-services promote-user \
         migrate makemigrations createsuperuser shell dbshell collectstatic \
         test lint format logs \
         _ensure_running_dirs _start_svc _stop_svc
@@ -54,7 +56,7 @@ start-django: _ensure_running_dirs
 	else \
 	  rm -f "$$PID_FILE"; \
 	  (cd $(MAKEFILE_DIR) && exec env ATLAS_SERVICE=django $(DJANGO_ENV) $(PYTHON) manage.py runserver 0.0.0.0:4500 --noreload) \
-	    > $(RUNNING_DIR)/logs/django.log 2>&1 & echo $$! > $(RUNNING_DIR)/pids/django.pid; \
+	    > /dev/null 2>&1 & echo $$! > $(RUNNING_DIR)/pids/django.pid; \
 	fi
 
 stop-django:
@@ -83,7 +85,7 @@ start-celery: _ensure_running_dirs
 	else \
 	  rm -f "$$PID_FILE"; \
 	  cd $(MAKEFILE_DIR) && ATLAS_SERVICE=celery-workers $(DJANGO_ENV) $(CELERY) -A config worker -l info -n worker@%h \
-	    > $(RUNNING_DIR)/logs/celery.log 2>&1 & echo $$! > $(RUNNING_DIR)/pids/celery.pid; \
+	    > /dev/null 2>&1 & echo $$! > $(RUNNING_DIR)/pids/celery.pid; \
 	fi
 
 stop-celery:
@@ -109,8 +111,8 @@ start-beat: _ensure_running_dirs
 	  echo "  beat already running (PID $$(cat $$PID_FILE)), skipping"; \
 	else \
 	  rm -f "$$PID_FILE"; \
-	  cd $(MAKEFILE_DIR) && ATLAS_SERVICE=celery-workers $(DJANGO_ENV) $(CELERY) -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler \
-	    > $(RUNNING_DIR)/logs/beat.log 2>&1 & echo $$! > $(RUNNING_DIR)/pids/beat.pid; \
+	  cd $(MAKEFILE_DIR) && ATLAS_SERVICE=celery-beat $(DJANGO_ENV) $(CELERY) -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler \
+	    > /dev/null 2>&1 & echo $$! > $(RUNNING_DIR)/pids/beat.pid; \
 	fi
 
 stop-beat:
@@ -138,7 +140,7 @@ start-flower: _ensure_running_dirs
 	  rm -f "$$PID_FILE"; \
 	  sleep 2; \
 	  (cd $(MAKEFILE_DIR) && exec env ATLAS_SERVICE=celery-flower $(DJANGO_ENV) $(CELERY) -A config flower --port=4504) \
-	    > $(RUNNING_DIR)/logs/flower.log 2>&1 & echo $$! > $(RUNNING_DIR)/pids/flower.pid; \
+	    > /dev/null 2>&1 & echo $$! > $(RUNNING_DIR)/pids/flower.pid; \
 	fi
 
 stop-flower:
@@ -209,28 +211,27 @@ status:
 	done
 
 logs:
-	@tail -f \
-	  $(RUNNING_DIR)/logs/django.log \
-	  $(RUNNING_DIR)/logs/celery.log \
-	  $(RUNNING_DIR)/logs/beat.log \
-	  $(RUNNING_DIR)/logs/flower.log
+	@echo "Local backend log files are disabled. Use GlitchTip Logs and make logs-glitchtip."
 
 logs-django:
-	@tail -f $(RUNNING_DIR)/logs/django.log 2>/dev/null || echo "No django log — is Django running? (make start-django)"
+	@echo "Local django log files are disabled. Use GlitchTip Logs service filter: django-*"
 
 logs-celery:
-	@tail -f $(RUNNING_DIR)/logs/celery.log 2>/dev/null || echo "No celery log — is Celery running? (make start-celery)"
+	@echo "Local celery log files are disabled. Use GlitchTip Logs service filter: celery-workers"
 
 logs-beat:
-	@tail -f $(RUNNING_DIR)/logs/beat.log 2>/dev/null || echo "No beat log — is beat running? (make start-beat)"
+	@echo "Local beat log files are disabled. Use GlitchTip Logs service filter: celery-workers"
 
 sentry-test-services:
-	@cd $(MAKEFILE_DIR) && $(DJANGO_ENV) $(PYTHON) scripts/sentry_service_test.py
+	@cd $(MAKEFILE_DIR) && $(DJANGO_ENV) $(PYTHON) -c "import os, sys; sys.path.insert(0, '.'); from scripts.sentry_service_test import load_env_and_run; load_env_and_run()"
 
 logs-flower:
-	@tail -f $(RUNNING_DIR)/logs/flower.log 2>/dev/null || echo "No flower log — is Flower running? (make start-flower)"
+	@echo "Local flower log files are disabled. Use GlitchTip Logs service filter: celery-flower"
+
+promote-user:
+	@cd $(MAKEFILE_DIR) && PROMOTE_EMAIL="$(EMAIL)" PROMOTE_USERNAME="$(USERNAME)" $(DJANGO_ENV) $(PYTHON) scripts/promote_user.py
 
 # ── Internal ───────────────────────────────────────────────────────────────────
 
 _ensure_running_dirs:
-	@mkdir -p $(RUNNING_DIR)/logs $(RUNNING_DIR)/pids
+	@mkdir -p $(RUNNING_DIR)/pids

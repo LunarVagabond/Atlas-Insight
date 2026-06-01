@@ -23,11 +23,9 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "glitchtip.settings")
 django.setup()
 
 from django.contrib.auth import get_user_model
-from allauth.socialaccount.models import SocialApp
 from apps.organizations_ext.models import (
     Organization,
     OrganizationOwner,
-    OrganizationSocialApp,
     OrganizationUser,
 )
 from apps.projects.models import Project, ProjectKey
@@ -36,29 +34,8 @@ User = get_user_model()
 
 org, _ = Organization.objects.get_or_create(name="Atlas Insight", defaults={"slug": "atlas-insight"})
 
-# Optional GitHub social login app wiring for this organization.
-github_client_id = os.environ.get("GITHUB_CLIENT_ID", "").strip()
-github_secret = os.environ.get("GITHUB_SECRET", "").strip()
-if github_client_id and github_secret:
-    social_app, _ = SocialApp.objects.get_or_create(
-        provider="github",
-        provider_id="github",
-        defaults={
-            "name": "GitHub",
-            "client_id": github_client_id,
-            "secret": github_secret,
-            "key": "",
-            "settings": {},
-        },
-    )
-    social_app.name = "GitHub"
-    social_app.client_id = github_client_id
-    social_app.secret = github_secret
-    social_app.key = ""
-    social_app.provider = "github"
-    social_app.provider_id = "github"
-    social_app.save()
-    OrganizationSocialApp.objects.get_or_create(organization=org, social_app=social_app)
+# GitHub OAuth is disabled for GlitchTip — email/password login only.
+# Admin invites users via Organizations → Members → Invite.
 
 # Promote first available user when one exists.
 u = User.objects.filter(email__isnull=False).order_by("id").first() or User.objects.order_by("id").first()

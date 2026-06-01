@@ -16,6 +16,7 @@ def main() -> None:
         "django-config": "config.urls",
         "django": "django.request",
         "celery-workers": "celery.worker",
+        "celery-beat": "celery.beat",
         "celery-flower": "flower.events",
     }
 
@@ -34,6 +35,8 @@ def main() -> None:
     print(f"Sent service test logs: {len(bucket_loggers)}")
     print(f"Marker: {marker}")
 
+
+load_env_and_run = main
 
 if __name__ == "__main__":
     main()
