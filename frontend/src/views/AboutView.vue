@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import AppTabs from '../components/ui/AppTabs.vue'
 
-const TABS = ['About', 'Guide']
+const TABS = ['About', 'Why Atlas Insight', 'Guide']
 const activeTab = ref('About')
 
 const _rawPublicBase = (import.meta.env.VITE_PUBLIC_BASE_URL as string | undefined) || window.location.origin
@@ -308,13 +308,6 @@ function clearSearch() {
       </section>
 
       <section class="about-view__section">
-        <h2 class="about-view__section-title">Why Atlas Insight?</h2>
-        <p>Open source is one of the best ways to grow as a developer — real codebases, real feedback, real impact on your portfolio. But walking into an unfamiliar repo can be genuinely overwhelming. Where do you start? Is the project still active? Is there anything a newcomer can actually pick up?</p>
-        <p>Atlas Insight was built to make that first step easier. Instead of spending an afternoon digging through commit history and reading issues trying to figure out if a project is a good fit, you can get a clear picture in seconds — how healthy the codebase is, whether it welcomes contributors, where the complexity lives, and what's actually available to work on.</p>
-        <p>Whether you're looking to land your first OSS contribution, find projects that align with skills you want to build, or just explore what's out there — Atlas Insight is a starting point, not a verdict. The goal is to lower the barrier between "I want to contribute" and "here's where to begin."</p>
-      </section>
-
-      <section class="about-view__section">
         <h2 class="about-view__section-title">How to use it</h2>
         <ol class="about-view__steps">
           <li>Paste a GitHub repository URL into the input on the home page.</li>
@@ -412,7 +405,24 @@ function clearSearch() {
       </section>
     </div>
 
-    <!-- ── Guide tab ──────────────────────────────────────────────────────── -->
+    <!-- ── Why tab ───────────────────────────────────────────────────────── -->
+    <div v-if="activeTab === 'Why Atlas Insight'" class="about-view__body" style="margin-top: 2rem">
+      <section class="about-view__section">
+        <p>Honestly, it started as a hobby project — something fun to tinker on. It turned out to be genuinely enjoyable to build, and somewhere along the way it became something worth sharing.</p>
+        <p>The problem it's trying to solve is real though. Open source is one of the best ways to grow as a developer — real codebases, real feedback, something concrete for a portfolio. But walking into an unfamiliar repo can be genuinely overwhelming. Where do you even start? Is the project still active? Is there anything a newcomer can actually pick up, or is every issue already claimed or hopelessly complex?</p>
+        <p>Atlas Insight is meant to make that first step easier. Instead of spending an afternoon digging through commit history and scanning issues trying to figure out if a project is a good fit, you can get a clear picture in seconds — how healthy the codebase is, whether it actually welcomes contributors, where the complexity lives, and what's available to work on right now.</p>
+        <p>Whether you're looking to land your first OSS contribution, build out a portfolio, find a project that matches skills you want to grow, or just explore — the goal is to lower the barrier between "I want to contribute" and "here's where to begin."</p>
+      </section>
+
+      <section class="about-view__section">
+        <h2 class="about-view__section-title">Feedback welcome</h2>
+        <p>Git history is a surprisingly rich data source. Commit timestamps, authorship patterns, file churn, message conventions, branch topology — there's a huge amount of signal sitting in plain text that most tools never look at. Atlas Insight is just scratching the surface. Dependency graphs, contributor network analysis, cross-repo comparisons, language trend detection — the surface area is enormous. Also, charts are cool. 🤓</p>
+        <p>Because there's so much left to explore, feedback genuinely matters. This is a side project built by one person — if a score feels off, a metric is confusing, a repo breaks the analysis, or you have an idea for something useful, I'd love to hear it.</p>
+        <p>Find the project on <a href="https://github.com/LunarVagabond/Atlas-Insight" target="_blank" rel="noopener noreferrer">GitHub</a> or reach out directly — feedback is the best way to help.</p>
+      </section>
+    </div>
+
+    <!-- ── Guide tab ───────────────────────────────────────────────────────── -->
     <div v-if="activeTab === 'Guide'" class="about-view__body guide" style="margin-top: 2rem">
 
       <p class="guide__intro">Plain-English reference for every number, score, and term in Atlas Insight. Each entry explains what the metric means and exactly how we compute it from the raw repository data.</p>
