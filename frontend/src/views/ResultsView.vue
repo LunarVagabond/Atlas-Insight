@@ -151,7 +151,7 @@ function exportJson() {
 }
 
 function printPage() {
-  window.print()
+  window.open(`/print/${runId.value}`, '_blank', 'noopener')
 }
 
 // Copy permalink

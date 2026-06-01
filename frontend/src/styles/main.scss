@@ -4,18 +4,10 @@
 @use 'typography';
 @use 'layout';
 @use 'components';
+@use 'print-view';
 
 body {
   background: var(--color-bg);
   color: var(--color-text);
 }
 
-@media print {
-  nav, .app-tabs, .btn, .results-header__actions, .chapter-nav,
-  .delta-bar__toggle, .card-hint-btn { display: none !important; }
-  .results-layout { padding: 0; }
-  .panel { break-inside: avoid; }
-  .heuristics-grid { grid-template-columns: repeat(2, 1fr); }
-  body { background: white; color: black; }
-  a { color: black; }
-}

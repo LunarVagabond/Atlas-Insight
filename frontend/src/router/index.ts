@@ -11,6 +11,11 @@ const router = createRouter({
       component: () => import('../views/ResultsView.vue'),
     },
     {
+      path: '/print/:runId',
+      name: 'print',
+      component: () => import('../views/PrintView.vue'),
+    },
+    {
       path: '/runs',
       name: 'runs',
       component: () => import('../views/RunsView.vue'),
