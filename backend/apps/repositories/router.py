@@ -81,6 +81,7 @@ class RunStatusSchema(Schema):
     repo_owner: str
     repo_name: str
     is_stale: bool
+    is_private: bool
     last_fetched_at: Optional[str]
     auth_token_warning: str
     cooldown_until: Optional[str] = None
@@ -318,6 +319,7 @@ def get_run(request, run_id: uuid.UUID):
         repo_owner=run.repo.owner,
         repo_name=run.repo.name,
         is_stale=run.repo.is_stale,
+        is_private=run.repo.is_private,
         last_fetched_at=run.repo.last_fetched_at.isoformat() if run.repo.last_fetched_at else None,
         auth_token_warning=run.repo.auth_token_warning,
         cooldown_until=_cooldown_until(run.repo),
@@ -439,27 +441,42 @@ def _svg_escape(text: str) -> str:
 def _make_card_svg(
     owner: str, name: str, health_label: str, color: str,
     oss_score, total_commits: int, total_files: int, contributors: int,
+    theme: str = 'dark',
 ) -> str:
-    owner = _svg_escape(owner[:30])
-    name = _svg_escape(name[:40])
+    owner = _svg_escape(owner[:22])
+    name = _svg_escape(name[:30])
     health_label = _svg_escape(health_label)
     score_str = str(oss_score) if oss_score is not None else '—'
-    pill_w = max(len(health_label) * 7 + 22, 70)
-    pill_cx = 22 + pill_w // 2
+    pill_w = max(len(health_label) * 7 + 24, 72)
+    pill_cx = 18 + pill_w // 2
     stats = f'{total_commits:,} commits  ·  {total_files:,} files  ·  {contributors} contributor{"s" if contributors != 1 else ""}'
     f = 'DejaVu Sans,Verdana,Geneva,sans-serif'
+    W, H = 480, 150
+    if theme == 'light':
+        bg, title, sub, muted = '#ffffff', '#24292f', '#57606a', '#8c959f'
+    else:
+        bg, title, sub, muted = '#0d1117', '#e6edf3', '#8b949e', '#6e7681'
     return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="480" height="130">'
-        f'<rect width="480" height="130" rx="10" fill="#0d1117"/>'
-        f'<rect width="5" height="130" rx="2" fill="{color}"/>'
-        f'<text x="22" y="22" font-family="{f}" font-size="11" fill="#8b949e">atlas insight</text>'
-        f'<text x="22" y="52" font-family="{f}" font-size="18" font-weight="bold" fill="#e6edf3">{owner}/{name}</text>'
-        f'<rect x="22" y="60" width="{pill_w}" height="20" rx="10" fill="{color}" fill-opacity="0.18" stroke="{color}" stroke-width="1"/>'
-        f'<text x="{pill_cx}" y="74" font-family="{f}" font-size="11" fill="{color}" text-anchor="middle">{health_label}</text>'
-        f'<text x="22" y="108" font-family="{f}" font-size="38" font-weight="bold" fill="{color}">{score_str}</text>'
-        f'<text x="72" y="98" font-family="{f}" font-size="11" fill="#8b949e">/10</text>'
-        f'<text x="72" y="112" font-family="{f}" font-size="10" fill="#6e7681">OSS Score</text>'
-        f'<text x="22" y="124" font-family="{f}" font-size="10" fill="#6e7681">{stats}</text>'
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}">'
+        f'<rect width="{W}" height="{H}" rx="10" fill="{bg}"/>'
+        f'<rect width="{W}" height="{H}" rx="10" fill="none" stroke="{color}" stroke-width="1" stroke-opacity="0.35"/>'
+        f'<rect width="4" height="{H}" rx="2" fill="{color}"/>'
+        # top-left: brand label
+        f'<text x="18" y="26" font-family="{f}" font-size="11" fill="{muted}">atlas insight</text>'
+        # top-right: score (big) + /10 label
+        f'<text x="{W - 16}" y="42" font-family="{f}" font-size="32" font-weight="700" fill="{color}" text-anchor="end">{score_str}</text>'
+        f'<text x="{W - 16}" y="54" font-family="{f}" font-size="10" fill="{sub}" text-anchor="end">/10  OSS Score</text>'
+        # divider 1
+        f'<line x1="18" y1="62" x2="{W - 16}" y2="62" stroke="{muted}" stroke-width="0.5" stroke-opacity="0.35"/>'
+        # repo name
+        f'<text x="18" y="90" font-family="{f}" font-size="18" font-weight="700" fill="{title}">{owner}/{name}</text>'
+        # health pill
+        f'<rect x="18" y="100" width="{pill_w}" height="22" rx="11" fill="{color}" fill-opacity="0.15" stroke="{color}" stroke-width="1"/>'
+        f'<text x="{pill_cx}" y="115" font-family="{f}" font-size="11" font-weight="600" fill="{color}" text-anchor="middle">{health_label}</text>'
+        # divider 2
+        f'<line x1="18" y1="130" x2="{W - 16}" y2="130" stroke="{muted}" stroke-width="0.5" stroke-opacity="0.35"/>'
+        # stats
+        f'<text x="18" y="144" font-family="{f}" font-size="10" fill="{muted}">{stats}</text>'
         f'</svg>'
     )
 
@@ -492,15 +509,13 @@ def _make_svg(label: str, value: str, color: str) -> str:
 
 @router.get('/runs/{run_id}/card.svg')
 @ratelimit(key='ip', rate='30/m', method='GET', block=False)
-def run_card(request, run_id: uuid.UUID):
+def run_card(request, run_id: uuid.UUID, theme: str = 'dark'):
     if getattr(request, 'limited', False):
         return HttpResponse('Rate limit exceeded', status=429)
     try:
         run = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
         return HttpResponse('Not found', status=404)
-    if run.repo.is_private:
-        return HttpResponse('Private', status=403)
     if run.status != 'completed' or not run.result:
         return HttpResponse('Not ready', status=404)
 
@@ -511,6 +526,7 @@ def run_card(request, run_id: uuid.UUID):
     oss_score = oss.get('score') if isinstance(oss, dict) else None
     commits = res.get('commits', {})
     structure = res.get('structure', {})
+    card_theme = theme if theme in ('dark', 'light') else 'dark'
 
     svg = _make_card_svg(
         owner=run.repo.owner,
@@ -521,9 +537,10 @@ def run_card(request, run_id: uuid.UUID):
         total_commits=commits.get('total_commits', 0),
         total_files=structure.get('total_files', 0),
         contributors=commits.get('total_contributors', 0),
+        theme=card_theme,
     )
     resp = HttpResponse(svg, content_type='image/svg+xml')
-    resp['Cache-Control'] = 'max-age=3600'
+    resp['Cache-Control'] = 'public, max-age=300, stale-while-revalidate=3600'
     return resp
 
 
@@ -1283,10 +1300,6 @@ def repo_badge(request, owner: str, name: str):
         svg = _make_svg('atlas insight', 'not found', _BADGE_NOT_ANALYZED)
         return HttpResponse(svg, content_type='image/svg+xml', status=404)
 
-    if repo.is_private:
-        svg = _make_svg('atlas insight', 'private', _BADGE_NOT_ANALYZED)
-        return HttpResponse(svg, content_type='image/svg+xml', status=403)
-
     run = repo.runs.filter(status='completed').order_by('-triggered_at').first()
     if not run or not run.result:
         svg = _make_svg('atlas insight', 'not analyzed', _BADGE_NOT_ANALYZED)
@@ -1302,5 +1315,5 @@ def repo_badge(request, owner: str, name: str):
 
     svg = _make_svg(label, value, color)
     resp = HttpResponse(svg, content_type='image/svg+xml')
-    resp['Cache-Control'] = 'max-age=3600'
+    resp['Cache-Control'] = 'public, max-age=300, stale-while-revalidate=3600'
     return resp

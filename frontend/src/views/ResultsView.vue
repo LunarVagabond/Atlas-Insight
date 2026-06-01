@@ -199,28 +199,37 @@ function copyLink() {
 // Embed / badge snippet
 const showEmbed = ref(false)
 const embedCopied = ref(false)
-const _apiBase = computed(() =>
-  (import.meta.env.VITE_API_BASE_URL as string).replace(/\/api$/, '')
-)
+const cardCopied = ref(false)
+const cardTheme = ref<'dark' | 'light'>('dark')
+const _origin = window.location.origin
 const badgeUrl = computed(() => {
   if (!store.run) return ''
   const { repo_owner: o, repo_name: n } = store.run
-  return `${_apiBase.value}/api/v1/repositories/badge/${o}/${n}.svg`
+  return `${_origin}/api/v1/repositories/badge/${o}/${n}.svg`
 })
 const embedMarkdown = computed(() => {
   if (!store.run) return ''
   const { repo_owner: o, repo_name: n } = store.run
-  const link = `${window.location.origin}/r/${o}/${n}`
-  return `[![Atlas Insight](${badgeUrl.value})](${link})`
+  return `[![Atlas Insight](${badgeUrl.value})](${_origin}/r/${o}/${n})`
 })
 const cardUrl = computed(() => {
   if (!store.run) return ''
-  return `${_apiBase.value}/api/v1/repositories/runs/${store.run.id}/card.svg`
+  return `${_origin}/api/v1/repositories/runs/${store.run.id}/card.svg?theme=${cardTheme.value}`
+})
+const cardMarkdown = computed(() => {
+  if (!store.run) return ''
+  const { repo_owner: o, repo_name: n } = store.run
+  return `[![Atlas Insight](${cardUrl.value})](${_origin}/r/${o}/${n})`
 })
 function copyEmbed() {
   navigator.clipboard.writeText(embedMarkdown.value)
   embedCopied.value = true
   setTimeout(() => { embedCopied.value = false }, 2000)
+}
+function copyCard() {
+  navigator.clipboard.writeText(cardMarkdown.value)
+  cardCopied.value = true
+  setTimeout(() => { cardCopied.value = false }, 2000)
 }
 
 const isArchived = computed(() => result.value?.github_meta?.archived === true)
@@ -320,21 +329,48 @@ const isArchived = computed(() => result.value?.github_meta?.archived === true)
             <span class="embed-panel__title">Embed in README</span>
             <button class="embed-panel__close" @click="showEmbed = false" aria-label="Close embed panel">✕</button>
           </div>
-          <p class="embed-panel__hint">Paste this markdown into your repository's README to add an Atlas Insight badge:</p>
-          <div class="embed-panel__snippet">
-            <code class="embed-panel__code">{{ embedMarkdown }}</code>
-            <button class="btn btn--secondary embed-panel__copy" @click="copyEmbed">
-              {{ embedCopied ? '✓ Copied' : 'Copy' }}
-            </button>
+          <div class="embed-panel__row">
+            <span class="embed-panel__row-label">Badge</span>
+            <div class="embed-panel__snippet">
+              <code class="embed-panel__code">{{ embedMarkdown }}</code>
+              <button class="btn btn--secondary embed-panel__copy" @click="copyEmbed">
+                {{ embedCopied ? '✓ Copied' : 'Copy' }}
+              </button>
+            </div>
+          </div>
+          <div class="embed-panel__row">
+            <div class="embed-panel__row-header">
+              <span class="embed-panel__row-label">Card</span>
+              <div class="embed-panel__theme-toggle">
+                <button
+                  class="embed-panel__theme-btn"
+                  :class="{ 'embed-panel__theme-btn--active': cardTheme === 'dark' }"
+                  @click="cardTheme = 'dark'"
+                >Dark</button>
+                <button
+                  class="embed-panel__theme-btn"
+                  :class="{ 'embed-panel__theme-btn--active': cardTheme === 'light' }"
+                  @click="cardTheme = 'light'"
+                >Light</button>
+              </div>
+            </div>
+            <div class="embed-panel__snippet">
+              <code class="embed-panel__code">{{ cardMarkdown }}</code>
+              <button class="btn btn--secondary embed-panel__copy" @click="copyCard">
+                {{ cardCopied ? '✓ Copied' : 'Copy' }}
+              </button>
+            </div>
           </div>
           <div class="embed-panel__previews">
             <div class="embed-panel__preview-item">
               <span class="embed-panel__preview-label">Badge</span>
               <img :src="badgeUrl" alt="Atlas Insight badge" class="embed-panel__badge-img" loading="lazy" />
             </div>
-            <div class="embed-panel__preview-item">
+            <div class="embed-panel__preview-item embed-panel__preview-item--card">
               <span class="embed-panel__preview-label">Card</span>
-              <img :src="cardUrl" alt="Atlas Insight health card" class="embed-panel__card-img" loading="lazy" />
+              <div class="embed-panel__card-bg" :class="{ 'embed-panel__card-bg--light': cardTheme === 'light' }">
+                <img :src="cardUrl" alt="Atlas Insight health card" class="embed-panel__card-img" loading="lazy" />
+              </div>
             </div>
           </div>
         </div>

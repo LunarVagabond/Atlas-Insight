@@ -11,6 +11,7 @@ export interface AnalysisRun {
   repo_owner: string
   repo_name: string
   is_stale: boolean
+  is_private: boolean
   last_fetched_at: string | null
   auth_token_warning: string
   cooldown_until: string | null
