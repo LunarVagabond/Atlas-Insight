@@ -1,5 +1,9 @@
 <script setup lang="ts">
-defineProps<{ tabs: string[]; modelValue: string }>()
+defineProps<{
+  tabs: string[]
+  modelValue: string
+  badges?: Record<string, number | string>
+}>()
 const emit = defineEmits<{ 'update:modelValue': [tab: string] }>()
 </script>
 
@@ -12,6 +16,7 @@ const emit = defineEmits<{ 'update:modelValue': [tab: string] }>()
       @click="emit('update:modelValue', tab)"
     >
       {{ tab }}
+      <span v-if="badges?.[tab]" class="tabs__badge">{{ badges[tab] }}</span>
     </button>
   </div>
 </template>

@@ -63,6 +63,26 @@ const hasRoadmap = computed(() => (result.value?.structure?.roadmap_parsed?.mile
 const CHAPTER_TABS = ['Overview', 'Project', 'History', 'Architecture', 'Ownership', 'Dependencies', 'Security', 'Heuristics', 'Contributing', 'Tours']
 const TABS = computed(() => CHAPTER_TABS)
 
+const tabBadges = computed<Record<string, number | string>>(() => {
+  if (!result.value) return {}
+  const r = result.value
+  const badges: Record<string, number | string> = {}
+
+  const secCount = (r.security?.issue_count ?? 0) + (r.security?.vulnerabilities?.length ?? 0)
+  if (secCount > 0) badges['Security'] = secCount
+
+  const contribCount = r.contribution_opportunities?.length ?? 0
+  if (contribCount > 0) badges['Contributing'] = contribCount
+
+  const toursCount = r.arch_tours?.length ?? 0
+  if (toursCount > 0) badges['Tours'] = toursCount
+
+  const highRiskHeuristics = (r.heuristics ?? []).filter(h => h.score >= 60).length
+  if (highRiskHeuristics > 0) badges['Heuristics'] = highRiskHeuristics
+
+  return badges
+})
+
 const activeTab = ref((route.query.tab as string) || 'Overview')
 
 const activeChapterIndex = computed(() => CHAPTER_TABS.indexOf(activeTab.value))
@@ -247,7 +267,7 @@ function copyLink() {
         :loading="store.diffLoading"
         style="margin-bottom: 1rem"
       />
-      <AppTabs :tabs="TABS" v-model="activeTab" />
+      <AppTabs :tabs="TABS" v-model="activeTab" :badges="tabBadges" />
       <div style="margin-top: 1.5rem">
         <OverviewPanel v-if="activeTab === 'Overview'" :result="result" />
         <template v-if="activeTab === 'Project'">
