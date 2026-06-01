@@ -1,12 +1,21 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
+import ShortcutsModal from './components/ui/ShortcutsModal.vue'
 
 const authStore = useAuthStore()
 const router = useRouter()
 
 const isDark = ref(false)
+const showShortcuts = ref(false)
+
+function onGlobalKey(e: KeyboardEvent) {
+  const tag = (e.target as HTMLElement).tagName
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return
+  if ((e.target as HTMLElement).isContentEditable) return
+  if (e.key === '?') showShortcuts.value = true
+}
 
 function applyTheme(dark: boolean) {
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
@@ -39,6 +48,11 @@ onMounted(async () => {
   if (window.location.search.includes('login=success')) {
     router.replace({ query: {} })
   }
+  window.addEventListener('keydown', onGlobalKey)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onGlobalKey)
 })
 
 const menuOpen = ref(false)
@@ -110,12 +124,14 @@ const menuOpen = ref(false)
       <RouterView />
     </div>
     <footer class="app-footer">
-      <span class="app-footer__spacer"></span>
+      <span class="app-footer__shortcuts-hint">Press <kbd>?</kbd> for shortcuts</span>
       <span class="app-footer__copy">© {{ new Date().getFullYear() }} Lunar Vagabond. All rights reserved.</span>
       <span class="app-footer__support">
         If you enjoy Atlas Insight, consider
         <a href="https://www.buymeacoffee.com/lunarvagabond" target="_blank" rel="noopener noreferrer" class="app-footer__bmc">☕ buying me a coffee</a>
       </span>
     </footer>
+
+    <ShortcutsModal v-if="showShortcuts" @close="showShortcuts = false" />
   </div>
 </template>

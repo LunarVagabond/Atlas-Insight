@@ -952,6 +952,70 @@ def get_run_diff(request, run_id: uuid.UUID):
     return _compute_run_diff(run.result, prev_run.result, prev_run.id, prev_run.triggered_at)
 
 
+class SimilarRunOut(Schema):
+    run_id: str
+    owner: str
+    name: str
+    repo_url: str
+    oss_score: float
+    health_key: str
+    primary_language: Optional[str]
+    stars: int
+
+
+@router.get('/runs/{run_id}/similar', response=list[SimilarRunOut])
+@ratelimit(key='user_or_ip', rate='60/h', method='GET', block=False)
+def get_similar_runs(request, run_id: uuid.UUID):
+    _assert_not_limited(request)
+    try:
+        run = AnalysisRun.objects.select_related('repo').get(id=run_id)
+    except AnalysisRun.DoesNotExist:
+        raise HttpError(404, 'Run not found')
+    if run.repo.is_private and not request.user.is_authenticated:
+        raise HttpError(403, 'Access denied')
+    if run.status != 'completed' or not run.result:
+        return []
+
+    lang = (run.result.get('github_meta') or {}).get('primary_language')
+    score = (run.result.get('oss_score') or {}).get('score', 5)
+
+    qs = AnalysisRun.objects.select_related('repo').filter(
+        status='completed',
+        repo__is_private=False,
+    ).exclude(repo=run.repo).order_by('-completed_at')
+
+    if lang:
+        qs = qs.filter(result__github_meta__primary_language=lang)
+
+    results = []
+    for candidate in qs[:50]:
+        if not candidate.result:
+            continue
+        cand_score = (candidate.result.get('oss_score') or {}).get('score', 5)
+        if abs(cand_score - score) > 2:
+            continue
+        health_key = (
+            (candidate.result.get('classification') or {})
+            .get('project_health', {})
+            .get('key', '')
+        )
+        stars = (candidate.result.get('github_meta') or {}).get('stars', 0)
+        results.append(SimilarRunOut(
+            run_id=str(candidate.id),
+            owner=candidate.repo.owner,
+            name=candidate.repo.name,
+            repo_url=candidate.repo.url,
+            oss_score=round(cand_score, 1),
+            health_key=health_key,
+            primary_language=lang,
+            stars=stars,
+        ))
+        if len(results) >= 5:
+            break
+
+    return results
+
+
 @router.get('/runs/{run_id}/file-history')
 @ratelimit(key='user_or_ip', rate='30/h', method='GET', block=False)
 def get_file_history(request, run_id: uuid.UUID, path: str = ''):

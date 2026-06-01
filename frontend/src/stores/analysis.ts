@@ -406,6 +406,17 @@ export interface HeuristicSignal {
   items?: string[]
 }
 
+export interface SimilarRun {
+  run_id: string
+  owner: string
+  name: string
+  repo_url: string
+  oss_score: number
+  health_key: string
+  primary_language: string | null
+  stars: number
+}
+
 export interface RunListItem {
   id: string
   repo_id: string
@@ -438,6 +449,8 @@ export const useAnalysisStore = defineStore('analysis', {
     jitError: false,
     diffData: null as DiffData | null,
     diffLoading: false,
+    similarRuns: null as SimilarRun[] | null,
+    similarLoading: false,
   }),
 
   actions: {
@@ -494,6 +507,19 @@ export const useAnalysisStore = defineStore('analysis', {
         this.diffData = { available: false }
       } finally {
         this.diffLoading = false
+      }
+    },
+
+    async fetchSimilar(runId: string) {
+      if (this.similarLoading) return
+      this.similarLoading = true
+      try {
+        const { data } = await axios.get(`/api/v1/repositories/runs/${runId}/similar`)
+        this.similarRuns = data
+      } catch {
+        this.similarRuns = []
+      } finally {
+        this.similarLoading = false
       }
     },
 
@@ -580,6 +606,7 @@ export const useAnalysisStore = defineStore('analysis', {
       this.jitIssues = null
       this.jitPrs = null
       this.jitError = false
+      this.similarRuns = null
     },
   },
 })

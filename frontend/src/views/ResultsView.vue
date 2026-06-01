@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onUnmounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAnalysisStore } from '../stores/analysis'
 import { useAuthStore } from '../stores/auth'
@@ -21,6 +21,8 @@ import OwnershipPanel from '../components/analysis/OwnershipPanel.vue'
 import DeltaPanel from '../components/analysis/DeltaPanel.vue'
 import ContributorGraph from '../components/analysis/ContributorGraph.vue'
 import StaleBranchesPanel from '../components/analysis/StaleBranchesPanel.vue'
+import SimilarReposPanel from '../components/analysis/SimilarReposPanel.vue'
+import CompareModal from '../components/ui/CompareModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -112,6 +114,7 @@ watch(runId, async (id) => {
   store.jitIssues = null
   store.jitPrs = null
   store.diffData = null
+  store.similarRuns = null
   await store.pollRun(id)
 }, { immediate: true })
 
@@ -119,12 +122,8 @@ watch(() => store.run?.status, (status) => {
   if (status === 'completed' && runId.value) {
     store.fetchJitData(runId.value)
     store.fetchDiff(runId.value)
+    store.fetchSimilar(runId.value)
   }
-})
-
-onUnmounted(() => {
-  store._stopPolling()
-  if (stepTimer) { clearInterval(stepTimer); stepTimer = null }
 })
 
 // Re-analyze with cooldown
@@ -233,6 +232,24 @@ function copyCard() {
 }
 
 const isArchived = computed(() => result.value?.github_meta?.archived === true)
+
+const showCompareModal = ref(false)
+
+function onTabKey(e: KeyboardEvent) {
+  const tag = (e.target as HTMLElement).tagName
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return
+  if ((e.target as HTMLElement).isContentEditable) return
+  const idx = CHAPTER_TABS.indexOf(activeTab.value)
+  if (e.key === 'j') activeTab.value = CHAPTER_TABS[Math.min(idx + 1, CHAPTER_TABS.length - 1)]
+  else if (e.key === 'k') activeTab.value = CHAPTER_TABS[Math.max(idx - 1, 0)]
+}
+
+onMounted(() => window.addEventListener('keydown', onTabKey))
+onUnmounted(() => {
+  window.removeEventListener('keydown', onTabKey)
+  store._stopPolling()
+  if (stepTimer) { clearInterval(stepTimer); stepTimer = null }
+})
 </script>
 
 <template>
@@ -247,6 +264,9 @@ const isArchived = computed(() => result.value?.github_meta?.archived === true)
           <div class="results-header__action-group">
             <AppButton v-if="result" variant="secondary" size="sm" @click="copyLink">
               {{ copied ? '✓ Copied' : '🔗 Share' }}
+            </AppButton>
+            <AppButton v-if="result" variant="secondary" size="sm" @click="showCompareModal = true">
+              ⇄ Compare
             </AppButton>
             <AppButton v-if="result" variant="secondary" size="sm" @click="showEmbed = !showEmbed">
               {{ showEmbed ? '✕ Embed' : '</> Embed' }}
@@ -388,6 +408,11 @@ const isArchived = computed(() => result.value?.github_meta?.archived === true)
           <div style="margin-top: 1.5rem">
             <OverviewPanel :result="result" />
           </div>
+          <SimilarReposPanel
+            v-if="store.similarRuns !== null || store.similarLoading"
+            :runs="store.similarRuns ?? []"
+            :loading="store.similarLoading"
+          />
         </template>
         <template v-if="activeTab === 'Project'">
           <ProjectPanel :result="result" />
@@ -451,4 +476,6 @@ const isArchived = computed(() => result.value?.github_meta?.archived === true)
     </div>
     </Transition>
   </div>
+
+  <CompareModal v-if="showCompareModal" @close="showCompareModal = false" />
 </template>

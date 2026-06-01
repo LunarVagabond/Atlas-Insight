@@ -2,18 +2,15 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
-import type { AnalysisRun, DiffData } from '../stores/analysis'
+import type { AnalysisRun } from '../stores/analysis'
 import LoadingSpinner from '../components/ui/LoadingSpinner.vue'
 import ComparePanel from '../components/analysis/ComparePanel.vue'
-import DeltaPanel from '../components/analysis/DeltaPanel.vue'
 
 const route = useRoute()
 const runA = ref<AnalysisRun | null>(null)
 const runB = ref<AnalysisRun | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
-const diffData = ref<DiffData | null>(null)
-const diffLoading = ref(false)
 
 onMounted(async () => {
   const { a, b } = route.query
@@ -33,18 +30,6 @@ onMounted(async () => {
     error.value = 'Failed to load one or both runs'
   } finally {
     loading.value = false
-  }
-
-  if (runA.value?.status === 'completed') {
-    diffLoading.value = true
-    try {
-      const { data } = await axios.get(`/api/v1/repositories/runs/${a}/diff`)
-      diffData.value = data
-    } catch {
-      diffData.value = { available: false }
-    } finally {
-      diffLoading.value = false
-    }
   }
 })
 </script>
@@ -68,12 +53,6 @@ onMounted(async () => {
       <div v-else-if="error" class="empty-state">{{ error }}</div>
       <template v-else-if="runA && runB">
         <ComparePanel :run-a="runA" :run-b="runB" />
-        <DeltaPanel
-          v-if="diffData || diffLoading"
-          :diff-data="diffData ?? { available: false }"
-          :loading="diffLoading"
-          style="margin-top: 1.5rem"
-        />
       </template>
     </div>
   </div>

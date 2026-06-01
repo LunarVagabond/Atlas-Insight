@@ -15,6 +15,13 @@ RUST_USE = re.compile(r'^\s*use\s+((?:super|self|crate)(?:::\w+)+)', re.MULTILIN
 JAVA_IMPORT = re.compile(r'^\s*import\s+(?:static\s+)?([\w.]+(?:\.\w+)+)\s*;', re.MULTILINE)
 CS_USING = re.compile(r'^\s*using\s+([\w.]+)\s*;', re.MULTILINE)
 PHP_USE = re.compile(r'^\s*(?:use|require(?:_once)?|include(?:_once)?)\s+[\\\'"]?([\w\\/.]+)[\'"]?\s*[;(]', re.MULTILINE)
+SWIFT_IMPORT = re.compile(r'^\s*import\s+([\w.]+)', re.MULTILINE)
+SCALA_IMPORT = re.compile(r'^\s*import\s+([\w.]+)', re.MULTILINE)
+ELIXIR_ALIAS = re.compile(r'^\s*(?:alias|require|import|use)\s+([\w.]+)', re.MULTILINE)
+LUA_REQUIRE = re.compile(
+    r"""^\s*(?:local\s+\w+\s*=\s*)?require\s*[(\s]['"]([^'"]+)['"]""", re.MULTILINE
+)
+DART_IMPORT = re.compile(r"""^\s*import\s+['"]([^'"]+)['"]""", re.MULTILINE)
 
 MAX_FILE_SIZE = 500_000  # 500KB
 
@@ -81,6 +88,33 @@ _RUBY_STDLIB = frozenset({
     'weakref', 'webrick', 'win32ole', 'yaml', 'zlib',
 })
 
+_SWIFT_STDLIB = frozenset({
+    'Swift', 'Foundation', 'UIKit', 'AppKit', 'SwiftUI', 'Combine', 'CoreData',
+    'CoreFoundation', 'CoreGraphics', 'CoreLocation', 'CoreMotion', 'CoreNFC',
+    'CoreText', 'CoreVideo', 'ARKit', 'AVFoundation', 'CFNetwork', 'CloudKit',
+    'Contacts', 'CoreBluetooth', 'CoreImage', 'CryptoKit', 'EventKit',
+    'GameKit', 'HealthKit', 'HomeKit', 'MapKit', 'MessageUI', 'Metal',
+    'ModelIO', 'MultipeerConnectivity', 'NaturalLanguage', 'Network',
+    'NotificationCenter', 'Photos', 'RealityKit', 'SafariServices',
+    'SceneKit', 'SpriteKit', 'StoreKit', 'UIKit', 'UserNotifications',
+    'Vision', 'WatchKit', 'WebKit', 'XCTest', 'Darwin', 'Dispatch',
+    'ObjectiveC', 'os', 'simd',
+})
+
+_SCALA_STDLIB_PREFIXES = ('scala.', 'java.', 'javax.', 'sun.', 'com.sun.')
+
+_ELIXIR_STDLIB = frozenset({
+    'Kernel', 'Enum', 'List', 'Map', 'MapSet', 'String', 'IO', 'File',
+    'Path', 'Process', 'Agent', 'GenServer', 'GenEvent', 'Supervisor',
+    'Task', 'Stream', 'Range', 'Regex', 'Date', 'Time', 'DateTime',
+    'NaiveDateTime', 'Calendar', 'Access', 'Application', 'Atom', 'Base',
+    'Behaviour', 'Bitwise', 'Code', 'Dict', 'Duration', 'DynamicSupervisor',
+    'Exception', 'Float', 'Function', 'HashDict', 'HashSet', 'Integer',
+    'Keyword', 'Logger', 'Macro', 'Module', 'Node', 'Port', 'Protocol',
+    'Record', 'Registry', 'Set', 'System', 'Tuple', 'URI', 'Version',
+    'Mix', 'ExUnit', 'IEx',
+})
+
 
 def _read_go_module_path(base: str) -> str | None:
     gomod = os.path.join(base, 'go.mod')
@@ -114,6 +148,19 @@ def _is_external_cs(dep: str) -> bool:
 def _is_external_ruby(dep: str) -> bool:
     top = dep.split('/')[0]
     return top in _RUBY_STDLIB
+
+
+def _is_external_swift(dep: str) -> bool:
+    return dep in _SWIFT_STDLIB
+
+
+def _is_external_scala(dep: str) -> bool:
+    return any(dep.startswith(p) for p in _SCALA_STDLIB_PREFIXES)
+
+
+def _is_external_elixir(dep: str) -> bool:
+    top = dep.split('.')[0]
+    return top in _ELIXIR_STDLIB
 
 
 def _is_external_go(dep: str, module_path: str | None) -> bool:
@@ -218,4 +265,31 @@ def parse_imports(repo_dir: str) -> list[dict]:
                     # skip relative path-style includes that look like stdlib
                     if dep and not dep.startswith('/'):
                         edges.append({'source': source, 'target': dep, 'lang': 'php'})
+            elif ext == '.swift':
+                for m in SWIFT_IMPORT.finditer(content):
+                    dep = m.group(1)
+                    if dep and not _is_external_swift(dep):
+                        edges.append({'source': source, 'target': dep, 'lang': 'swift'})
+            elif ext == '.scala':
+                for m in SCALA_IMPORT.finditer(content):
+                    dep = m.group(1)
+                    if dep and not _is_external_scala(dep):
+                        edges.append({'source': source, 'target': dep, 'lang': 'scala'})
+            elif ext in {'.ex', '.exs'}:
+                for m in ELIXIR_ALIAS.finditer(content):
+                    dep = m.group(1)
+                    if dep and not _is_external_elixir(dep):
+                        edges.append({'source': source, 'target': dep, 'lang': 'elixir'})
+            elif ext == '.lua':
+                for m in LUA_REQUIRE.finditer(content):
+                    dep = m.group(1)
+                    if dep:
+                        edges.append({'source': source, 'target': dep, 'lang': 'lua'})
+            elif ext == '.dart':
+                for m in DART_IMPORT.finditer(content):
+                    dep = m.group(1)
+                    # keep only package: imports; dart: = stdlib, relative paths = noise
+                    if dep and dep.startswith('package:') and not dep.startswith('dart:'):
+                        pkg = dep[len('package:'):].split('/')[0]
+                        edges.append({'source': source, 'target': pkg, 'lang': 'dart'})
     return edges
