@@ -119,6 +119,51 @@ def _parse_gemfile(path: Path) -> list[dict]:
     return deps
 
 
+def _parse_composer_json(path: Path) -> list[dict]:
+    try:
+        data = json.loads(path.read_text())
+    except Exception:
+        return []
+    deps = []
+    for section in ('require', 'require-dev'):
+        for name, ver in data.get(section, {}).items():
+            if name == 'php' or name.startswith('ext-'):
+                continue
+            deps.append({
+                'name': name,
+                'version_spec': ver,
+                'source': 'composer.json',
+                'dev': section == 'require-dev',
+            })
+    return deps
+
+
+def _parse_build_gradle(path: Path) -> list[dict]:
+    deps = []
+    for line in path.read_text(errors='ignore').splitlines():
+        line = line.strip()
+        m = re.search(r"""(?:implementation|api|compile|testImplementation|runtimeOnly)\s+['"]([^'"]+)['"]""", line)
+        if m:
+            coords = m.group(1)
+            parts = coords.split(':')
+            if len(parts) >= 2:
+                name = f'{parts[0]}/{parts[1]}'
+                deps.append({'name': name, 'version_spec': parts[2] if len(parts) > 2 else '', 'source': path.name})
+    return deps
+
+
+def _parse_pom_xml(path: Path) -> list[dict]:
+    deps = []
+    try:
+        content = path.read_text(errors='ignore')
+        for m in re.finditer(r'<groupId>([^<]+)</groupId>\s*<artifactId>([^<]+)</artifactId>(?:\s*<version>([^<]+)</version>)?', content):
+            name = f'{m.group(1).strip()}/{m.group(2).strip()}'
+            deps.append({'name': name, 'version_spec': (m.group(3) or '').strip(), 'source': 'pom.xml'})
+    except Exception:
+        pass
+    return deps
+
+
 def _scan_dockerfiles(repo_dir: str) -> list[dict]:
     issues = []
     for p in Path(repo_dir).rglob('Dockerfile*'):
@@ -166,6 +211,19 @@ def analyze_dependencies(repo_dir: str) -> dict:
     gemfile = base / 'Gemfile'
     if gemfile.exists():
         all_deps.extend(_parse_gemfile(gemfile))
+
+    composer = base / 'composer.json'
+    if composer.exists():
+        all_deps.extend(_parse_composer_json(composer))
+
+    pom = base / 'pom.xml'
+    if pom.exists():
+        all_deps.extend(_parse_pom_xml(pom))
+
+    for gradle in base.rglob('build.gradle'):
+        if not _should_skip(gradle, base):
+            all_deps.extend(_parse_build_gradle(gradle))
+            break  # root only
 
     docker_issues = _scan_dockerfiles(repo_dir)
 

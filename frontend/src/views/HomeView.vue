@@ -11,6 +11,7 @@ import CompareModal from '../components/ui/CompareModal.vue'
 import { useAnalysisStore } from '../stores/analysis'
 import type { RunListItem, FeaturedRepo } from '../stores/analysis'
 import { useAuthStore } from '../stores/auth'
+import logoUrl from '../assets/logo.png'
 
 const router = useRouter()
 const route = useRoute()
@@ -194,6 +195,7 @@ const ghostRows = computed(() => Math.max(0, perPage - items.value.length))
 <template>
   <div>
     <main class="hero hero--compact">
+      <img :src="logoUrl" alt="Atlas Insight" class="hero__logo" />
       <h1 class="hero__title">Atlas <span>Insight</span></h1>
       <p class="hero__subtitle">
         Paste a repository URL and get a deep analysis of its commit history,

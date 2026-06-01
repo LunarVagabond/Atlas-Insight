@@ -190,6 +190,13 @@
     padding-bottom: $space-10;
   }
 
+  &__logo {
+    display: block;
+    margin: 0 auto $space-4;
+    height: 72px;
+    width: auto;
+  }
+
   &__title {
     font-size: clamp(2rem, 5vw, 3.5rem);
     font-weight: 800;
@@ -280,12 +287,18 @@
     &--title {
       font-size: 1.25rem;
       font-weight: 700;
-      color: var(--color-text);
+      color: var(--color-accent);
       opacity: 1;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3em;
+      text-decoration: underline;
+      text-decoration-color: transparent;
+      text-underline-offset: 3px;
+      transition: text-decoration-color 0.15s;
 
       &:hover {
-        color: var(--color-accent);
-        text-decoration: none;
+        text-decoration-color: var(--color-accent);
       }
     }
   }

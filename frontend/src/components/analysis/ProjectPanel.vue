@@ -431,6 +431,14 @@ const interactionLinks = computed<DisplayLink[]>(() => {
     <!-- Languages -->
     <section v-if="structure?.languages?.length" class="project-panel__section">
       <h2 class="panel__title">Languages</h2>
+      <p class="project-panel__coverage-note">
+        Don't see the framework or language you expected?
+        Our static analysis covers the most common ecosystems but has gaps.
+        <a href="https://github.com/LunarVagabond/Atlas-Insight" target="_blank" rel="noopener noreferrer" class="project-panel__coverage-link">
+          Open an issue or PR
+        </a>
+        — the repo is private for now but opening soon.
+      </p>
       <AppCard>
         <div class="lang-list">
           <div

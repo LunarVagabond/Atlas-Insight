@@ -259,7 +259,8 @@ onUnmounted(() => {
     <div class="results-layout__header">
       <div class="results-header">
         <a v-if="store.run?.repo_url" :href="store.run.repo_url" target="_blank" rel="noopener noreferrer" class="results-header__repo-link results-header__repo-link--title">
-          {{ store.run?.repo_owner }}/{{ store.run?.repo_name }} ↗
+          {{ store.run?.repo_owner }}/{{ store.run?.repo_name }}
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3H3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V9"/><polyline points="10 1 15 1 15 6"/><line x1="15" y1="1" x2="7" y2="9"/></svg>
         </a>
         <span v-else class="results-header__title">Analysis Results</span>
         <div class="results-header__actions">

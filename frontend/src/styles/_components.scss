@@ -1887,6 +1887,20 @@
   &__tag {
     font-size: 0.75rem;
   }
+
+  &__coverage-note {
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+    margin: 0 0 $space-4;
+    line-height: 1.5;
+    opacity: 0.8;
+  }
+
+  &__coverage-link {
+    color: var(--color-accent);
+    text-decoration: none;
+    &:hover { text-decoration: underline; }
+  }
 }
 
 .classify-grid {

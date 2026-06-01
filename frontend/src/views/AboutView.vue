@@ -308,6 +308,13 @@ function clearSearch() {
       </section>
 
       <section class="about-view__section">
+        <h2 class="about-view__section-title">Why Atlas Insight?</h2>
+        <p>Open source is one of the best ways to grow as a developer — real codebases, real feedback, real impact on your portfolio. But walking into an unfamiliar repo can be genuinely overwhelming. Where do you start? Is the project still active? Is there anything a newcomer can actually pick up?</p>
+        <p>Atlas Insight was built to make that first step easier. Instead of spending an afternoon digging through commit history and reading issues trying to figure out if a project is a good fit, you can get a clear picture in seconds — how healthy the codebase is, whether it welcomes contributors, where the complexity lives, and what's actually available to work on.</p>
+        <p>Whether you're looking to land your first OSS contribution, find projects that align with skills you want to build, or just explore what's out there — Atlas Insight is a starting point, not a verdict. The goal is to lower the barrier between "I want to contribute" and "here's where to begin."</p>
+      </section>
+
+      <section class="about-view__section">
         <h2 class="about-view__section-title">How to use it</h2>
         <ol class="about-view__steps">
           <li>Paste a GitHub repository URL into the input on the home page.</li>

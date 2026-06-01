@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { buildProjectType, buildStackSentence } from '../../composables/useProjectNarrative'
+
 const props = defineProps<{
   result: Record<string, any>
   repoOwner: string
@@ -26,6 +28,7 @@ const narrative = computed(() => {
 
   const name = `${props.repoOwner}/${props.repoName}`
   const techStack: string[] = structure.tech_stack ?? []
+  const primaryLang = meta.primary_language as string | null
   const desc = meta.github_description ? (meta.github_description as string).replace(/\.$/, '') : null
   const health = cls.project_health?.label ?? null
   const difficulty = cls.contribution_difficulty?.label ?? null
@@ -34,35 +37,9 @@ const narrative = computed(() => {
   const age = meta.created_at ? ageFromDate(meta.created_at as string) : null
   const busFactor = structure.bus_factor ?? null
 
-  // Build a meaningful project-type label from the tech stack
-  const hasTauri = techStack.includes('Tauri')
-  const hasVue = techStack.includes('Vue')
-  const hasReact = techStack.includes('React')
-  const hasNextjs = techStack.includes('Next.js')
-  const hasNuxt = techStack.includes('Nuxt')
-  const primaryLang = meta.primary_language as string | null
-
-  let projectType: string
-  if (hasTauri) {
-    const ui = hasVue ? 'Vue' : hasReact ? 'React' : primaryLang ?? 'web'
-    projectType = `${ui} + Tauri desktop app`
-  } else if (hasNextjs) {
-    projectType = 'Next.js app'
-  } else if (hasNuxt) {
-    projectType = 'Nuxt app'
-  } else if (hasVue) {
-    projectType = 'Vue app'
-  } else if (hasReact) {
-    projectType = 'React app'
-  } else if (primaryLang) {
-    projectType = `${primaryLang} repository`
-  } else {
-    projectType = 'repository'
-  }
-
+  const projectType = buildProjectType(techStack, primaryLang)
   const sentences: string[] = []
 
-  // Sentence 1: identity
   let s1 = `**${name}** is a ${projectType}`
   if (desc) s1 += ` — ${desc}`
   if (age) s1 += `, ${age}`
@@ -71,18 +48,19 @@ const narrative = computed(() => {
   }
   sentences.push(s1 + '.')
 
-  // Sentence 2: health & contribution posture
+  const stackLine = buildStackSentence(techStack)
+  if (stackLine) sentences.push(stackLine)
+
   if (health || difficulty) {
-    let s2 = ''
-    if (health) s2 += `It scores **${health}** on project health`
-    if (difficulty) s2 += `${health ? ' and is rated ' : 'Contributions are rated '}**${difficulty}** for new contributors`
-    sentences.push(s2 + '.')
+    let s3 = ''
+    if (health) s3 += `It scores **${health}** on project health`
+    if (difficulty) s3 += `${health ? ' and is rated ' : 'Contributions are rated '}**${difficulty}** for new contributors`
+    sentences.push(s3 + '.')
   }
 
-  // Sentence 3: bus factor signal
   if (busFactor !== null) {
     if (contributors === 1) {
-      // Solo project — bus factor is inherently 1, not a risk signal
+      // solo — skip
     } else if (busFactor <= 1) {
       sentences.push('Knowledge is concentrated in very few contributors — high bus factor risk.')
     } else if (busFactor <= 3) {

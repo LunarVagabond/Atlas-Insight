@@ -7,6 +7,7 @@ import AppButton from '../ui/AppButton.vue'
 import { useAnalysisStore } from '../../stores/analysis'
 import type { AnalysisRun } from '../../stores/analysis'
 import { techStackFromDeps } from '../../composables/frameworkSignals'
+import { buildProjectType, buildStackSentence } from '../../composables/useProjectNarrative'
 
 const props = defineProps<{ run: AnalysisRun }>()
 const store = useAnalysisStore()
@@ -31,7 +32,8 @@ const narrative = computed(() => {
   const commits: Record<string, any> = r.commits ?? {}
   const structure: Record<string, any> = r.structure ?? {}
 
-  const stackArr: string[] = structure.tech_stack ?? []
+  const techStack: string[] = structure.tech_stack ?? []
+  const primaryLang: string | null = meta.primary_language ?? null
   const desc = meta.github_description ? (meta.github_description as string).replace(/\.$/, '') : null
   const health = cls.project_health?.label ?? null
   const difficulty = cls.contribution_difficulty?.label ?? null
@@ -39,32 +41,8 @@ const narrative = computed(() => {
   const totalCommits: number = commits.total_commits ?? 0
   const age = meta.created_at ? ageFromDate(meta.created_at as string) : null
   const busFactor: number | null = structure.bus_factor ?? null
-  const primaryLang: string | null = meta.primary_language ?? null
 
-  const hasTauri = stackArr.includes('Tauri')
-  const hasVue = stackArr.includes('Vue')
-  const hasReact = stackArr.includes('React')
-  const hasNextjs = stackArr.includes('Next.js')
-  const hasNuxt = stackArr.includes('Nuxt')
-
-  let projectType: string
-  if (hasTauri) {
-    const ui = hasVue ? 'Vue' : hasReact ? 'React' : primaryLang ?? 'web'
-    projectType = `${ui} + Tauri desktop app`
-  } else if (hasNextjs) {
-    projectType = 'Next.js app'
-  } else if (hasNuxt) {
-    projectType = 'Nuxt app'
-  } else if (hasVue) {
-    projectType = 'Vue app'
-  } else if (hasReact) {
-    projectType = 'React app'
-  } else if (primaryLang) {
-    projectType = `${primaryLang} repository`
-  } else {
-    projectType = 'repository'
-  }
-
+  const projectType = buildProjectType(techStack, primaryLang)
   const sentences: string[] = []
 
   let s1 = projectType
@@ -75,6 +53,9 @@ const narrative = computed(() => {
   }
   sentences.push(s1.charAt(0).toUpperCase() + s1.slice(1) + '.')
 
+  const stackLine = buildStackSentence(techStack)
+  if (stackLine) sentences.push(stackLine)
+
   if (health || difficulty) {
     let s2 = ''
     if (health) s2 += `Scores ${health} on project health`
@@ -84,7 +65,7 @@ const narrative = computed(() => {
 
   if (busFactor !== null) {
     if (contributors === 1) {
-      // solo project — skip bus factor sentence
+      // solo project — skip
     } else if (busFactor <= 1) {
       sentences.push('Knowledge concentrated in very few contributors — high bus factor risk.')
     } else if (busFactor <= 3) {
