@@ -554,12 +554,6 @@ const interactionLinks = computed<DisplayLink[]>(() => {
             <div class="stat__label">Files ({{ structure.total_lines.toLocaleString() }} lines)</div>
           </div>
         </AppCard>
-        <AppCard>
-          <div class="stat">
-            <div class="stat__value stat__value--md">{{ structure.bus_factor }}</div>
-            <div class="stat__label">Bus Factor</div>
-          </div>
-        </AppCard>
       </div>
 
       <!-- CI & tooling row -->
@@ -578,33 +572,6 @@ const interactionLinks = computed<DisplayLink[]>(() => {
           Tests: {{ (structure.test_ratio * 100).toFixed(0) }}% ratio
         </AppBadge>
       </div>
-    </section>
-
-    <!-- GitHub Contributors -->
-    <section v-if="gh?.contributors?.length" class="project-panel__section">
-      <h2 class="panel__title">GitHub Contributors <span class="panel__title-sub">(top 30 by commits)</span></h2>
-      <AppCard>
-        <div class="contributor-grid">
-          <a
-            v-for="contrib in gh.contributors"
-            :key="contrib.login"
-            :href="contrib.html_url"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="contributor-card"
-            :title="`${contrib.login} — ${contrib.contributions} commits`"
-          >
-            <img
-              :src="contrib.avatar_url + '&s=64'"
-              :alt="contrib.login"
-              class="contributor-card__avatar"
-              loading="lazy"
-            />
-            <span class="contributor-card__login">{{ contrib.login }}</span>
-            <span class="contributor-card__count">{{ contrib.contributions.toLocaleString() }}</span>
-          </a>
-        </div>
-      </AppCard>
     </section>
 
   </div>

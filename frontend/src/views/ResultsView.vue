@@ -188,12 +188,10 @@ function copyLink() {
   <div class="results-layout">
     <div class="results-layout__header">
       <div class="results-header">
-        <div style="display:flex;align-items:baseline;gap:0.75rem">
-          <h1 class="results-header__title">Analysis Results</h1>
-          <a v-if="store.run?.repo_url" :href="store.run.repo_url" target="_blank" rel="noopener noreferrer" class="results-header__repo-link">
-            {{ store.run.repo_owner }}/{{ store.run.repo_name }} ↗
-          </a>
-        </div>
+        <a v-if="store.run?.repo_url" :href="store.run.repo_url" target="_blank" rel="noopener noreferrer" class="results-header__repo-link results-header__repo-link--title">
+          {{ store.run?.repo_owner }}/{{ store.run?.repo_name }} ↗
+        </a>
+        <span v-else class="results-header__title">Analysis Results</span>
         <div class="results-header__actions">
           <AppButton v-if="result" variant="secondary" @click="copyLink" style="font-size:0.8125rem;padding:4px 12px">
             {{ copied ? '✓ Copied' : '🔗 Share' }}
@@ -212,9 +210,6 @@ function copyLink() {
           </template>
           <a href="/" class="btn btn--secondary" style="font-size:0.875rem">← New Analysis</a>
         </div>
-      </div>
-      <div v-if="store.run" style="margin-top: 1rem">
-        <AnalysisStatusCard :run="store.run" />
       </div>
     </div>
 
@@ -261,15 +256,20 @@ function copyLink() {
       <div v-if="store.run?.auth_token_warning" class="analysis-token-warning">
         {{ store.run.auth_token_warning }}
       </div>
-      <DeltaPanel
-        v-if="store.diffData || store.diffLoading"
-        :diff-data="store.diffData ?? { available: false }"
-        :loading="store.diffLoading"
-        style="margin-bottom: 1rem"
-      />
       <AppTabs :tabs="TABS" v-model="activeTab" :badges="tabBadges" />
       <div style="margin-top: 1.5rem">
-        <OverviewPanel v-if="activeTab === 'Overview'" :result="result" />
+        <template v-if="activeTab === 'Overview'">
+          <AnalysisStatusCard v-if="store.run" :run="store.run" />
+          <DeltaPanel
+            v-if="store.diffData || store.diffLoading"
+            :diff-data="store.diffData ?? { available: false }"
+            :loading="store.diffLoading"
+            style="margin-top: 1rem"
+          />
+          <div style="margin-top: 1.5rem">
+            <OverviewPanel :result="result" />
+          </div>
+        </template>
         <template v-if="activeTab === 'Project'">
           <ProjectPanel :result="result" />
           <div v-if="result.structure" style="margin-top: 1.5rem" class="panel">

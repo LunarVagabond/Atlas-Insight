@@ -247,6 +247,18 @@
       opacity: 1;
       text-decoration: underline;
     }
+
+    &--title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--color-text);
+      opacity: 1;
+
+      &:hover {
+        color: var(--color-accent);
+        text-decoration: none;
+      }
+    }
   }
 }
 
