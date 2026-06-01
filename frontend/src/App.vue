@@ -14,8 +14,20 @@ function applyTheme(dark: boolean) {
 }
 
 function toggleTheme() {
+  const bg = getComputedStyle(document.documentElement)
+    .getPropertyValue('--color-bg').trim() || '#ffffff'
+  const overlay = document.createElement('div')
+  overlay.className = 'theme-peel-overlay'
+  overlay.style.background = bg
+  document.body.appendChild(overlay)
+
   isDark.value = !isDark.value
   applyTheme(isDark.value)
+
+  requestAnimationFrame(() => {
+    overlay.classList.add('theme-peel-overlay--active')
+    overlay.addEventListener('animationend', () => overlay.remove(), { once: true })
+  })
 }
 
 onMounted(async () => {

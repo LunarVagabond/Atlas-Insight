@@ -5,6 +5,7 @@
 @use 'layout';
 @use 'components';
 @use 'print-view';
+@use 'animations';
 
 body {
   background: var(--color-bg);

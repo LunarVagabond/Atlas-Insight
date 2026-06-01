@@ -33,6 +33,7 @@ const result = computed<RunResult | null>(() => {
   return r
 })
 
+// ── Helpers ──
 function scoreLevel(score: number): 'low' | 'medium' | 'high' {
   if (score < 30) return 'low'
   if (score < 60) return 'medium'
@@ -44,17 +45,6 @@ function scoreRiskLabel(score: number): string {
   if (score < 60) return 'Worth watching'
   return 'Needs attention'
 }
-
-const overallScore = computed(() => {
-  if (!result.value?.heuristics?.length) return null
-  return Math.round(
-    result.value.heuristics.reduce((s, h) => s + h.score, 0) / result.value.heuristics.length
-  )
-})
-
-const sortedSignals = computed(() =>
-  result.value ? [...result.value.heuristics].sort((a, b) => b.score - a.score) : []
-)
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—'
@@ -71,24 +61,20 @@ function formatPct(n: number | null | undefined): string {
   return `${Math.round(n * 100)}%`
 }
 
-const langBarColors = ['#0969da', '#2da44e', '#e36209', '#8250df']
+// ── Computed data ──
+const overallScore = computed(() => {
+  if (!result.value?.heuristics?.length) return null
+  return Math.round(
+    result.value.heuristics.reduce((s, h) => s + h.score, 0) / result.value.heuristics.length
+  )
+})
 
-function triggerPrint() { window.print() }
-function triggerClose() { window.close() }
+const sortedSignals = computed(() =>
+  result.value ? [...result.value.heuristics].sort((a, b) => b.score - a.score) : []
+)
 
+const langBarColors = ['#0969da', '#2da44e', '#e36209', '#8250df', '#bc4c00']
 const topLangs = computed(() => result.value?.structure?.languages?.slice(0, 5) ?? [])
-
-const prodDeps = computed(() =>
-  (result.value?.dependencies?.dependencies ?? [])
-    .filter(d => !d.dev)
-    .slice(0, 40)
-)
-
-const devDeps = computed(() =>
-  (result.value?.dependencies?.dependencies ?? [])
-    .filter(d => d.dev)
-    .slice(0, 20)
-)
 
 const securityIssues = computed(() => {
   const issues = result.value?.security?.issues ?? []
@@ -98,35 +84,119 @@ const securityIssues = computed(() => {
 
 const vulns = computed(() => result.value?.security?.vulnerabilities ?? [])
 
+const cveSeverityCounts = computed(() => {
+  const counts = { critical: 0, high: 0, medium: 0, low: 0 }
+  for (const v of vulns.value) {
+    const s = (v.severity ?? '').toLowerCase()
+    if (s.includes('critical')) counts.critical++
+    else if (s.includes('high') || s.match(/9\.\d|10\.0/)) counts.high++
+    else if (s.includes('medium') || s.includes('moderate')) counts.medium++
+    else counts.low++
+  }
+  return counts
+})
+
+function cveRowClass(severity: string | null): string {
+  const s = (severity ?? '').toLowerCase()
+  if (s.includes('critical')) return 'print-cve-row--critical'
+  if (s.includes('high')) return 'print-cve-row--high'
+  if (s.includes('medium') || s.includes('moderate')) return 'print-cve-row--medium'
+  return ''
+}
+
+function cveBadgeClass(severity: string | null): string {
+  const s = (severity ?? '').toLowerCase()
+  if (s.includes('critical')) return 'print-badge--critical'
+  if (s.includes('high')) return 'print-badge--high'
+  if (s.includes('medium') || s.includes('moderate')) return 'print-badge--medium'
+  return 'print-badge--low'
+}
+
+const prodDeps = computed(() =>
+  (result.value?.dependencies?.dependencies ?? []).filter(d => !d.dev).slice(0, 40)
+)
+
+const devDeps = computed(() =>
+  (result.value?.dependencies?.dependencies ?? []).filter(d => d.dev).slice(0, 20)
+)
+
 const godModules = computed(() => result.value?.graph?.god_modules?.slice(0, 15) ?? [])
 const hotFiles = computed(() => result.value?.structure?.hot_files?.slice(0, 15) ?? [])
-
-const opportunities = computed(() =>
-  (result.value?.contribution_opportunities ?? []).slice(0, 20)
-)
+const opportunities = computed(() => (result.value?.contribution_opportunities ?? []).slice(0, 20))
 
 const difficultyColor: Record<string, string> = {
   beginner: '#2da44e',
   intermediate: '#d97706',
   advanced: '#dc2626',
 }
+
+// Dynamic section numbering — CVE section only appears if vulns exist
+const hasVulns = computed(() => vulns.value.length > 0)
+const sectionNums = computed(() => {
+  let n = 1
+  return {
+    summary: String(n++).padStart(2, '0'),
+    health: String(n++).padStart(2, '0'),
+    security: String(n++).padStart(2, '0'),
+    vulns: hasVulns.value ? String(n++).padStart(2, '0') : null,
+    project: String(n++).padStart(2, '0'),
+    deps: String(n++).padStart(2, '0'),
+    arch: String(n++).padStart(2, '0'),
+    contributing: opportunities.value.length ? String(n++).padStart(2, '0') : null,
+  }
+})
+
+// ── Actions ──
+function triggerPrint() { window.print() }
+function triggerClose() { window.close() }
+
+function exportCvesCsv() {
+  if (!vulns.value.length || !run.value) return
+  const header = ['Package', 'Version', 'CVE ID', 'Severity', 'Ecosystem', 'Summary', 'URL']
+  const rows = vulns.value.map(v => [
+    v.name,
+    v.version ?? '',
+    v.vuln_id,
+    v.severity ?? '',
+    v.ecosystem ?? '',
+    `"${(v.summary ?? '').replace(/"/g, '""')}"`,
+    v.url ?? '',
+  ])
+  const csv = [header, ...rows].map(r => r.join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${run.value.repo_owner}-${run.value.repo_name}-cve-report.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
 </script>
 
 <template>
   <div class="print-view">
 
-    <!-- Screen-only controls -->
+    <!-- ── Controls (screen only) ── -->
     <div class="print-controls">
       <div class="print-controls__inner">
         <span class="print-controls__brand">Atlas Insight</span>
-        <span class="print-controls__label">Analysis Report Preview</span>
+        <span class="print-controls__sep" />
+        <span class="print-controls__label">Analysis Report</span>
         <div class="print-controls__actions">
+          <button
+            class="print-controls__btn print-controls__btn--danger"
+            :disabled="!hasVulns"
+            :title="hasVulns ? 'Export CVE findings as CSV' : 'No CVEs found'"
+            @click="exportCvesCsv"
+          >
+            ↓ Export CVEs (CSV)
+          </button>
           <button class="print-controls__btn print-controls__btn--primary" @click="triggerPrint">
             ⎙ Print / Save PDF
           </button>
-          <button class="print-controls__btn" @click="triggerClose">
-            ✕ Close
-          </button>
+          <button class="print-controls__btn" @click="triggerClose">✕</button>
         </div>
       </div>
     </div>
@@ -139,51 +209,121 @@ const difficultyColor: Record<string, string> = {
 
     <template v-else-if="result && run">
 
-      <!-- ── COVER ── -->
+      <!-- ══ COVER ══ -->
       <section class="print-cover">
-        <div class="print-cover__brand">Atlas Insight</div>
-        <div class="print-cover__report-label">Repository Analysis Report</div>
-        <div class="print-cover__rule" />
+        <div class="print-cover__eyebrow">
+          <span class="print-cover__brand-text">Atlas Insight</span>
+          <span class="print-cover__eyebrow-sep" />
+          <span class="print-cover__report-type">Repository Analysis Report</span>
+        </div>
+
         <h1 class="print-cover__repo">{{ run.repo_owner }} / {{ run.repo_name }}</h1>
-        <div class="print-cover__meta">
-          <div class="print-cover__meta-row">
-            <span class="print-cover__meta-key">Repository</span>
-            <span class="print-cover__meta-val">{{ run.repo_url }}</span>
+        <div class="print-cover__repo-url">{{ run.repo_url }}</div>
+
+        <!-- Key stats summary row -->
+        <div class="print-cover__summary-row">
+          <div class="print-cover__summary-cell">
+            <div class="print-cover__summary-val">{{ formatNum(result.commits.total_commits) }}</div>
+            <div class="print-cover__summary-label">Total Commits</div>
           </div>
+          <div class="print-cover__summary-cell">
+            <div class="print-cover__summary-val">{{ result.commits.total_contributors }}</div>
+            <div class="print-cover__summary-label">Contributors</div>
+          </div>
+          <div class="print-cover__summary-cell">
+            <div
+              :class="['print-cover__summary-val', overallScore !== null ? `print-stat__value--${scoreLevel(overallScore)}` : '']"
+            >
+              {{ overallScore ?? '—' }}<span v-if="overallScore !== null" style="font-size:0.55em;color:#aaa;font-weight:400">/100</span>
+            </div>
+            <div class="print-cover__summary-label">Composite Risk</div>
+          </div>
+          <div class="print-cover__summary-cell">
+            <div :class="['print-cover__summary-val', hasVulns ? 'print-risk--high' : '']">
+              {{ vulns.length }}
+            </div>
+            <div class="print-cover__summary-label">CVEs Found</div>
+          </div>
+        </div>
+
+        <!-- Classification -->
+        <div v-if="result.classification" class="print-cover__classify">
+          <div class="print-cover__classify-item">
+            <span class="print-cover__classify-key">Health</span>
+            <span class="print-cover__classify-val">{{ result.classification.project_health.label }}</span>
+          </div>
+          <div class="print-cover__classify-item">
+            <span class="print-cover__classify-key">Contribution</span>
+            <span class="print-cover__classify-val">{{ result.classification.contribution_difficulty.label }}</span>
+          </div>
+          <div class="print-cover__classify-item">
+            <span class="print-cover__classify-key">Complexity</span>
+            <span class="print-cover__classify-val">{{ result.classification.code_complexity.label }}</span>
+          </div>
+          <div class="print-cover__classify-item">
+            <span class="print-cover__classify-key">Documentation</span>
+            <span class="print-cover__classify-val">{{ result.classification.documentation_grade.label }}</span>
+          </div>
+          <div v-if="result.github_meta?.license_spdx ?? result.github_meta?.license_name" class="print-cover__classify-item">
+            <span class="print-cover__classify-key">License</span>
+            <span class="print-cover__classify-val">{{ result.github_meta!.license_spdx ?? result.github_meta!.license_name }}</span>
+          </div>
+        </div>
+
+        <div class="print-cover__meta">
           <div class="print-cover__meta-row">
             <span class="print-cover__meta-key">Analyzed</span>
             <span class="print-cover__meta-val">{{ formatDate(run.completed_at) }}</span>
-          </div>
-          <div class="print-cover__meta-row">
-            <span class="print-cover__meta-key">Run ID</span>
-            <span class="print-cover__meta-val print-cover__run-id">{{ run.id }}</span>
           </div>
           <div v-if="result.github_meta?.primary_language" class="print-cover__meta-row">
             <span class="print-cover__meta-key">Primary Language</span>
             <span class="print-cover__meta-val">{{ result.github_meta.primary_language }}</span>
           </div>
-          <div v-if="result.classification" class="print-cover__meta-row">
-            <span class="print-cover__meta-key">Project Health</span>
-            <span class="print-cover__meta-val">{{ result.classification.project_health.label }}</span>
+          <div class="print-cover__meta-row">
+            <span class="print-cover__meta-key">Run ID</span>
+            <span class="print-cover__meta-val print-cover__run-id">{{ run.id }}</span>
           </div>
         </div>
+
         <div v-if="result.github_meta?.github_description" class="print-cover__desc">
           {{ result.github_meta.github_description }}
         </div>
+
         <div v-if="result.github_meta?.topics?.length" class="print-cover__topics">
           <span v-for="t in result.github_meta.topics" :key="t" class="print-cover__topic">{{ t }}</span>
         </div>
-        <div class="print-cover__footer">Generated by Atlas Insight · {{ formatDate(run.completed_at) }}</div>
+
+        <div v-if="topLangs.length" class="print-cover__langs">
+          <div class="print-langs">
+            <div class="print-langs__bar">
+              <div
+                v-for="(lang, i) in topLangs"
+                :key="lang.name"
+                class="print-langs__seg"
+                :style="{ width: `${lang.pct}%`, background: langBarColors[i] ?? '#888' }"
+              />
+            </div>
+            <div class="print-langs__legend">
+              <span v-for="(lang, i) in topLangs" :key="lang.name" class="print-langs__item">
+                <span class="print-langs__dot" :style="{ background: langBarColors[i] ?? '#888' }" />
+                {{ lang.name }} {{ lang.pct }}%
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="result.commits.abandoned" class="print-alert print-alert--warn" style="margin-top:1rem">
+          Repository appears abandoned — no commits in 365+ days.
+        </div>
       </section>
 
-      <!-- ── SECTION 1: EXECUTIVE SUMMARY ── -->
+      <!-- ══ §01 EXECUTIVE SUMMARY ══ -->
       <section class="print-section">
         <div class="print-section__header">
-          <span class="print-section__num">01</span>
+          <span class="print-section__num">{{ sectionNums.summary }}</span>
           <h2 class="print-section__title">Executive Summary</h2>
         </div>
 
-        <!-- Key stats -->
         <div class="print-stat-grid">
           <div class="print-stat">
             <div class="print-stat__value">{{ formatNum(result.commits.total_commits) }}</div>
@@ -195,7 +335,7 @@ const difficultyColor: Record<string, string> = {
           </div>
           <div class="print-stat">
             <div class="print-stat__value">{{ result.commits.days_since_last_commit ?? '—' }}</div>
-            <div class="print-stat__label">Days Since Last Commit</div>
+            <div class="print-stat__label">Days Since Commit</div>
           </div>
           <div v-if="result.structure?.total_lines" class="print-stat">
             <div class="print-stat__value">{{ formatNum(result.structure.total_lines) }}</div>
@@ -205,126 +345,101 @@ const difficultyColor: Record<string, string> = {
             <div :class="['print-stat__value', `print-stat__value--${scoreLevel(overallScore)}`]">
               {{ overallScore }}<span class="print-stat__unit">/100</span>
             </div>
-            <div class="print-stat__label">Composite Risk Score</div>
+            <div class="print-stat__label">Composite Risk</div>
           </div>
           <div v-if="result.structure?.test_ratio != null" class="print-stat">
             <div class="print-stat__value">{{ formatPct(result.structure.test_ratio) }}</div>
             <div class="print-stat__label">Test Coverage</div>
           </div>
-        </div>
-
-        <!-- Classification -->
-        <div v-if="result.classification" class="print-classify">
-          <div class="print-classify__row">
-            <div class="print-classify__item">
-              <span class="print-classify__key">Health</span>
-              <span class="print-classify__val">{{ result.classification.project_health.label }}</span>
-            </div>
-            <div class="print-classify__item">
-              <span class="print-classify__key">Contribution</span>
-              <span class="print-classify__val">{{ result.classification.contribution_difficulty.label }}</span>
-            </div>
-            <div class="print-classify__item">
-              <span class="print-classify__key">Complexity</span>
-              <span class="print-classify__val">{{ result.classification.code_complexity.label }}</span>
-            </div>
-            <div class="print-classify__item">
-              <span class="print-classify__key">Documentation</span>
-              <span class="print-classify__val">{{ result.classification.documentation_grade.label }}</span>
-            </div>
+          <div v-if="result.structure?.total_files" class="print-stat">
+            <div class="print-stat__value">{{ formatNum(result.structure.total_files) }}</div>
+            <div class="print-stat__label">Total Files</div>
           </div>
-          <div v-if="result.classification.tags?.length" class="print-classify__tags">
-            <span v-for="tag in result.classification.tags" :key="tag" class="print-classify__tag">{{ tag }}</span>
+          <div v-if="result.dependencies?.dependency_count" class="print-stat">
+            <div class="print-stat__value">{{ result.dependencies.dependency_count }}</div>
+            <div class="print-stat__label">Dependencies</div>
           </div>
         </div>
 
-        <!-- GitHub stats -->
-        <div v-if="result.github_meta" class="print-gh-stats">
-          <table class="print-table print-table--compact">
+        <!-- GitHub meta table -->
+        <div v-if="result.github_meta" style="margin-bottom:1.25rem">
+          <table class="print-table print-table--bordered print-table--compact">
             <tbody>
               <tr v-if="result.github_meta.stars">
-                <td class="print-table__key">Stars</td>
-                <td>{{ formatNum(result.github_meta.stars) }}</td>
-                <td class="print-table__key">Forks</td>
-                <td>{{ formatNum(result.github_meta.forks) }}</td>
+                <td class="print-table__key">Stars</td><td>{{ formatNum(result.github_meta.stars) }}</td>
+                <td class="print-table__key">Forks</td><td>{{ formatNum(result.github_meta.forks) }}</td>
+                <td class="print-table__key">Watchers</td><td>{{ formatNum(result.github_meta.watchers) }}</td>
               </tr>
               <tr>
-                <td class="print-table__key">Open Issues</td>
-                <td>{{ formatNum(result.github_meta.open_issues) }}</td>
-                <td class="print-table__key">Open PRs</td>
-                <td>{{ result.github_meta.open_prs ?? '—' }}</td>
-              </tr>
-              <tr v-if="result.github_meta.license_name">
-                <td class="print-table__key">License</td>
-                <td>{{ result.github_meta.license_spdx ?? result.github_meta.license_name }}</td>
-                <td class="print-table__key">Default Branch</td>
-                <td>{{ result.github_meta.default_branch }}</td>
+                <td class="print-table__key">Open Issues</td><td>{{ formatNum(result.github_meta.open_issues) }}</td>
+                <td class="print-table__key">Open PRs</td><td>{{ result.github_meta.open_prs ?? '—' }}</td>
+                <td class="print-table__key">Default Branch</td><td>{{ result.github_meta.default_branch }}</td>
               </tr>
               <tr v-if="result.github_meta.created_at">
-                <td class="print-table__key">Created</td>
-                <td>{{ formatDate(result.github_meta.created_at) }}</td>
-                <td class="print-table__key">Last Push</td>
-                <td>{{ formatDate(result.github_meta.pushed_at) }}</td>
+                <td class="print-table__key">Created</td><td>{{ formatDate(result.github_meta.created_at) }}</td>
+                <td class="print-table__key">Last Push</td><td>{{ formatDate(result.github_meta.pushed_at) }}</td>
+                <td class="print-table__key">Size</td><td>{{ result.github_meta.size_kb ? `${(result.github_meta.size_kb / 1024).toFixed(1)} MB` : '—' }}</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <!-- Language breakdown -->
-        <div v-if="topLangs.length" class="print-langs">
-          <div class="print-langs__bar">
-            <div
-              v-for="(lang, i) in topLangs"
-              :key="lang.name"
-              :style="{ width: `${lang.pct}%`, background: langBarColors[i] ?? '#888' }"
-              class="print-langs__seg"
-              :title="`${lang.name}: ${lang.pct}%`"
-            />
+        <!-- Classification -->
+        <div v-if="result.classification" style="margin-bottom:1rem">
+          <table class="print-table print-table--bordered print-table--compact">
+            <thead>
+              <tr>
+                <th>Project Health</th>
+                <th>Contribution Difficulty</th>
+                <th>Code Complexity</th>
+                <th>Documentation</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>{{ result.classification.project_health.label }}</strong></td>
+                <td><strong>{{ result.classification.contribution_difficulty.label }}</strong></td>
+                <td><strong>{{ result.classification.code_complexity.label }}</strong></td>
+                <td><strong>{{ result.classification.documentation_grade.label }}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-if="result.classification.tags?.length" class="print-tags">
+            <span v-for="tag in result.classification.tags" :key="tag" class="print-tag">{{ tag }}</span>
           </div>
-          <div class="print-langs__legend">
-            <span v-for="(lang, i) in topLangs" :key="lang.name" class="print-langs__item">
-              <span class="print-langs__dot" :style="{ background: langBarColors[i] ?? '#888' }" />
-              {{ lang.name }} {{ lang.pct }}%
-            </span>
-          </div>
-        </div>
-
-        <!-- Abandoned notice -->
-        <div v-if="result.commits.abandoned" class="print-alert print-alert--warn">
-          Repository appears abandoned — no commits in 365+ days.
         </div>
       </section>
 
-      <!-- ── SECTION 2: HEALTH SIGNALS ── -->
+      <!-- ══ §02 HEALTH SIGNALS ══ -->
       <section class="print-section">
         <div class="print-section__header">
-          <span class="print-section__num">02</span>
+          <span class="print-section__num">{{ sectionNums.health }}</span>
           <h2 class="print-section__title">Health Signals</h2>
         </div>
         <p class="print-section__intro">
           Automated signals about project activity, health, and contributor patterns.
-          Scores are 0–100 where higher = greater risk or concern.
+          Scores are 0–100; higher = greater risk or concern.
         </p>
 
         <div v-if="overallScore !== null" class="print-composite">
-          Composite Score:
+          Composite Risk Score:
           <strong :class="`print-risk--${scoreLevel(overallScore)}`">{{ overallScore }} / 100</strong>
-          — {{ scoreRiskLabel(overallScore) }}
+          &mdash; {{ scoreRiskLabel(overallScore) }}
         </div>
 
-        <table class="print-table">
+        <table class="print-table print-table--bordered">
           <thead>
             <tr>
               <th>Signal</th>
               <th class="print-table__num-col">Score</th>
-              <th class="print-table__bar-col">Risk</th>
+              <th class="print-table__bar-col">Bar</th>
               <th>Risk Level</th>
               <th>Confidence</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="s in sortedSignals" :key="s.signal">
-              <td>{{ s.label }}</td>
+              <td><strong>{{ s.label }}</strong></td>
               <td class="print-table__num-col">
                 <strong :class="`print-risk--${scoreLevel(s.score)}`">{{ s.score }}</strong>
               </td>
@@ -343,32 +458,33 @@ const difficultyColor: Record<string, string> = {
           </tbody>
         </table>
 
-        <!-- Signal descriptions -->
         <div class="print-signal-details">
-          <div v-for="s in sortedSignals" :key="`desc-${s.signal}`" class="print-signal-detail">
-            <strong>{{ s.label }}:</strong> {{ s.description }}
-            <template v-if="s.items?.length">
-              <ul class="print-signal-items">
-                <li v-for="item in s.items.slice(0, 5)" :key="item">{{ item }}</li>
-              </ul>
-            </template>
+          <div
+            v-for="s in sortedSignals"
+            :key="`desc-${s.signal}`"
+            :class="['print-signal-detail', `print-signal-detail--${scoreLevel(s.score)}`]"
+          >
+            <strong>{{ s.label }}</strong>
+            {{ s.description }}
+            <ul v-if="s.items?.length" class="print-signal-items">
+              <li v-for="item in s.items.slice(0, 4)" :key="item">{{ item }}</li>
+            </ul>
           </div>
         </div>
       </section>
 
-      <!-- ── SECTION 3: SECURITY ── -->
+      <!-- ══ §03 SECURITY ══ -->
       <section class="print-section">
         <div class="print-section__header">
-          <span class="print-section__num">03</span>
+          <span class="print-section__num">{{ sectionNums.security }}</span>
           <h2 class="print-section__title">Security</h2>
         </div>
         <p class="print-section__intro">
-          Automated pattern matching only — not a full security audit.
-          Always consult a security professional for production systems.
+          Automated pattern matching only — not a full security audit. Consult a security professional for production systems.
         </p>
 
-        <div v-if="result.security" class="print-security-meta">
-          <table class="print-table print-table--compact">
+        <div v-if="result.security" style="margin-bottom:1.25rem">
+          <table class="print-table print-table--bordered print-table--compact">
             <tbody>
               <tr>
                 <td class="print-table__key">Security Score</td>
@@ -378,109 +494,123 @@ const difficultyColor: Record<string, string> = {
                   </strong>
                 </td>
                 <td class="print-table__key">.gitignore</td>
-                <td>{{ result.security.gitignore_exists ? 'Present' : 'Missing' }}</td>
+                <td>{{ result.security.gitignore_exists ? '✓ Present' : '✗ Missing' }}</td>
               </tr>
               <tr>
                 <td class="print-table__key">Security Policy</td>
-                <td>{{ result.structure?.has_security_policy ? (result.structure.security_policy_file ?? 'Present') : 'Not found' }}</td>
+                <td>{{ result.structure?.has_security_policy ? (result.structure.security_policy_file ?? '✓ Present') : '✗ Not found' }}</td>
                 <td class="print-table__key">Gitignore Gaps</td>
-                <td>{{ result.security.gitignore_gaps?.length ? result.security.gitignore_gaps.join(', ') : 'None' }}</td>
+                <td>{{ result.security.gitignore_gaps?.length ? result.security.gitignore_gaps.join(', ') : 'None detected' }}</td>
               </tr>
             </tbody>
           </table>
         </div>
 
+        <div class="print-subsection">Code Pattern Scan</div>
         <template v-if="securityIssues.length">
-          <h3 class="print-subsection">Patterns Detected ({{ securityIssues.length }})</h3>
-          <table class="print-table">
+          <table class="print-table print-table--bordered">
             <thead>
-              <tr>
-                <th>Severity</th>
-                <th>Type</th>
-                <th>Detail</th>
-              </tr>
+              <tr><th>Severity</th><th>Type</th><th>Detail</th></tr>
             </thead>
             <tbody>
               <tr v-for="(issue, i) in securityIssues" :key="i">
-                <td>
-                  <span :class="['print-badge', `print-badge--${issue.severity}`]">{{ issue.severity }}</span>
-                </td>
+                <td><span :class="['print-badge', `print-badge--${issue.severity}`]">{{ issue.severity }}</span></td>
                 <td>{{ issue.type }}</td>
                 <td>{{ issue.detail }}</td>
               </tr>
             </tbody>
           </table>
         </template>
-        <div v-else class="print-clear">
-          ✓ No common security patterns detected.
-        </div>
+        <div v-else class="print-clear">No common security patterns detected.</div>
 
-        <template v-if="vulns.length">
-          <h3 class="print-subsection">Dependency Vulnerabilities — OSV.dev ({{ vulns.length }})</h3>
-          <table class="print-table">
-            <thead>
-              <tr>
-                <th>Package</th>
-                <th>Version</th>
-                <th>CVE ID</th>
-                <th>Severity</th>
-                <th>Summary</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="v in vulns" :key="v.vuln_id + v.name">
-                <td><strong>{{ v.name }}</strong></td>
-                <td class="print-table__mono">{{ v.version }}</td>
-                <td class="print-table__mono">{{ v.vuln_id }}</td>
-                <td>
-                  <span :class="['print-badge', v.severity?.toLowerCase().includes('critical') || v.severity?.toLowerCase().includes('high') ? 'print-badge--critical' : v.severity?.toLowerCase().includes('medium') ? 'print-badge--medium' : 'print-badge--low']">
-                    {{ v.severity ?? 'unknown' }}
-                  </span>
-                </td>
-                <td>{{ v.summary }}</td>
-              </tr>
-            </tbody>
-          </table>
+        <!-- CVE summary line in security section if vulns exist — full detail in §04 -->
+        <template v-if="hasVulns">
+          <div class="print-alert print-alert--error" style="margin-top:1rem">
+            {{ vulns.length }} dependency vulnerability{{ vulns.length !== 1 ? 'ies' : 'y' }} found
+            ({{ cveSeverityCounts.critical }} critical · {{ cveSeverityCounts.high }} high ·
+            {{ cveSeverityCounts.medium }} medium · {{ cveSeverityCounts.low }} low).
+            Full details in section {{ sectionNums.vulns }}.
+          </div>
         </template>
-        <div v-else class="print-clear">
-          ✓ No known CVEs detected in scanned dependencies.
-        </div>
+        <div v-else class="print-clear">No known CVEs detected in scanned dependencies.</div>
       </section>
 
-      <!-- ── SECTION 4: PROJECT STRUCTURE ── -->
+      <!-- ══ §04 VULNERABILITY REPORT (conditional) ══ -->
+      <section v-if="hasVulns" class="print-section">
+        <div class="print-section__header">
+          <span class="print-section__num">{{ sectionNums.vulns }}</span>
+          <h2 class="print-section__title">Vulnerability Report</h2>
+        </div>
+        <p class="print-section__intro">
+          Dependency vulnerabilities from OSV.dev scan at analysis time.
+          Results reflect version specs found in dependency files — pinned lockfile versions are more accurate.
+        </p>
+
+        <!-- Severity summary -->
+        <div class="print-cve-summary">
+          <div class="print-cve-summary__cell print-cve-summary__cell--critical">
+            <div class="print-cve-summary__count">{{ cveSeverityCounts.critical }}</div>
+            <div class="print-cve-summary__label">Critical</div>
+          </div>
+          <div class="print-cve-summary__cell print-cve-summary__cell--high">
+            <div class="print-cve-summary__count">{{ cveSeverityCounts.high }}</div>
+            <div class="print-cve-summary__label">High</div>
+          </div>
+          <div class="print-cve-summary__cell print-cve-summary__cell--medium">
+            <div class="print-cve-summary__count">{{ cveSeverityCounts.medium }}</div>
+            <div class="print-cve-summary__label">Medium</div>
+          </div>
+          <div class="print-cve-summary__cell print-cve-summary__cell--low">
+            <div class="print-cve-summary__count">{{ cveSeverityCounts.low }}</div>
+            <div class="print-cve-summary__label">Low / Unknown</div>
+          </div>
+        </div>
+
+        <table class="print-table print-table--bordered">
+          <thead>
+            <tr>
+              <th>Package</th>
+              <th>Version</th>
+              <th>CVE / Advisory</th>
+              <th>Severity</th>
+              <th>Ecosystem</th>
+              <th>Summary</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="v in vulns" :key="v.vuln_id + v.name" :class="cveRowClass(v.severity)">
+              <td><strong>{{ v.name }}</strong></td>
+              <td class="print-table__mono">{{ v.version }}</td>
+              <td class="print-table__mono" style="white-space:nowrap">{{ v.vuln_id }}</td>
+              <td><span :class="['print-badge', cveBadgeClass(v.severity)]">{{ v.severity ?? 'unknown' }}</span></td>
+              <td class="print-table__muted">{{ v.ecosystem ?? '—' }}</td>
+              <td style="font-size:0.75rem">{{ v.summary }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p class="print-section__intro" style="margin-top:0.5rem">
+          Source: <span class="print-table__mono">osv.dev</span> ·
+          Scan performed at analysis time · Always verify against current lockfile versions before remediating.
+        </p>
+      </section>
+
+      <!-- ══ §PROJECT STRUCTURE ══ -->
       <section class="print-section">
         <div class="print-section__header">
-          <span class="print-section__num">04</span>
+          <span class="print-section__num">{{ sectionNums.project }}</span>
           <h2 class="print-section__title">Project Structure</h2>
         </div>
 
         <div v-if="result.structure" class="print-two-col">
-          <table class="print-table print-table--compact">
+          <table class="print-table print-table--bordered print-table--compact">
             <tbody>
-              <tr>
-                <td class="print-table__key">Total Files</td>
-                <td>{{ formatNum(result.structure.total_files) }}</td>
-              </tr>
-              <tr>
-                <td class="print-table__key">Lines of Code</td>
-                <td>{{ formatNum(result.structure.total_lines) }}</td>
-              </tr>
-              <tr>
-                <td class="print-table__key">Test Files</td>
-                <td>{{ formatNum(result.structure.test_files) }} ({{ formatPct(result.structure.test_ratio) }})</td>
-              </tr>
-              <tr>
-                <td class="print-table__key">Repository Age</td>
-                <td>{{ result.structure.repo_age_days ? `${result.structure.repo_age_days.toLocaleString()} days` : '—' }}</td>
-              </tr>
-              <tr>
-                <td class="print-table__key">Bus Factor</td>
-                <td>{{ result.structure.bus_factor }}</td>
-              </tr>
-              <tr>
-                <td class="print-table__key">Releases</td>
-                <td>{{ result.structure.release_count }}</td>
-              </tr>
+              <tr><td class="print-table__key">Total Files</td><td>{{ formatNum(result.structure.total_files) }}</td></tr>
+              <tr><td class="print-table__key">Lines of Code</td><td>{{ formatNum(result.structure.total_lines) }}</td></tr>
+              <tr><td class="print-table__key">Test Files</td><td>{{ formatNum(result.structure.test_files) }} ({{ formatPct(result.structure.test_ratio) }})</td></tr>
+              <tr><td class="print-table__key">Repository Age</td><td>{{ result.structure.repo_age_days ? `${result.structure.repo_age_days.toLocaleString()} days` : '—' }}</td></tr>
+              <tr><td class="print-table__key">Bus Factor</td><td>{{ result.structure.bus_factor }}</td></tr>
+              <tr><td class="print-table__key">Releases</td><td>{{ result.structure.release_count }}</td></tr>
               <tr v-if="result.structure.last_release">
                 <td class="print-table__key">Last Release</td>
                 <td>{{ result.structure.last_release.name }} ({{ formatDate(result.structure.last_release.date) }})</td>
@@ -488,57 +618,30 @@ const difficultyColor: Record<string, string> = {
             </tbody>
           </table>
 
-          <table class="print-table print-table--compact">
+          <table class="print-table print-table--bordered print-table--compact">
             <tbody>
-              <tr>
-                <td class="print-table__key">CI / CD</td>
-                <td>{{ result.structure.has_ci ? (result.structure.ci_systems?.join(', ') || 'Yes') : 'Not detected' }}</td>
-              </tr>
-              <tr>
-                <td class="print-table__key">Docker</td>
-                <td>{{ result.structure.has_docker ? 'Present' : 'Not found' }}</td>
-              </tr>
-              <tr>
-                <td class="print-table__key">Lint Config</td>
-                <td>{{ result.structure.has_lint_config ? 'Present' : 'Not found' }}</td>
-              </tr>
-              <tr>
-                <td class="print-table__key">License</td>
-                <td>{{ result.structure.license_type ?? (result.structure.license_file ?? 'Not found') }}</td>
-              </tr>
-              <tr>
-                <td class="print-table__key">Contributing Guide</td>
-                <td>{{ result.structure.has_contributing ? (result.structure.contributing_file ?? 'Present') : 'Not found' }}</td>
-              </tr>
-              <tr>
-                <td class="print-table__key">Code of Conduct</td>
-                <td>{{ result.structure.has_coc ? (result.structure.coc_file ?? 'Present') : 'Not found' }}</td>
-              </tr>
-              <tr>
-                <td class="print-table__key">Changelog</td>
-                <td>{{ result.structure.has_changelog ? (result.structure.changelog_file ?? 'Present') : 'Not found' }}</td>
-              </tr>
+              <tr><td class="print-table__key">CI / CD</td><td>{{ result.structure.has_ci ? (result.structure.ci_systems?.join(', ') || 'Yes') : 'Not detected' }}</td></tr>
+              <tr><td class="print-table__key">Docker</td><td>{{ result.structure.has_docker ? 'Present' : 'Not found' }}</td></tr>
+              <tr><td class="print-table__key">Lint Config</td><td>{{ result.structure.has_lint_config ? 'Present' : 'Not found' }}</td></tr>
+              <tr><td class="print-table__key">License</td><td>{{ result.structure.license_type ?? (result.structure.license_file ?? 'Not found') }}</td></tr>
+              <tr><td class="print-table__key">Contributing Guide</td><td>{{ result.structure.has_contributing ? (result.structure.contributing_file ?? 'Present') : 'Not found' }}</td></tr>
+              <tr><td class="print-table__key">Code of Conduct</td><td>{{ result.structure.has_coc ? (result.structure.coc_file ?? 'Present') : 'Not found' }}</td></tr>
+              <tr><td class="print-table__key">Changelog</td><td>{{ result.structure.has_changelog ? (result.structure.changelog_file ?? 'Present') : 'Not found' }}</td></tr>
             </tbody>
           </table>
         </div>
 
-        <!-- Tech stack -->
-        <div v-if="result.structure?.tech_stack?.length" class="print-tech-stack">
-          <span class="print-table__key" style="display:block;margin-bottom:0.35rem">Tech Stack</span>
-          <span v-for="t in result.structure.tech_stack" :key="t" class="print-classify__tag">{{ t }}</span>
+        <div v-if="result.structure?.tech_stack?.length">
+          <div class="print-subsection">Tech Stack</div>
+          <div class="print-tags">
+            <span v-for="t in result.structure.tech_stack" :key="t" class="print-tag">{{ t }}</span>
+          </div>
         </div>
 
-        <!-- Top contributors -->
         <template v-if="result.structure?.top_contributors?.length">
-          <h3 class="print-subsection">Top Contributors</h3>
-          <table class="print-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Author</th>
-                <th>Files Touched</th>
-              </tr>
-            </thead>
+          <div class="print-subsection">Top Contributors</div>
+          <table class="print-table print-table--bordered">
+            <thead><tr><th>#</th><th>Author</th><th>Files Touched</th></tr></thead>
             <tbody>
               <tr v-for="(c, i) in result.structure.top_contributors.slice(0, 10)" :key="c.author">
                 <td class="print-table__muted">{{ i + 1 }}</td>
@@ -549,19 +652,10 @@ const difficultyColor: Record<string, string> = {
           </table>
         </template>
 
-        <!-- Stale branches -->
         <template v-if="(result.structure?.stale_branches?.length ?? 0) > 0">
-          <h3 class="print-subsection">
-            Stale Branches ({{ result.structure!.stale_branch_count }})
-          </h3>
-          <table class="print-table">
-            <thead>
-              <tr>
-                <th>Branch</th>
-                <th>Last Commit</th>
-                <th>Days Stale</th>
-              </tr>
-            </thead>
+          <div class="print-subsection">Stale Branches ({{ result.structure!.stale_branch_count }})</div>
+          <table class="print-table print-table--bordered">
+            <thead><tr><th>Branch</th><th>Last Commit</th><th>Days Stale</th></tr></thead>
             <tbody>
               <tr v-for="b in result.structure!.stale_branches!.slice(0, 10)" :key="b.name">
                 <td class="print-table__mono">{{ b.name }}</td>
@@ -573,10 +667,10 @@ const difficultyColor: Record<string, string> = {
         </template>
       </section>
 
-      <!-- ── SECTION 5: DEPENDENCIES ── -->
+      <!-- ══ §DEPENDENCIES ══ -->
       <section class="print-section">
         <div class="print-section__header">
-          <span class="print-section__num">05</span>
+          <span class="print-section__num">{{ sectionNums.deps }}</span>
           <h2 class="print-section__title">Dependencies</h2>
         </div>
 
@@ -594,30 +688,20 @@ const difficultyColor: Record<string, string> = {
             <div class="print-stat__label">Dev</div>
           </div>
           <div class="print-stat">
-            <div :class="['print-stat__value', (result.security?.vulnerabilities?.length ?? 0) > 0 ? 'print-risk--high' : '']">
-              {{ result.security?.vulnerabilities?.length ?? 0 }}
-            </div>
-            <div class="print-stat__label">CVEs Found</div>
+            <div :class="['print-stat__value', hasVulns ? 'print-risk--high' : '']">{{ vulns.length }}</div>
+            <div class="print-stat__label">CVEs</div>
           </div>
         </div>
 
-        <template v-if="result.dependencies?.missing_lockfile_warnings?.length">
-          <div class="print-alert print-alert--warn">
-            Missing lockfile{{ result.dependencies.missing_lockfile_warnings.length > 1 ? 's' : '' }}:
-            {{ result.dependencies.missing_lockfile_warnings.join(', ') }}
-          </div>
-        </template>
+        <div v-if="result.dependencies?.missing_lockfile_warnings?.length" class="print-alert print-alert--warn">
+          Missing lockfile{{ result.dependencies.missing_lockfile_warnings.length > 1 ? 's' : '' }}:
+          {{ result.dependencies.missing_lockfile_warnings.join(', ') }}
+        </div>
 
         <template v-if="prodDeps.length">
-          <h3 class="print-subsection">Production Dependencies{{ prodDeps.length >= 40 ? ' (top 40)' : '' }}</h3>
-          <table class="print-table">
-            <thead>
-              <tr>
-                <th>Package</th>
-                <th>Version Spec</th>
-                <th>Source</th>
-              </tr>
-            </thead>
+          <div class="print-subsection">Production Dependencies{{ prodDeps.length >= 40 ? ' — top 40' : '' }}</div>
+          <table class="print-table print-table--bordered">
+            <thead><tr><th>Package</th><th>Version Spec</th><th>Source</th></tr></thead>
             <tbody>
               <tr v-for="d in prodDeps" :key="d.name + d.source">
                 <td><strong>{{ d.name }}</strong></td>
@@ -629,15 +713,9 @@ const difficultyColor: Record<string, string> = {
         </template>
 
         <template v-if="devDeps.length">
-          <h3 class="print-subsection">Dev Dependencies{{ devDeps.length >= 20 ? ' (top 20)' : '' }}</h3>
-          <table class="print-table">
-            <thead>
-              <tr>
-                <th>Package</th>
-                <th>Version Spec</th>
-                <th>Source</th>
-              </tr>
-            </thead>
+          <div class="print-subsection">Dev Dependencies{{ devDeps.length >= 20 ? ' — top 20' : '' }}</div>
+          <table class="print-table print-table--bordered">
+            <thead><tr><th>Package</th><th>Version Spec</th><th>Source</th></tr></thead>
             <tbody>
               <tr v-for="d in devDeps" :key="d.name + d.source">
                 <td>{{ d.name }}</td>
@@ -649,14 +727,9 @@ const difficultyColor: Record<string, string> = {
         </template>
 
         <template v-if="result.dependencies?.docker_issues?.length">
-          <h3 class="print-subsection">Docker Issues</h3>
-          <table class="print-table">
-            <thead>
-              <tr>
-                <th>File</th>
-                <th>Issue</th>
-              </tr>
-            </thead>
+          <div class="print-subsection">Docker Issues</div>
+          <table class="print-table print-table--bordered">
+            <thead><tr><th>File</th><th>Issue</th></tr></thead>
             <tbody>
               <tr v-for="(d, i) in result.dependencies.docker_issues" :key="i">
                 <td class="print-table__mono">{{ d.file }}</td>
@@ -667,10 +740,10 @@ const difficultyColor: Record<string, string> = {
         </template>
       </section>
 
-      <!-- ── SECTION 6: ARCHITECTURE ── -->
+      <!-- ══ §ARCHITECTURE ══ -->
       <section class="print-section">
         <div class="print-section__header">
-          <span class="print-section__num">06</span>
+          <span class="print-section__num">{{ sectionNums.arch }}</span>
           <h2 class="print-section__title">Architecture</h2>
         </div>
 
@@ -681,7 +754,7 @@ const difficultyColor: Record<string, string> = {
           </div>
           <div class="print-stat">
             <div class="print-stat__value">{{ result.graph.edge_count }}</div>
-            <div class="print-stat__label">Dependencies</div>
+            <div class="print-stat__label">Edges</div>
           </div>
           <div class="print-stat">
             <div :class="['print-stat__value', result.graph.cycle_count > 0 ? 'print-risk--high' : '']">
@@ -690,7 +763,7 @@ const difficultyColor: Record<string, string> = {
             <div class="print-stat__label">Cycles</div>
           </div>
           <div class="print-stat">
-            <div :class="['print-stat__value', result.graph.god_modules?.length > 0 ? 'print-risk--medium' : '']">
+            <div :class="['print-stat__value', (result.graph.god_modules?.length ?? 0) > 0 ? 'print-risk--medium' : '']">
               {{ result.graph.god_modules?.length ?? 0 }}
             </div>
             <div class="print-stat__label">God Modules</div>
@@ -698,81 +771,65 @@ const difficultyColor: Record<string, string> = {
         </div>
 
         <template v-if="result.graph.cycles?.length">
-          <h3 class="print-subsection">Dependency Cycles ({{ result.graph.cycle_count }})</h3>
-          <table class="print-table">
-            <thead><tr><th>#</th><th>Cycle</th></tr></thead>
+          <div class="print-subsection">Dependency Cycles ({{ result.graph.cycle_count }})</div>
+          <table class="print-table print-table--bordered">
+            <thead><tr><th>#</th><th>Cycle Path</th></tr></thead>
             <tbody>
               <tr v-for="(cycle, i) in result.graph.cycles.slice(0, 10)" :key="i">
                 <td class="print-table__muted">{{ i + 1 }}</td>
-                <td class="print-table__mono" style="font-size:0.75rem">{{ cycle.join(' → ') }}</td>
+                <td class="print-table__mono" style="font-size:0.72rem;word-break:break-all">{{ cycle.join(' → ') }}</td>
               </tr>
             </tbody>
           </table>
         </template>
 
-        <template v-if="godModules.length">
-          <h3 class="print-subsection">God Modules (high fan-in)</h3>
-          <table class="print-table">
-            <thead>
-              <tr>
-                <th>Module</th>
-                <th>In-degree</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="m in godModules" :key="m.module">
-                <td class="print-table__mono">{{ m.module }}</td>
-                <td>{{ m.in_degree }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </template>
-
-        <template v-if="hotFiles.length">
-          <h3 class="print-subsection">Hot Files (most commits)</h3>
-          <table class="print-table">
-            <thead>
-              <tr>
-                <th>File</th>
-                <th>Commits</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="f in hotFiles" :key="f.file">
-                <td class="print-table__mono">{{ f.file }}</td>
-                <td>{{ f.commit_count }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </template>
+        <div class="print-two-col" style="margin-top:0.5rem">
+          <div v-if="godModules.length">
+            <div class="print-subsection">God Modules</div>
+            <table class="print-table print-table--bordered">
+              <thead><tr><th>Module</th><th>In-degree</th></tr></thead>
+              <tbody>
+                <tr v-for="m in godModules" :key="m.module">
+                  <td class="print-table__mono">{{ m.module }}</td>
+                  <td>{{ m.in_degree }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-if="hotFiles.length">
+            <div class="print-subsection">Hot Files</div>
+            <table class="print-table print-table--bordered">
+              <thead><tr><th>File</th><th>Commits</th></tr></thead>
+              <tbody>
+                <tr v-for="f in hotFiles" :key="f.file">
+                  <td class="print-table__mono">{{ f.file }}</td>
+                  <td>{{ f.commit_count }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
-      <!-- ── SECTION 7: CONTRIBUTING OPPORTUNITIES ── -->
+      <!-- ══ §CONTRIBUTING (conditional) ══ -->
       <section v-if="opportunities.length" class="print-section">
         <div class="print-section__header">
-          <span class="print-section__num">07</span>
+          <span class="print-section__num">{{ sectionNums.contributing }}</span>
           <h2 class="print-section__title">Contributing Opportunities</h2>
         </div>
-        <p class="print-section__intro">
-          Identified opportunities for contribution based on repository analysis.
-        </p>
 
-        <table class="print-table">
+        <table class="print-table print-table--bordered">
           <thead>
-            <tr>
-              <th>Title</th>
-              <th>Difficulty</th>
-              <th>Category</th>
-              <th>Effort</th>
-            </tr>
+            <tr><th>Title</th><th>Difficulty</th><th>Category</th><th>Effort</th></tr>
           </thead>
           <tbody>
             <tr v-for="op in opportunities" :key="op.id">
               <td>{{ op.title }}</td>
               <td>
-                <span class="print-badge" :style="{ color: difficultyColor[op.difficulty], borderColor: difficultyColor[op.difficulty] }">
-                  {{ op.difficulty }}
-                </span>
+                <span
+                  class="print-badge"
+                  :style="{ color: difficultyColor[op.difficulty], borderColor: difficultyColor[op.difficulty], background: 'transparent' }"
+                >{{ op.difficulty }}</span>
               </td>
               <td class="print-table__muted">{{ op.category }}</td>
               <td class="print-table__muted">{{ op.effort_estimate ?? '—' }}</td>
@@ -781,15 +838,17 @@ const difficultyColor: Record<string, string> = {
         </table>
       </section>
 
-      <!-- ── REPORT FOOTER ── -->
+      <!-- ══ REPORT FOOTER ══ -->
       <div class="print-report-footer">
-        <div class="print-report-footer__brand">Atlas Insight</div>
-        <div class="print-report-footer__meta">
-          {{ run.repo_owner }}/{{ run.repo_name }} · {{ formatDate(run.completed_at) }} · Run {{ run.id }}
+        <div class="print-report-footer__left">
+          <div class="print-report-footer__brand">Atlas Insight</div>
+          <div class="print-report-footer__meta">
+            {{ run.repo_owner }}/{{ run.repo_name }} · {{ formatDate(run.completed_at) }} · {{ run.id }}
+          </div>
         </div>
         <div class="print-report-footer__disclaimer">
-          This report is generated by automated static analysis. It does not constitute a security audit,
-          code review, or professional assessment. Always apply domain expertise when interpreting results.
+          Automated static analysis only. Does not constitute a security audit, code review,
+          or professional assessment. Apply domain expertise when interpreting results.
         </div>
       </div>
 
