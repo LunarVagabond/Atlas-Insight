@@ -110,6 +110,8 @@ const menuOpen = ref(false)
     </div>
     <footer class="app-footer">
       © {{ new Date().getFullYear() }} Lunar Vagabond. All rights reserved.
+      <span class="app-footer__sep">·</span>
+      <a href="https://ko-fi.com/chrisconlon" target="_blank" rel="noopener noreferrer" class="app-footer__kofi">☕ Buy me a coffee</a>
     </footer>
   </div>
 </template>

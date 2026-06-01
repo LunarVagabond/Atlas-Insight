@@ -3,6 +3,7 @@ import os
 from datetime import datetime, timezone as _tz
 
 from celery import shared_task
+from django.db.models import Exists, OuterRef
 from django.utils import timezone
 
 from apps.repositories.models import AnalysisRun
@@ -213,6 +214,7 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
 
 @shared_task
 def check_stale_repos():
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     from datetime import timedelta
 
     from django.conf import settings
@@ -222,28 +224,28 @@ def check_stale_repos():
     from .github_meta import fetch_latest_sha
 
     stale_threshold = timezone.now() - timedelta(days=settings.STALE_AFTER_DAYS)
-    repos = Repository.objects.exclude(last_commit_sha='')
-    updated = 0
-    for repo in repos:
-        if repo.is_stale:
-            continue
-        stale = False
-        # Time-based: not fetched within STALE_AFTER_DAYS
+    repos = list(Repository.objects.exclude(last_commit_sha='').filter(is_stale=False))
+
+    def _check(repo) -> bool:
         if repo.last_fetched_at and repo.last_fetched_at < stale_threshold:
-            stale = True
-        # SHA-based: new commits on GitHub
-        if not stale:
-            try:
-                latest = fetch_latest_sha(repo.owner, repo.name)
-                if latest and latest != repo.last_commit_sha:
-                    stale = True
-            except Exception:
-                logger.warning('Stale SHA check failed for %s/%s', repo.owner, repo.name)
-        if stale:
-            repo.is_stale = True
-            repo.save(update_fields=['is_stale'])
-            updated += 1
-    logger.info('Stale check complete: %d repos marked stale', updated)
+            return True
+        try:
+            latest = fetch_latest_sha(repo.owner, repo.name)
+            return bool(latest and latest != repo.last_commit_sha)
+        except Exception:
+            logger.warning('Stale SHA check failed for %s/%s', repo.owner, repo.name)
+            return False
+
+    stale_ids = []
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        futures = {pool.submit(_check, r): r.pk for r in repos}
+        for future in as_completed(futures):
+            if future.result():
+                stale_ids.append(futures[future])
+
+    if stale_ids:
+        Repository.objects.filter(pk__in=stale_ids).update(is_stale=True)
+    logger.info('Stale check complete: %d repos marked stale', len(stale_ids))
 
 
 @shared_task
@@ -403,6 +405,31 @@ def reanalyze_watched_repos():
         logger.info('Queued re-analysis for watched repo %s/%s (run %s)', repo.owner, repo.name, run.id)
 
     logger.info('Watched repo re-analysis: %d/%d repos queued', queued, len(watched))
+
+
+@shared_task
+def cleanup_never_succeeded_repos():
+    """Delete repos that have never had a completed run and are older than 1 hour.
+
+    Catches invalid/nonexistent URLs (e.g. 404s from GitHub) that failed
+    immediately and would otherwise linger in the DB indefinitely.
+    """
+    from datetime import timedelta
+
+    from apps.repositories.models import Repository
+
+    cutoff = timezone.now() - timedelta(hours=1)
+
+    # Repos with at least one completed run are safe — skip them
+    ever_completed = (
+        AnalysisRun.objects.filter(repo=OuterRef('pk'), status='completed')
+    )
+    stale = (
+        Repository.objects.annotate(has_success=Exists(ever_completed))
+        .filter(has_success=False, created_at__lt=cutoff)
+    )
+    count, _ = stale.delete()
+    logger.info('Orphan repo cleanup: %d repos deleted (never completed, older than 1 h)', count)
 
 
 @shared_task

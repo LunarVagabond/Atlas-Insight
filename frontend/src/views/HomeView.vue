@@ -154,6 +154,7 @@ async function togglePin(repoUrl: string) {
 
 const pinnedItems = computed(() => items.value.filter(r => watchlist.value.has(r.repo_url)))
 const unpinnedItems = computed(() => items.value.filter(r => !watchlist.value.has(r.repo_url)))
+const ghostRows = computed(() => Math.max(0, perPage - items.value.length))
 
 </script>
 
@@ -323,6 +324,15 @@ const unpinnedItems = computed(() => items.value.filter(r => !watchlist.value.ha
               <td>
                 <AppButton variant="secondary" @click.stop="goToRun(run.id)" style="font-size:0.8125rem;padding:4px 12px">View</AppButton>
               </td>
+            </tr>
+
+            <!-- Ghost rows — keep table height stable at perPage slots -->
+            <tr
+              v-for="i in ghostRows"
+              :key="'ghost-' + i"
+              class="runs-table__row runs-table__row--ghost"
+            >
+              <td colspan="6">&nbsp;</td>
             </tr>
           </tbody>
         </table>

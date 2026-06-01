@@ -1,4 +1,290 @@
 <script setup lang="ts">
+import { ref, computed } from 'vue'
+import AppTabs from '../components/ui/AppTabs.vue'
+
+const TABS = ['About', 'Guide']
+const activeTab = ref('About')
+
+const searchQuery = ref('')
+
+interface GuideEntry {
+  id: string
+  term: string
+  range?: string
+  section: string
+  defHtml: string
+  methodLabel: string
+  method: string
+  searchText: string
+}
+
+const GUIDE_ENTRIES: GuideEntry[] = [
+  // ── Scores & Risk ────────────────────────────────────────────────────────
+  {
+    id: 'risk-score',
+    term: 'Risk Score',
+    range: '0 – 100',
+    section: 'Scores & Risk',
+    defHtml: `Each heuristic signal produces a 0–100 risk score where <span class="guide-kw">0 = no concern</span> and <span class="guide-kw">100 = maximum risk</span>. The composite "Overall Risk Score" on the Overview tab is the unweighted average across all signals. A score of 30 or below is shown in green, 30–60 in yellow, and above 60 in red.`,
+    methodLabel: 'How we compute it',
+    method: 'Each signal uses its own formula (see individual entries below). The composite is a simple mean across all signals that were computable for that repo.',
+    searchText: 'risk score 0 100 composite overall heuristic signal green yellow red health',
+  },
+  {
+    id: 'oss-score',
+    term: 'OSS Score',
+    range: '0 – 10',
+    section: 'Scores & Risk',
+    defHtml: `A single number summarizing how ready a project is for open-source collaboration and long-term sustainability. <span class="guide-kw">10 is best</span>. This is not a code quality score — it measures community scaffolding: docs, CI, licensing, and regular releases.`,
+    methodLabel: 'How we compute it',
+    method: 'Weighted combination of six heuristics: community health (25%), documentation (20%), CI/testing (20%), release cadence (15%), abandonment risk (10%), bus factor (10%). Each is inverted (100 − risk score) so lower risk = higher contribution to the OSS score, then normalized to 0–10.',
+    searchText: 'oss score open source sustainability champion thriving growing seedling struggling dormant 10 weighted community docs ci release bus factor',
+  },
+  {
+    id: 'confidence',
+    term: 'Confidence Level',
+    section: 'Scores & Risk',
+    defHtml: `Each heuristic signal carries a <span class="guide-kw">confidence</span> rating — <em>low</em>, <em>medium</em>, or <em>high</em> — indicating how much data was available to compute it. A young repo with 10 commits will have low confidence on activity signals. Treat low-confidence scores as directional hints, not firm conclusions.`,
+    methodLabel: 'How we compute it',
+    method: 'Set per-signal based on thresholds: e.g., burnout is high-confidence only if the repo has 6+ months of contributor churn data; monolith growth is high-confidence only if the import graph has 50+ nodes.',
+    searchText: 'confidence low medium high data young repo hints directional signal reliability',
+  },
+  // ── Activity & Momentum ──────────────────────────────────────────────────
+  {
+    id: 'commit-velocity',
+    term: 'Commit Velocity',
+    section: 'Activity & Momentum',
+    defHtml: `Whether the pace of commits is <span class="guide-kw">speeding up or slowing down</span> over the last 6 months. A declining velocity can signal reduced interest, shifting priorities, or a project approaching completion. Rising velocity is a strong health indicator.`,
+    methodLabel: 'How we compute it',
+    method: 'We split the last 6 months of commit history into two 3-month windows and compare their averages. If the recent window is below 70% of the prior window it is a "slight slowdown"; below 40% it is a "sharp decline". Needs at least 6 months of history to run.',
+    searchText: 'commit velocity pace slowing speeding up 6 months trend decline rise momentum activity',
+  },
+  {
+    id: 'activity-decay',
+    term: 'Activity Decay Ratio',
+    section: 'Activity & Momentum',
+    defHtml: `The ratio of <span class="guide-kw">recent commit frequency to historical peak frequency</span>. A ratio of 1.0 means the project is as active as it has ever been. A ratio of 0.3 means recent months produce about 30% of the commits the project did at its busiest.`,
+    methodLabel: 'How we compute it',
+    method: 'We bucket all commits by week, find the rolling peak 4-week average, and divide the most recent 4-week average by that peak. The result feeds the Burnout Risk heuristic.',
+    searchText: 'activity decay ratio peak frequency recent historical burnout 1.0 0.3 weekly',
+  },
+  {
+    id: 'abandonment-risk',
+    term: 'Abandonment Risk',
+    section: 'Activity & Momentum',
+    defHtml: `How likely it is that this repo is <span class="guide-kw">no longer actively maintained</span>, based on the time since the last commit. Unmaintained repos don't get security patches, bug fixes, or compatibility updates with newer tooling.`,
+    methodLabel: 'How we compute it',
+    method: 'Days since last commit maps directly to a risk score: under 30d = 0, 30–90d = 5, 90–180d = 20, 180–365d = 45, 365–730d = 70, 730d+ = 90.',
+    searchText: 'abandonment risk maintained last commit days silent dormant inactive unmaintained deprecated',
+  },
+  {
+    id: 'contributor-churn',
+    term: 'Contributor Churn',
+    section: 'Activity & Momentum',
+    defHtml: `How many unique authors committed code each month, broken into <span class="guide-kw">new</span> (first-ever commit), <span class="guide-kw">active</span> (committed this month), and <span class="guide-kw">lost</span> (active last month, quiet this month). A shrinking active count is one of the strongest burnout signals.`,
+    methodLabel: 'How we compute it',
+    method: 'Parsed from the full commit log. Each month we track which email addresses committed; "new" is their first appearance, "lost" is their first month of absence after at least one prior active month.',
+    searchText: 'contributor churn new active lost monthly authors burnout signal leave leaving email',
+  },
+  {
+    id: 'burnout-risk',
+    term: 'Team Burnout Risk',
+    section: 'Activity & Momentum',
+    defHtml: `A composite signal combining <span class="guide-kw">contributor drop from peak</span> and <span class="guide-kw">activity decay</span>. High scores mean fewer people are doing less work than they historically did — a classic early warning sign of a project running out of steam.`,
+    methodLabel: 'How we compute it',
+    method: 'Score = (contributor_drop × 50) + ((1 − activity_decay_ratio) × 50), capped at 100. If the most recent month has 25% of the peak contributor count and commits are at 40% of peak pace, that is (0.75 × 50) + (0.6 × 50) = 67 risk.',
+    searchText: 'burnout risk team contributors drop peak activity decay steam momentum warning formula',
+  },
+  // ── Architecture ─────────────────────────────────────────────────────────
+  {
+    id: 'import-graph',
+    term: 'Import Graph',
+    section: 'Architecture',
+    defHtml: `A <span class="guide-kw">directed graph</span> where each node is a source file and each edge is an import statement. If file A imports from file B, there is an edge A → B. The shape of this graph reveals how tightly coupled different parts of the codebase are.`,
+    methodLabel: 'How we compute it',
+    method: 'We statically parse import/require/use statements from source files using language-specific parsers. Supported: Python, TypeScript, JavaScript, Go, Ruby, Rust, Java, Kotlin, C#, PHP. We do not execute any code — this is pure text analysis.',
+    searchText: 'import graph directed nodes edges files coupling dependency static analysis python typescript javascript go ruby rust java kotlin csharp php',
+  },
+  {
+    id: 'god-module',
+    term: 'God Module',
+    section: 'Architecture',
+    defHtml: `A file that <span class="guide-kw">many other files import from</span> — it has a high "in-degree" in the import graph. God modules are not always bad (a well-designed utility module is fine), but they create architectural risk: changing one affects everything that depends on it, making refactoring expensive and risky.`,
+    methodLabel: 'How we compute it',
+    method: 'We count how many other files import each file (in-degree). Files with unusually high in-degree relative to the graph size are flagged as god modules. The threshold scales with repository size. Each god module adds 4 points to the Monolith Growth score.',
+    searchText: 'god module in-degree import many files coupling refactor utility shared centralized hub',
+  },
+  {
+    id: 'circular-dependency',
+    term: 'Circular Dependency',
+    section: 'Architecture',
+    defHtml: `When module A imports B which (directly or through a chain) imports A again. Circular dependencies prevent <span class="guide-kw">tree-shaking</span>, complicate testing in isolation, and can cause <span class="guide-kw">initialization-order bugs</span> that are hard to diagnose.`,
+    methodLabel: 'How we compute it',
+    method: 'We run a depth-first cycle detection algorithm on the import graph. Each detected cycle adds 3 points to the Monolith Growth score. The heuristic drawer shows an example cycle chain so you can find it in the code.',
+    searchText: 'circular dependency cycle import chain tree-shaking initialization order bug graph detection dfs',
+  },
+  {
+    id: 'monolith-growth',
+    term: 'Monolith Growth Score',
+    section: 'Architecture',
+    defHtml: `A combined measure of <span class="guide-kw">architectural complexity</span> — how much the codebase has structural patterns that make it harder to work in. It combines god modules and circular dependencies into one number.`,
+    methodLabel: 'How we compute it',
+    method: 'Score = (god_module_count × 4) + (cycle_count × 3), capped at 100. A repo with 5 god modules and 3 cycles scores (5 × 4) + (3 × 3) = 29.',
+    searchText: 'monolith growth score architectural complexity god modules cycles formula calculation',
+  },
+  {
+    id: 'hot-files',
+    term: 'Hot Files',
+    section: 'Architecture',
+    defHtml: `Files with the <span class="guide-kw">most commit touches</span> over the project history. High-churn files are either critical shared utilities, or files that are frequently broken and patched. Worth understanding before making changes.`,
+    methodLabel: 'How we compute it',
+    method: 'We count how many distinct commits touched each file path across the entire git log, then rank by that count. Files renamed or moved may appear separately.',
+    searchText: 'hot files churn commit touches high frequency changed often utility critical',
+  },
+  {
+    id: 'bus-factor',
+    term: 'Bus Factor',
+    section: 'Architecture',
+    defHtml: `The <span class="guide-kw">minimum number of contributors</span> that would need to stop working before 80% or more of the codebase has no active knowledge holder. A bus factor of 1 means one person leaving would leave most of the codebase "orphaned."`,
+    methodLabel: 'How we compute it',
+    method: 'For each file we identify the contributor who touched it the most. We rank contributors by how many files they "own" and count how many are needed to cover 80% of all files. Risk score = max(0, (5 − bus_factor) × 20), so bus factor 1 = 80 risk, bus factor 5+ = 0 risk.',
+    searchText: 'bus factor knowledge holder contributors 80% owner file single point failure orphan institutional',
+  },
+  {
+    id: 'subsystems',
+    term: 'Subsystems',
+    section: 'Architecture',
+    defHtml: `Logical groupings of files by their <span class="guide-kw">path structure</span> — frontend, API, data layer, tests, config, etc. Each subsystem shows which files are most active, who works on them, and what GitHub issues relate to that area.`,
+    methodLabel: 'How we compute it',
+    method: 'We match file paths against keyword patterns (e.g. paths containing "component", "view", "ui" → frontend subsystem). Files that do not match any pattern go into "other". Subsystems are ranked by commit activity.',
+    searchText: 'subsystems frontend api data tests config path groups areas ownership activity',
+  },
+  // ── Project Health ───────────────────────────────────────────────────────
+  {
+    id: 'community-health-files',
+    term: 'Community Health Files',
+    section: 'Project Health',
+    defHtml: `Standard files that signal a project is set up to welcome contributors: <span class="guide-kw">LICENSE</span> (legal terms of use), <span class="guide-kw">CONTRIBUTING</span> (how to make your first PR), <span class="guide-kw">CODE_OF_CONDUCT</span> (community norms), <span class="guide-kw">SECURITY</span> (how to report vulnerabilities), <span class="guide-kw">CHANGELOG</span> (what changed between versions).`,
+    methodLabel: 'How we compute it',
+    method: 'We scan the file tree for common filenames and locations for each community file (root, docs/, .github/). Score: no license +30, no CONTRIBUTING +20, no SECURITY +15, no CoC +10, no CHANGELOG +10.',
+    searchText: 'community health files license contributing code of conduct security changelog readme welcome contributors',
+  },
+  {
+    id: 'documentation-quality',
+    term: 'Documentation Quality',
+    section: 'Project Health',
+    defHtml: `How complete and useful the project documentation is for a newcomer. Scores low when there is no README, when the README is <span class="guide-kw">too short to be useful</span> (under 100 words), or when key sections are missing — how to install it, how to use it, how to contribute.`,
+    methodLabel: 'How we compute it',
+    method: 'We parse the README and scan for section headings matching installation, usage, contributing, and changelog patterns. Each missing section adds 15 points. A missing README entirely scores 90. Max capped at 100.',
+    searchText: 'documentation quality readme short word count installation usage contributing changelog sections missing newcomer',
+  },
+  {
+    id: 'ci-health',
+    term: 'CI Health',
+    section: 'Project Health',
+    defHtml: `Whether the project has <span class="guide-kw">automated quality checks</span> wired up: a CI pipeline (GitHub Actions, CircleCI, Travis, etc.), a linting configuration, and a meaningful amount of test files. These catch bugs before they ship.`,
+    methodLabel: 'How we compute it',
+    method: 'No CI detected = +40 risk. No lint config = +20 risk. Test file ratio below 5% = +30 risk, below 15% = +15 risk, below 25% = +5 risk.',
+    searchText: 'ci health continuous integration github actions circleci travis pipeline linting automated testing checks',
+  },
+  {
+    id: 'test-ratio',
+    term: 'Test Ratio',
+    section: 'Project Health',
+    defHtml: `The proportion of <span class="guide-kw">test files to source files</span> in the repository. A ratio of 20% means roughly 1 test file for every 5 source files. A structural proxy — a project with 3 comprehensive integration tests and 100 source files will score low even if it has excellent coverage.`,
+    methodLabel: 'How we compute it',
+    method: 'Files are classified as tests if they live in a test/ or spec/ directory, have "test" or "spec" in their filename, or match common test framework patterns. Count of test files ÷ non-test source files.',
+    searchText: 'test ratio files coverage proxy integration unit spec testing percentage',
+  },
+  {
+    id: 'dependency-health',
+    term: 'Dependency Health',
+    section: 'Project Health',
+    defHtml: `Risk from external dependencies — <span class="guide-kw">deprecated Docker base images</span>, missing <span class="guide-kw">lockfiles</span>, and very large dependency trees. Each represents a different class of supply-chain or reproducibility risk.`,
+    methodLabel: 'How we compute it',
+    method: 'Deprecated Docker base image = +15 per image. Missing lockfile = +20 per package manager. Over 200 total dependencies adds a small scaling penalty (max +20). Score capped at 100.',
+    searchText: 'dependency health docker base image deprecated lockfile supply chain reproducibility package count',
+  },
+  {
+    id: 'lockfile',
+    term: 'Lockfile',
+    section: 'Project Health',
+    defHtml: `A file that <span class="guide-kw">pins exact dependency versions</span> so every build uses the same code. Examples: <code>package-lock.json</code>, <code>yarn.lock</code>, <code>Pipfile.lock</code>, <code>poetry.lock</code>, <code>Cargo.lock</code>. Without one, two developers running the same install command may get different package versions.`,
+    methodLabel: 'How we detect it',
+    method: 'We scan the file tree for the expected lockfile for each detected package manager. If a package manifest exists (e.g. package.json) but its lockfile does not, we flag it as a missing lockfile warning.',
+    searchText: 'lockfile package-lock.json yarn.lock pipfile.lock poetry.lock cargo.lock pin versions reproducible build npm pip cargo',
+  },
+  {
+    id: 'release-cadence',
+    term: 'Release Cadence',
+    section: 'Project Health',
+    defHtml: `How regularly the project <span class="guide-kw">cuts formal releases</span> (git tags / GitHub releases) and how recently the last one was. Regular releases give downstream users a stable update path and signal active maintenance.`,
+    methodLabel: 'How we compute it',
+    method: 'No releases = 35 risk. Days since last release: under 90d = 0, 90–365d = 15, 365–730d = 50, 730d+ = 75. Projects that ship continuously from main without tagging will score worse than they deserve.',
+    searchText: 'release cadence tags versions github releases stable update maintenance semver changelog last release',
+  },
+  {
+    id: 'security-hygiene',
+    term: 'Security Hygiene',
+    section: 'Project Health',
+    defHtml: `Whether common security mistakes are present: <span class="guide-kw">accidentally committed secrets</span> (API keys, .env files, private keys), a missing <code>.gitignore</code>, or a <code>.gitignore</code> that doesn't exclude patterns it should. A committed secret should be treated as compromised immediately.`,
+    methodLabel: 'How we detect it',
+    method: 'We scan the tracked file list (not file contents) for filenames matching common secret patterns: .env, *.pem, *.key, credential JSON files, etc. We also parse .gitignore and check it against recommended patterns. We do not read file contents or transmit any detected secrets.',
+    searchText: 'security hygiene secrets api keys env pem key gitignore credentials committed compromised patterns',
+  },
+  // ── Contributing ────────────────────────────────────────────────────────
+  {
+    id: 'contribution-opportunities',
+    term: 'Contribution Opportunities',
+    section: 'Contributing & Opportunities',
+    defHtml: `Specific, actionable entry points for someone who wants to contribute. These can be <span class="guide-kw">open GitHub issues</span> tagged good-first-issue or help-wanted, structural gaps like missing tests or docs, or infrastructure improvements like adding CI.`,
+    methodLabel: 'How we find them',
+    method: 'Combination of GitHub issues fetched via the API (filtered for beginner-friendly labels) and synthetic opportunities from structural analysis (e.g. "add a lockfile", "write a CONTRIBUTING guide", "add CI"). Issue opportunities require a GitHub token to fetch.',
+    searchText: 'contribution opportunities first issue help wanted open source beginner newcomer entry points issues structural',
+  },
+  {
+    id: 'difficulty-ratings',
+    term: 'Difficulty Ratings',
+    section: 'Contributing & Opportunities',
+    defHtml: `Each opportunity is rated <span class="guide-kw">beginner</span>, <span class="guide-kw">intermediate</span>, or <span class="guide-kw">advanced</span>. Beginner tasks require minimal domain knowledge — adding a file, fixing a typo, writing a small doc. Advanced tasks require deep architectural understanding.`,
+    methodLabel: 'How we rate them',
+    method: 'For GitHub issues we look at labels (good-first-issue = beginner, help-wanted = intermediate). For synthetic opportunities we assign fixed difficulty by task type: adding a LICENSE is beginner, refactoring a god module is advanced.',
+    searchText: 'difficulty beginner intermediate advanced rating labels good first issue help wanted domain knowledge',
+  },
+  {
+    id: 'readiness-score',
+    term: 'Readiness Score',
+    section: 'Contributing & Opportunities',
+    defHtml: `Whether an opportunity is actually <span class="guide-kw">ready to be picked up right now</span>. A "Ready" issue has no open PR already addressing it and is not blocked. A "Claimed" issue has an open PR. "Stale" issues have not been touched in a long time.`,
+    methodLabel: 'How we compute it',
+    method: 'We cross-reference open issues against open PRs using JIT data fetched from GitHub after analysis completes. A PR mentioning an issue number (via "Fixes #123" or "Closes #123") marks that issue as claimed.',
+    searchText: 'readiness ready claimed stale open pr issue cross reference fixes closes blocked available',
+  },
+]
+
+const SECTION_ORDER = ['Scores & Risk', 'Activity & Momentum', 'Architecture', 'Project Health', 'Contributing & Opportunities']
+
+const filteredEntries = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return GUIDE_ENTRIES
+  return GUIDE_ENTRIES.filter(e =>
+    e.term.toLowerCase().includes(q) ||
+    e.searchText.toLowerCase().includes(q) ||
+    e.method.toLowerCase().includes(q)
+  )
+})
+
+const visibleSections = computed(() =>
+  SECTION_ORDER.filter(s => filteredEntries.value.some(e => e.section === s))
+)
+
+function entriesForSection(section: string) {
+  return filteredEntries.value.filter(e => e.section === section)
+}
+
+function clearSearch() {
+  searchQuery.value = ''
+}
 </script>
 
 <template>
@@ -8,7 +294,10 @@
       <p class="about-view__tagline">Repository archaeology — no AI, just data.</p>
     </div>
 
-    <div class="about-view__body">
+    <AppTabs :tabs="TABS" v-model="activeTab" />
+
+    <!-- ── About tab ──────────────────────────────────────────────────────── -->
+    <div v-if="activeTab === 'About'" class="about-view__body" style="margin-top: 2rem">
       <section class="about-view__section">
         <h2 class="about-view__section-title">What is this?</h2>
         <p>Atlas Insight analyzes public GitHub repositories and surfaces patterns that are hard to see at a glance — commit velocity trends, contributor burnout signals, architectural complexity, dependency health, and more. Everything is deterministic and computed directly from the git history and source files. No LLMs, no guessing.</p>
@@ -47,54 +336,43 @@
         <div class="about-view__badge-grid">
           <div class="about-view__badge-row">
             <span class="about-view__badge-emoji">🏆</span>
-            <div>
-              <strong>Champion (9–10)</strong>
-              <span>License, docs, CI, releases, active contributors — the works.</span>
-            </div>
+            <div><strong>Champion (9–10)</strong><span>License, docs, CI, releases, active contributors — the works.</span></div>
           </div>
           <div class="about-view__badge-row">
             <span class="about-view__badge-emoji">⭐</span>
-            <div>
-              <strong>Thriving (7.5–9)</strong>
-              <span>Strong foundation with minor gaps.</span>
-            </div>
+            <div><strong>Thriving (7.5–9)</strong><span>Strong foundation with minor gaps.</span></div>
           </div>
           <div class="about-view__badge-row">
             <span class="about-view__badge-emoji">🌱</span>
-            <div>
-              <strong>Growing (6–7.5)</strong>
-              <span>Good bones, room to improve community scaffolding.</span>
-            </div>
+            <div><strong>Growing (6–7.5)</strong><span>Good bones, room to improve community scaffolding.</span></div>
           </div>
           <div class="about-view__badge-row">
             <span class="about-view__badge-emoji">🌿</span>
-            <div>
-              <strong>Seedling (4–6)</strong>
-              <span>Active but missing several OSS essentials.</span>
-            </div>
+            <div><strong>Seedling (4–6)</strong><span>Active but missing several OSS essentials.</span></div>
           </div>
           <div class="about-view__badge-row">
             <span class="about-view__badge-emoji">😬</span>
-            <div>
-              <strong>Struggling (2–4)</strong>
-              <span>Low docs, CI, or release cadence.</span>
-            </div>
+            <div><strong>Struggling (2–4)</strong><span>Low docs, CI, or release cadence.</span></div>
           </div>
           <div class="about-view__badge-row">
             <span class="about-view__badge-emoji">💀</span>
-            <div>
-              <strong>Dormant (0–2)</strong>
-              <span>Abandoned or severely under-maintained.</span>
-            </div>
+            <div><strong>Dormant (0–2)</strong><span>Abandoned or severely under-maintained.</span></div>
           </div>
         </div>
         <p class="about-view__note">Score weights: Community health 25% · Documentation 20% · CI/testing 20% · Release cadence 15% · Activity 10% · Bus factor 10%.</p>
       </section>
 
+      <section class="about-view__section about-view__section--support">
+        <p class="about-view__support-text">
+          Atlas Insight is free and always will be.
+          If it's been useful, <a href="https://ko-fi.com/chrisconlon" target="_blank" rel="noopener noreferrer" class="about-view__kofi-link">☕ buy me a coffee</a> — it keeps the servers running.
+        </p>
+      </section>
+
       <section class="about-view__section">
         <h2 class="about-view__section-title">Disclaimer</h2>
         <div class="about-view__disclaimer">
-          <p>Atlas Insight is a <strong>for-fun tool</strong> built for curiosity and exploration — not auditing or judgment. Scores and signals are heuristic-based and will never capture the full picture of how a team operates. A low OSS score doesn't mean a project is bad; it might just mean the team works differently, ships privately, or simply hasn't gotten around to adding a CONTRIBUTING file. Take everything here with a healthy grain of salt.</p>
+          <p>Atlas Insight is a <strong>for-fun tool</strong> built for curiosity and exploration — not auditing or judgment. Scores and signals are heuristic-based and will never capture the full picture of how a team operates. A low OSS score doesn't mean a project is bad; it might just mean the team works differently, ships privately, or simply hasn't gotten around to adding a CONTRIBUTING file.</p>
           <p>If a score feels wrong for your project, it probably is — every codebase has context that static analysis can't see. Use this as a starting point for conversation, not a verdict.</p>
         </div>
       </section>
@@ -103,11 +381,72 @@
         <h2 class="about-view__section-title">Limitations</h2>
         <ul class="about-view__feature-list">
           <li>Analysis runs on a point-in-time clone — results reflect the repo at fetch time.</li>
-          <li>Import graph analysis covers Python, TypeScript, JavaScript, Go, Ruby, Rust, Java, Kotlin, C#, and PHP. Other languages show dependency reports only. We're always working to expand language support.</li>
+          <li>Import graph analysis covers Python, TypeScript, JavaScript, Go, Ruby, Rust, Java, Kotlin, C#, and PHP. Other languages show dependency reports only.</li>
           <li>Very large repositories (&gt;500 MB) may time out.</li>
           <li>GitHub API rate limits apply; some JIT data (issues, PRs) may be unavailable under load.</li>
         </ul>
       </section>
+    </div>
+
+    <!-- ── Guide tab ──────────────────────────────────────────────────────── -->
+    <div v-if="activeTab === 'Guide'" class="about-view__body guide" style="margin-top: 2rem">
+
+      <p class="guide__intro">Plain-English reference for every number, score, and term in Atlas Insight. Each entry explains what the metric means and exactly how we compute it from the raw repository data.</p>
+
+      <!-- Search bar -->
+      <div class="guide-search">
+        <div class="guide-search__input-wrap">
+          <span class="guide-search__icon">⌕</span>
+          <input
+            v-model="searchQuery"
+            type="search"
+            class="guide-search__input"
+            placeholder="Search terms — e.g. bus factor, lockfile, CI health…"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button v-if="searchQuery" class="guide-search__clear" @click="clearSearch" aria-label="Clear search">✕</button>
+        </div>
+        <span v-if="searchQuery" class="guide-search__count">
+          {{ filteredEntries.length }} result{{ filteredEntries.length !== 1 ? 's' : '' }}
+        </span>
+      </div>
+
+      <!-- No results -->
+      <div v-if="filteredEntries.length === 0" class="guide-empty">
+        No terms match <strong>{{ searchQuery }}</strong>. Try a different keyword.
+      </div>
+
+      <!-- Sections -->
+      <template v-for="section in visibleSections" :key="section">
+        <section class="about-view__section">
+          <h2 class="about-view__section-title">{{ section }}</h2>
+          <div class="guide-entry" v-for="entry in entriesForSection(section)" :key="entry.id">
+            <div class="guide-entry__term">
+              {{ entry.term }}
+              <span v-if="entry.range" class="guide-entry__range">{{ entry.range }}</span>
+            </div>
+            <p class="guide-entry__def" v-html="entry.defHtml" />
+            <div class="guide-entry__method">
+              <span class="guide-entry__method-label">{{ entry.methodLabel }}</span>
+              {{ entry.method }}
+            </div>
+          </div>
+        </section>
+      </template>
+
+      <!-- Heuristics drawer reading guide (always shown, not searchable) -->
+      <section v-if="!searchQuery" class="about-view__section">
+        <h2 class="about-view__section-title">Reading the Heuristics tab</h2>
+        <p style="color: var(--color-text-secondary); line-height: 1.65; margin: 0">The Heuristics tab shows every signal as a card with a 0–100 score. Click any card to open a detail drawer. The drawer has three parts:</p>
+        <ol class="about-view__steps" style="margin-top: 0.5rem">
+          <li><strong>In this repo</strong> — actual numbers and filenames from this specific analysis. Repo-specific context.</li>
+          <li><strong>Overview</strong> — what this metric measures in general terms.</li>
+          <li><strong>What raises this score / What to look for</strong> — the scoring factors and where to find them in the repo.</li>
+        </ol>
+        <p class="about-view__note">All scores reset on each re-analysis. Push changes and re-analyze to see updated scores.</p>
+      </section>
+
     </div>
   </div>
 </template>

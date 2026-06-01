@@ -149,7 +149,8 @@ def parse_imports(repo_dir: str) -> list[dict]:
             ext = Path(fname).suffix.lower()
             source = _rel(base, fpath)
             try:
-                content = open(fpath, encoding='utf-8', errors='ignore').read()
+                with open(fpath, encoding='utf-8', errors='ignore') as _f:
+                    content = _f.read()
             except Exception:
                 continue
             if ext == '.py':

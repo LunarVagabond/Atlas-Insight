@@ -434,6 +434,7 @@ export const useAnalysisStore = defineStore('analysis', {
     jitIssues: null as JitIssue[] | null,
     jitPrs: null as JitPrData | null,
     jitLoading: false,
+    jitError: false,
     diffData: null as DiffData | null,
     diffLoading: false,
   }),
@@ -466,6 +467,7 @@ export const useAnalysisStore = defineStore('analysis', {
     async fetchJitData(runId: string) {
       if (this.jitLoading) return
       this.jitLoading = true
+      this.jitError = false
       try {
         const [issuesRes, prsRes] = await Promise.allSettled([
           axios.get(`/api/v1/repositories/runs/${runId}/issues`),
@@ -473,6 +475,9 @@ export const useAnalysisStore = defineStore('analysis', {
         ])
         this.jitIssues = issuesRes.status === 'fulfilled' ? issuesRes.value.data : null
         this.jitPrs = prsRes.status === 'fulfilled' ? prsRes.value.data : null
+        if (issuesRes.status === 'rejected' && prsRes.status === 'rejected') {
+          this.jitError = true
+        }
       } finally {
         this.jitLoading = false
       }
@@ -573,6 +578,7 @@ export const useAnalysisStore = defineStore('analysis', {
       this.diffData = null
       this.jitIssues = null
       this.jitPrs = null
+      this.jitError = false
     },
   },
 })

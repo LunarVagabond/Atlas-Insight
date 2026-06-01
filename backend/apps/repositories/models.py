@@ -2,6 +2,8 @@ from django.conf import settings
 from django.db import models
 from uuid_extensions import uuid7
 
+from apps.utils.encryption import EncryptedCharField
+
 
 class Repository(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
@@ -13,7 +15,7 @@ class Repository(models.Model):
     last_fetched_at = models.DateTimeField(null=True, blank=True)
     is_stale = models.BooleanField(default=False)
     is_private = models.BooleanField(default=False)
-    auth_token = models.CharField(max_length=255, blank=True, default='')
+    auth_token = EncryptedCharField(blank=True, default='')
     auth_token_warning = models.CharField(max_length=500, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     view_count = models.IntegerField(default=0)

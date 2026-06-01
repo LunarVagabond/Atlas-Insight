@@ -783,31 +783,29 @@ function exportCvesCsv() {
           </table>
         </template>
 
-        <div class="print-two-col" style="margin-top:0.5rem">
-          <div v-if="godModules.length">
-            <div class="print-subsection">God Modules</div>
-            <table class="print-table print-table--bordered">
-              <thead><tr><th>Module</th><th>In-degree</th></tr></thead>
-              <tbody>
-                <tr v-for="m in godModules" :key="m.module">
-                  <td class="print-table__mono">{{ m.module }}</td>
-                  <td>{{ m.in_degree }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div v-if="hotFiles.length">
-            <div class="print-subsection">Hot Files</div>
-            <table class="print-table print-table--bordered">
-              <thead><tr><th>File</th><th>Commits</th></tr></thead>
-              <tbody>
-                <tr v-for="f in hotFiles" :key="f.file">
-                  <td class="print-table__mono">{{ f.file }}</td>
-                  <td>{{ f.commit_count }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <div v-if="godModules.length" style="margin-top:0.5rem;margin-bottom:1rem">
+          <div class="print-subsection">God Modules</div>
+          <table class="print-table print-table--bordered">
+            <thead><tr><th>Module</th><th>In-degree</th></tr></thead>
+            <tbody>
+              <tr v-for="m in godModules" :key="m.module">
+                <td class="print-table__mono">{{ m.module }}</td>
+                <td>{{ m.in_degree }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div v-if="hotFiles.length" style="margin-top:0.5rem">
+          <div class="print-subsection">Hot Files</div>
+          <table class="print-table print-table--bordered" style="width:100%">
+            <thead><tr><th>File</th><th style="width:6rem">Commits</th></tr></thead>
+            <tbody>
+              <tr v-for="f in hotFiles" :key="f.file">
+                <td class="print-table__mono">{{ f.file }}</td>
+                <td>{{ f.commit_count }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 

@@ -11,6 +11,7 @@ api = NinjaAPI(
     title='Atlas Insight API',
     version='1.0.0',
     description='Repository archaeology and static analysis platform.',
+    docs_url='/api/docs',
 )
 api.add_router('/v1/', api_router)
 api.add_router('/v1/repositories/', repositories_router)

@@ -55,6 +55,11 @@ const router = createRouter({
       name: 'spotlight',
       component: () => import('../views/SpotlightView.vue'),
     },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      component: () => import('../views/NotFoundView.vue'),
+    },
   ],
 })
 

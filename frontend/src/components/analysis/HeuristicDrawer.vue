@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue'
-import type { HeuristicSignal, HeuristicSignalKey } from '../../stores/analysis'
+import type { HeuristicSignal, HeuristicSignalKey, RunResult } from '../../stores/analysis'
 
-const props = defineProps<{ signal: HeuristicSignal | null }>()
+const props = defineProps<{ signal: HeuristicSignal | null; result?: RunResult }>()
 const emit = defineEmits<{ close: [] }>()
 
 interface SignalInfo {
@@ -161,6 +161,182 @@ const ICONS: Record<HeuristicSignalKey, string> = {
   community_health: '🤝', commit_velocity: '📈',
 }
 
+interface RepoInsightItem {
+  text: string
+  sub?: string
+  highlight?: boolean
+  monospace?: boolean
+}
+
+const repoInsight = computed<RepoInsightItem[] | null>(() => {
+  if (!props.signal || !props.result) return null
+  const r = props.result
+  const sig = props.signal.signal
+  const items: RepoInsightItem[] = []
+
+  if (sig === 'monolith_growth') {
+    const gods = r.graph?.god_modules ?? []
+    if (gods.length) {
+      for (const g of gods.slice(0, 6)) {
+        items.push({ text: g.module, sub: `imported by ${g.in_degree} file${g.in_degree !== 1 ? 's' : ''}`, highlight: g.in_degree >= 10, monospace: true })
+      }
+      if (gods.length > 6) items.push({ text: `…and ${gods.length - 6} more` })
+    }
+    const cycles = r.graph?.cycles ?? []
+    if (cycles.length) {
+      const ex = cycles[0]
+      if (ex.length >= 2) {
+        items.push({ text: ex.slice(0, 3).join(' → ') + (ex.length > 3 ? ' → …' : ''), sub: 'example cycle', monospace: true })
+      }
+    }
+  }
+
+  if (sig === 'dependency_health') {
+    const dockerIssues = r.dependencies?.docker_issues ?? []
+    for (const d of dockerIssues.slice(0, 4)) {
+      items.push({ text: d.file, sub: d.issue, highlight: true, monospace: true })
+    }
+    const lockfiles = r.dependencies?.missing_lockfile_warnings ?? []
+    for (const l of lockfiles.slice(0, 4)) {
+      items.push({ text: l, sub: 'missing lockfile', highlight: true })
+    }
+    const depCount = r.dependencies?.dependency_count ?? 0
+    items.push({ text: `${depCount.toLocaleString()} total dependencies` })
+  }
+
+  if (sig === 'documentation_quality') {
+    const readme = r.readme
+    if (!readme?.found) {
+      items.push({ text: 'No README detected', highlight: true })
+    } else {
+      items.push({ text: `README: ${readme.word_count.toLocaleString()} words`, highlight: readme.word_count < 100 })
+      if (!readme.has_installation) items.push({ text: 'Missing installation instructions', highlight: true })
+      if (!readme.has_usage) items.push({ text: 'Missing usage section', highlight: true })
+      if (!readme.has_changelog) items.push({ text: 'Changelog not referenced in README' })
+      if (!readme.has_contributing) items.push({ text: 'Contributing guide not in README' })
+      if (!r.structure?.has_contributing) items.push({ text: 'No CONTRIBUTING.md file', highlight: true })
+    }
+  }
+
+  if (sig === 'ci_health') {
+    const s = r.structure
+    if (s) {
+      if (s.has_ci) {
+        items.push({ text: s.ci_systems.join(', '), sub: `CI system${s.ci_systems.length > 1 ? 's' : ''} detected` })
+        if (s.gh_workflow_count > 0) {
+          items.push({ text: `${s.gh_workflow_count} GitHub workflow${s.gh_workflow_count !== 1 ? 's' : ''}` })
+        }
+      } else {
+        items.push({ text: 'No CI configuration detected', highlight: true })
+      }
+      const testPct = (s.test_ratio * 100).toFixed(1)
+      items.push({ text: `Test file ratio: ${testPct}%`, highlight: s.test_ratio < 0.05, sub: s.test_ratio < 0.05 ? 'very few test files' : s.test_ratio < 0.15 ? 'below average' : undefined })
+      items.push({ text: s.has_lint_config ? 'Linting configured' : 'No lint config detected', highlight: !s.has_lint_config })
+    }
+  }
+
+  if (sig === 'bus_factor_risk') {
+    const busFactor = r.structure?.bus_factor ?? r.ownership?.bus_factor ?? 0
+    items.push({ text: `Bus factor: ${busFactor}`, sub: busFactor <= 1 ? '1 person holds 80%+ of file knowledge' : busFactor <= 2 ? '2 people hold 80%+ of file knowledge' : `${busFactor} contributors needed to cover 80% of the codebase`, highlight: busFactor <= 2 })
+    const topContribs = r.structure?.top_contributors ?? r.ownership?.top_contributors ?? []
+    for (const c of topContribs.slice(0, 5)) {
+      items.push({ text: c.author, sub: `${c.files_touched.toLocaleString()} file${c.files_touched !== 1 ? 's' : ''} touched` })
+    }
+  }
+
+  if (sig === 'security_hygiene') {
+    const sec = r.security
+    if (sec) {
+      if (!sec.gitignore_exists) {
+        items.push({ text: 'No .gitignore file', highlight: true })
+      } else if (sec.gitignore_gaps.length) {
+        items.push({ text: `Missing patterns: ${sec.gitignore_gaps.slice(0, 5).join(', ')}`, sub: '.gitignore gaps', monospace: true })
+      } else {
+        items.push({ text: '.gitignore present with no detected gaps' })
+      }
+      const vulns = sec.vulnerabilities ?? []
+      if (vulns.length) {
+        for (const v of vulns.slice(0, 4)) {
+          items.push({ text: `${v.name}@${v.version}`, sub: `${v.vuln_id}${v.severity ? ` · ${v.severity}` : ''}`, highlight: true, monospace: true })
+        }
+        if (vulns.length > 4) items.push({ text: `…and ${vulns.length - 4} more CVE${vulns.length - 4 > 1 ? 's' : ''}` })
+      }
+    }
+  }
+
+  if (sig === 'release_cadence') {
+    const s = r.structure
+    if (s) {
+      items.push({ text: `${s.release_count} total release${s.release_count !== 1 ? 's' : ''}`, highlight: s.release_count === 0 })
+      if (s.last_release) {
+        const d = new Date(s.last_release.date)
+        const days = Math.floor((Date.now() - d.getTime()) / 86400000)
+        items.push({ text: s.last_release.name, sub: `${days} days ago · ${d.toLocaleDateString()}`, highlight: days > 365, monospace: true })
+      }
+    }
+  }
+
+  if (sig === 'community_health') {
+    const s = r.structure
+    if (s) {
+      const checks = [
+        { label: 'License', present: !!(s.license_type || s.license_file), file: s.license_file ?? (s.license_type ? `(${s.license_type})` : null), critical: true },
+        { label: 'CONTRIBUTING', present: s.has_contributing, file: s.contributing_file, critical: false },
+        { label: 'SECURITY policy', present: s.has_security_policy, file: s.security_policy_file, critical: false },
+        { label: 'Code of Conduct', present: s.has_coc, file: s.coc_file, critical: false },
+        { label: 'CHANGELOG', present: s.has_changelog, file: s.changelog_file, critical: false },
+      ]
+      for (const c of checks) {
+        items.push({
+          text: c.present ? `✓ ${c.label}${c.file ? ` — ${c.file}` : ''}` : `✗ ${c.label}`,
+          highlight: !c.present && c.critical,
+        })
+      }
+    }
+  }
+
+  if (sig === 'burnout') {
+    const commits = r.commits
+    items.push({ text: `Activity at ${(commits.activity_decay_ratio * 100).toFixed(0)}% of historical pace`, highlight: commits.activity_decay_ratio < 0.5 })
+    const churn = commits.contributor_churn
+    if (churn.length >= 2) {
+      const peak = Math.max(...churn.map(c => c.active))
+      const recent = churn[churn.length - 1].active
+      const pct = peak > 0 ? ((recent / peak) * 100).toFixed(0) : '100'
+      items.push({ text: `${recent} active contributor${recent !== 1 ? 's' : ''} now`, sub: `down from peak of ${peak} (${pct}% retained)`, highlight: recent < peak * 0.5 })
+    }
+  }
+
+  if (sig === 'abandonment_risk') {
+    const days = r.commits.days_since_last_commit
+    const lastDate = r.commits.last_commit_date
+    if (days != null) {
+      items.push({ text: `${days} day${days !== 1 ? 's' : ''} since last commit`, highlight: days > 180 })
+    }
+    if (lastDate) {
+      items.push({ text: new Date(lastDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }), sub: 'last commit date' })
+    }
+  }
+
+  if (sig === 'commit_velocity') {
+    const monthly = r.commits.monthly_frequency
+    if (monthly.length >= 6) {
+      const recent = monthly.slice(-3)
+      const prior = monthly.slice(-6, -3)
+      const recentAvg = recent.reduce((s, m) => s + m.count, 0) / 3
+      const priorAvg = prior.reduce((s, m) => s + m.count, 0) / 3
+      items.push({ text: `${recentAvg.toFixed(1)} commits/month`, sub: 'recent 3-month average', highlight: recentAvg < priorAvg * 0.5 })
+      items.push({ text: `${priorAvg.toFixed(1)} commits/month`, sub: 'prior 3-month average' })
+      if (priorAvg > 0) {
+        const ratio = ((recentAvg / priorAvg) * 100).toFixed(0)
+        items.push({ text: `${ratio}% of prior pace` })
+      }
+    }
+  }
+
+  return items.length > 0 ? items : null
+})
+
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape') emit('close')
 }
@@ -202,6 +378,24 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
               </div>
               <p class="h-drawer__live-desc">{{ signal.description }}</p>
             </div>
+
+            <!-- In this repo -->
+            <template v-if="repoInsight">
+              <hr class="h-drawer__divider" />
+              <section class="h-drawer__section">
+                <h3 class="h-drawer__section-title">In this repo</h3>
+                <ul class="h-drawer__repo-list">
+                  <li
+                    v-for="(item, i) in repoInsight"
+                    :key="i"
+                    :class="['h-drawer__repo-item', item.highlight && 'h-drawer__repo-item--highlight']"
+                  >
+                    <span :class="['h-drawer__repo-item-text', item.monospace && 'h-drawer__repo-item-text--mono']">{{ item.text }}</span>
+                    <span v-if="item.sub" class="h-drawer__repo-item-sub">{{ item.sub }}</span>
+                  </li>
+                </ul>
+              </section>
+            </template>
 
             <hr class="h-drawer__divider" />
 

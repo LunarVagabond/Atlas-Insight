@@ -2,9 +2,9 @@
 import { computed, ref } from 'vue'
 import AppCard from '../ui/AppCard.vue'
 import HeuristicDrawer from './HeuristicDrawer.vue'
-import type { HeuristicSignal, HeuristicSignalKey } from '../../stores/analysis'
+import type { HeuristicSignal, HeuristicSignalKey, RunResult } from '../../stores/analysis'
 
-const props = defineProps<{ signals: HeuristicSignal[] }>()
+const props = defineProps<{ signals: HeuristicSignal[]; result?: RunResult }>()
 
 const active = ref<HeuristicSignal | null>(null)
 const activeHint = ref<HeuristicSignalKey | null>(null)
@@ -160,6 +160,6 @@ const SIGNAL_DESCRIPTIONS: Partial<Record<HeuristicSignalKey, string>> = {
       </AppCard>
     </div>
 
-    <HeuristicDrawer :signal="active" @close="active = null" />
+    <HeuristicDrawer :signal="active" :result="result" @close="active = null" />
   </div>
 </template>

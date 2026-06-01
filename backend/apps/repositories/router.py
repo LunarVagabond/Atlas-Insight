@@ -18,6 +18,11 @@ logger = logging.getLogger(__name__)
 router = Router(tags=['repositories'])
 
 
+def _assert_not_limited(request):
+    if getattr(request, 'limited', False):
+        raise HttpError(429, 'Rate limit exceeded. Please try again later.')
+
+
 def _resolve_api_token_user(request):
     """If request carries a valid Bearer token, return the associated user; else None."""
     auth_header = request.META.get('HTTP_AUTHORIZATION', '')
@@ -197,6 +202,7 @@ def analyze(request, payload: AnalyzeRequest):
 
 
 @router.get('/runs/', response=RunListSchema)
+@ratelimit(key='user_or_ip', rate='120/h', method='GET', block=False)
 def list_runs(
     request,
     q: str = '',
@@ -206,15 +212,17 @@ def list_runs(
     per_page: int = 25,
     mine: bool = False,
 ):
+    _assert_not_limited(request)
     from django.db.models import Exists, OuterRef, Subquery
 
-    # Latest run per repo
+    # Latest non-failed run per repo — failed runs are hidden from public listings
     latest_per_repo = AnalysisRun.objects.filter(
-        repo=OuterRef('pk')
+        repo=OuterRef('pk'),
+        status__in=['completed', 'pending', 'running'],
     ).order_by('-triggered_at').values('id')[:1]
     latest_ids = Repository.objects.annotate(
         latest_id=Subquery(latest_per_repo)
-    ).values('latest_id')
+    ).exclude(latest_id=None).values('latest_id')
 
     qs = AnalysisRun.objects.filter(pk__in=latest_ids).select_related('repo', 'user')
 
@@ -287,7 +295,9 @@ def list_runs(
 
 
 @router.get('/runs/{run_id}', response=RunStatusSchema)
+@ratelimit(key='user_or_ip', rate='120/h', method='GET', block=False)
 def get_run(request, run_id: uuid.UUID):
+    _assert_not_limited(request)
     from django.db.models import F
     try:
         run = AnalysisRun.objects.select_related('repo', 'user').get(id=run_id)
@@ -315,8 +325,9 @@ def get_run(request, run_id: uuid.UUID):
 
 
 @router.post('/runs/{run_id}/retry', response=AnalyzeResponse)
+@ratelimit(key='user_or_ip', rate='10/h', method='POST', block=False)
 def retry_run(request, run_id: uuid.UUID):
-    """Force a fresh analysis. Blocked if repo was analyzed within RERUN_COOLDOWN_HOURS."""
+    _assert_not_limited(request)
     try:
         original = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
@@ -413,7 +424,19 @@ _BADGE_COLORS = {
 _BADGE_NOT_ANALYZED = '#9f9f9f'
 
 
+def _svg_escape(text: str) -> str:
+    return (
+        text.replace('&', '&amp;')
+            .replace('<', '&lt;')
+            .replace('>', '&gt;')
+            .replace('"', '&quot;')
+            .replace("'", '&#x27;')
+    )
+
+
 def _make_svg(label: str, value: str, color: str) -> str:
+    label = _svg_escape(label)
+    value = _svg_escape(value)
     lw = max(len(label) * 6 + 10, 90)
     vw = max(len(value) * 6 + 10, 60)
     tw = lw + vw
@@ -630,7 +653,9 @@ def _jit_headers(token: str) -> dict:
 
 
 @router.get('/runs/{run_id}/issues')
+@ratelimit(key='user_or_ip', rate='30/h', method='GET', block=False)
 def get_run_issues(request, run_id: uuid.UUID):
+    _assert_not_limited(request)
     try:
         run = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
@@ -652,7 +677,9 @@ def get_run_issues(request, run_id: uuid.UUID):
 
 
 @router.get('/runs/{run_id}/prs')
+@ratelimit(key='user_or_ip', rate='30/h', method='GET', block=False)
 def get_run_prs(request, run_id: uuid.UUID):
+    _assert_not_limited(request)
     try:
         run = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
@@ -760,7 +787,9 @@ def _compute_run_diff(curr: dict, prev: dict, prev_run_id, prev_triggered_at) ->
 
 
 @router.get('/runs/{run_id}/diff')
+@ratelimit(key='user_or_ip', rate='60/h', method='GET', block=False)
 def get_run_diff(request, run_id: uuid.UUID):
+    _assert_not_limited(request)
     try:
         run = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
@@ -784,7 +813,9 @@ def get_run_diff(request, run_id: uuid.UUID):
 
 
 @router.get('/runs/{run_id}/file-history')
+@ratelimit(key='user_or_ip', rate='30/h', method='GET', block=False)
 def get_file_history(request, run_id: uuid.UUID, path: str = ''):
+    _assert_not_limited(request)
     import hashlib
     import re as _re
     import requests as _requests
@@ -834,7 +865,9 @@ def get_file_history(request, run_id: uuid.UUID, path: str = ''):
 
 
 @router.post('/repos/{repo_id}/favorite', response={200: None})
+@ratelimit(key='user_or_ip', rate='60/h', method='POST', block=False)
 def add_favorite(request, repo_id: uuid.UUID):
+    _assert_not_limited(request)
     if not request.user.is_authenticated:
         raise HttpError(403, 'Authentication required')
     try:
@@ -846,7 +879,9 @@ def add_favorite(request, repo_id: uuid.UUID):
 
 
 @router.delete('/repos/{repo_id}/favorite', response={204: None})
+@ratelimit(key='user_or_ip', rate='60/h', method='DELETE', block=False)
 def remove_favorite(request, repo_id: uuid.UUID):
+    _assert_not_limited(request)
     if not request.user.is_authenticated:
         raise HttpError(403, 'Authentication required')
     UserFavorite.objects.filter(user=request.user, repo__id=repo_id).delete()
@@ -891,8 +926,9 @@ def admin_stats(request):
 
 
 @router.get('/runs/{run_id}/vulnerabilities')
+@ratelimit(key='user_or_ip', rate='30/h', method='GET', block=False)
 def get_run_vulnerabilities(request, run_id: uuid.UUID):
-    """JIT dependency vulnerability scan via OSV.dev batch API."""
+    _assert_not_limited(request)
     import requests as _requests
 
     try:
@@ -1048,19 +1084,29 @@ def unwatch_repo(request, repo_id: uuid.UUID):
 
 @router.post('/webhooks/github', response={200: None})
 def github_webhook(request):
-    """Inbound GitHub push webhook — triggers re-analysis when a watched repo gets new commits."""
     import hashlib
     import hmac
 
     from django.conf import settings as django_settings
+    from django.core.cache import cache
 
     secret = getattr(django_settings, 'GITHUB_WEBHOOK_SECRET', '')
+    if not secret and not getattr(django_settings, 'DEBUG', False):
+        raise HttpError(500, 'Webhook secret not configured')
+
     sig_header = request.META.get('HTTP_X_HUB_SIGNATURE_256', '')
     if secret:
         body = request.body
         expected = 'sha256=' + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
         if not hmac.compare_digest(sig_header, expected):
             raise HttpError(400, 'Invalid signature')
+
+    delivery_id = request.META.get('HTTP_X_GITHUB_DELIVERY', '')
+    if delivery_id:
+        dedup_key = f'gh_delivery_{delivery_id}'
+        if cache.get(dedup_key):
+            return 200, None
+        cache.set(dedup_key, 1, 3600)
 
     import json
     try:
@@ -1093,7 +1139,10 @@ def github_webhook(request):
 
 
 @router.get('/badge/{owner}/{name}.svg')
+@ratelimit(key='ip', rate='60/m', method='GET', block=False)
 def repo_badge(request, owner: str, name: str):
+    if getattr(request, 'limited', False):
+        return HttpResponse('Rate limit exceeded', status=429)
     try:
         repo = Repository.objects.get(owner__iexact=owner, name__iexact=name)
     except Repository.DoesNotExist:

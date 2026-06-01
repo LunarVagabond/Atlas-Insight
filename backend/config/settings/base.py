@@ -163,6 +163,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 GITHUB_TOKEN = config('GITHUB_TOKEN', default='')
 GITHUB_WEBHOOK_SECRET = config('GITHUB_WEBHOOK_SECRET', default='')
+FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY', default='')
 FEATURED_REPO_URL = config('FEATURED_REPO_URL', default='')
 REPO_CACHE_DIR = BASE_DIR.parent / config('REPO_CACHE_DIR', default='_running/repo_cache')
 STALE_AFTER_DAYS = config('STALE_AFTER_DAYS', default=7, cast=int)
@@ -190,6 +191,10 @@ CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 from celery.schedules import crontab  # noqa: E402
 
 CELERY_BEAT_SCHEDULE = {
+    'cleanup-never-succeeded-repos': {
+        'task': 'apps.analysis.tasks.cleanup_never_succeeded_repos',
+        'schedule': crontab(minute=0),  # every hour
+    },
     'check-stale-repos': {
         'task': 'apps.analysis.tasks.check_stale_repos',
         'schedule': crontab(minute=0, hour='*/6'),

@@ -2681,6 +2681,48 @@
     line-height: 1.6;
   }
 
+  &__repo-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+  }
+
+  &__repo-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: $space-2 $space-3;
+    border-radius: $radius-sm;
+    background: var(--color-surface-raised, rgba(0,0,0,0.03));
+    border-left: 2px solid transparent;
+
+    &--highlight {
+      border-color: var(--color-error);
+      background: rgba(var(--color-error-rgb, 220,38,38), 0.06);
+    }
+  }
+
+  &__repo-item-text {
+    font-size: 0.8125rem;
+    color: var(--color-text);
+    line-height: 1.4;
+
+    &--mono {
+      font-family: monospace;
+      font-size: 0.75rem;
+      word-break: break-all;
+    }
+  }
+
+  &__repo-item-sub {
+    font-size: 0.6875rem;
+    color: var(--color-text-muted);
+    line-height: 1.3;
+  }
+
   &__section-title--findings {
     color: var(--color-warning);
   }
@@ -3262,6 +3304,12 @@
 
 .runs-table__row--pinned {
   background: var(--color-surface);
+}
+
+.runs-table__row--ghost {
+  pointer-events: none;
+  td { border-bottom-color: transparent; }
+  &:hover td { background: transparent; }
 }
 
 .runs-table__divider td {
@@ -6159,6 +6207,22 @@
     color: var(--color-text-muted);
     font-variant-numeric: tabular-nums;
   }
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+    gap: $space-3;
+
+    &__btn,
+    &__spacer {
+      min-width: 0;
+      width: 100%;
+      text-align: center;
+    }
+
+    &__position {
+      order: -1;
+    }
+  }
 }
 
 // ── Repo of the Week Card ────────────────────────────────────────────────────
@@ -6922,5 +6986,56 @@
     font-size: 0.875rem;
     color: var(--color-text-muted);
     text-align: center;
+  }
+}
+
+// ── JIT error notice ─────────────────────────────────────────────────────────
+.jit-error-notice {
+  padding: $space-2 $space-4;
+  margin-bottom: $space-4;
+  border-radius: $radius-md;
+  font-size: 0.8125rem;
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
+}
+
+// ── 404 / not-found page ─────────────────────────────────────────────────────
+.not-found {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  padding: $space-12 $space-6;
+
+  &__code {
+    font-size: 6rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--color-border);
+    font-variant-numeric: tabular-nums;
+    margin-bottom: $space-4;
+  }
+
+  &__title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: $space-2;
+  }
+
+  &__message {
+    color: var(--color-text-secondary);
+    margin-bottom: $space-8;
+    max-width: 400px;
+  }
+
+  &__actions {
+    display: flex;
+    gap: $space-3;
+    flex-wrap: wrap;
+    justify-content: center;
   }
 }

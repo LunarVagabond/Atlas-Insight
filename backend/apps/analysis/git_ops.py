@@ -11,6 +11,9 @@ from django.utils import timezone
 # (VSCode, GNOME keyring, etc.) for every git operation we run.
 # GIT_CONFIG_COUNT / KEY / VALUE syntax requires git 2.32+ (2021).
 # DISPLAY/WAYLAND_DISPLAY cleared so no GUI dialog can spawn from the worker.
+_FETCH_TIMEOUT = 300   # seconds — kills hung fetch
+_CLONE_TIMEOUT = 600   # seconds — kills hung clone
+
 _GIT_ENV = {
     'GIT_TERMINAL_PROMPT': '0',       # never block waiting for a terminal prompt
     'GIT_CONFIG_COUNT': '1',
@@ -105,7 +108,7 @@ def clone_or_fetch(url: str, pat: Optional[str] = None) -> tuple:
                 repo.remotes.origin.set_url(clone_url)
             repo.git.update_environment(**_GIT_ENV)
             try:
-                repo.remotes.origin.fetch()
+                repo.remotes.origin.fetch(kill_after_timeout=_FETCH_TIMEOUT)
             except git.GitCommandError as exc:
                 if pat:
                     repo.remotes.origin.set_url(url)
@@ -125,7 +128,8 @@ def clone_or_fetch(url: str, pat: Optional[str] = None) -> tuple:
     g = git.Git()
     g.update_environment(**_GIT_ENV)
     try:
-        repo = git.Repo.clone_from(clone_url, cache_path, env=_GIT_ENV)
+        g.execute(['git', 'clone', clone_url, cache_path], kill_after_timeout=_CLONE_TIMEOUT)
+        repo = git.Repo(cache_path)
     except git.GitCommandError as exc:
         # Remove partial clone dir so the next attempt starts clean
         if os.path.exists(cache_path):

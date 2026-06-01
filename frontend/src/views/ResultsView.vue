@@ -297,6 +297,9 @@ function copyLink() {
             <DependencyGraphView :graph="result.graph" />
           </div>
         </template>
+        <div v-if="(activeTab === 'Ownership' || activeTab === 'Contributing') && store.jitError" class="jit-error-notice">
+          Could not load live GitHub data (issues / PRs). Showing static analysis only.
+        </div>
         <OwnershipPanel
           v-if="activeTab === 'Ownership'"
           :ownership="result.ownership ?? { subsystems: [], top_contributors: [], bus_factor: 0 }"
@@ -308,7 +311,7 @@ function copyLink() {
         />
         <DependenciesPanel v-if="activeTab === 'Dependencies'" :deps="result.dependencies" :security="result.security" />
         <SecurityPanel v-if="activeTab === 'Security'" :security="result.security" :heuristics="result.heuristics" :structure="result.structure" />
-        <HeuristicsPanel v-if="activeTab === 'Heuristics'" :signals="result.heuristics" />
+        <HeuristicsPanel v-if="activeTab === 'Heuristics'" :signals="result.heuristics" :result="result" />
         <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" :structure="result.structure" :todos="result.todos" :arch-tours="result.arch_tours ?? []" />
         <ArchitectureToursPanel v-if="activeTab === 'Tours'" :tours="result.arch_tours ?? []" :repo-url="store.run?.repo_url" :run-id="runId" />
 

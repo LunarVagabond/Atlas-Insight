@@ -414,12 +414,12 @@ watch(() => props.graph, initGraph)
             @keydown.shift.enter="stepMatch(-1)"
           />
           <template v-if="searchQuery && searchMatches.length > 0">
-            <button class="dep-graph__search-step" @click="stepMatch(-1)" title="Previous (Shift+Enter)">↑</button>
-            <span class="dep-graph__search-count">{{ searchIndex + 1 }}/{{ searchMatches.length }}</span>
-            <button class="dep-graph__search-step" @click="stepMatch(1)" title="Next (Enter)">↓</button>
+            <button class="dep-graph__search-step" @click="stepMatch(-1)" title="Previous (Shift+Enter)" aria-label="Previous match">↑</button>
+            <span class="dep-graph__search-count" aria-live="polite">{{ searchIndex + 1 }}/{{ searchMatches.length }}</span>
+            <button class="dep-graph__search-step" @click="stepMatch(1)" title="Next (Enter)" aria-label="Next match">↓</button>
           </template>
-          <span v-else-if="searchQuery && searchMatches.length === 0" class="dep-graph__search-none">No match</span>
-          <button v-if="searchQuery" class="dep-graph__search-clear" @click="clearSearch" title="Clear">✕</button>
+          <span v-else-if="searchQuery && searchMatches.length === 0" class="dep-graph__search-none" role="status">No match</span>
+          <button v-if="searchQuery" class="dep-graph__search-clear" @click="clearSearch" title="Clear" aria-label="Clear search">✕</button>
         </div>
         <Transition name="node-drawer">
           <div v-if="selectedNode" class="dep-graph__drawer">
@@ -428,7 +428,7 @@ watch(() => props.graph, initGraph)
                 <span v-if="selectedNode.isGod" class="dep-graph__drawer-god-badge">God module</span>
                 <span class="dep-graph__drawer-label" :title="selectedNode.id">{{ selectedNode.label }}</span>
               </div>
-              <button class="dep-graph__drawer-close" @click="closeDrawer" title="Close">✕</button>
+              <button class="dep-graph__drawer-close" @click="closeDrawer" title="Close" aria-label="Close file detail">✕</button>
             </div>
             <p class="dep-graph__drawer-path">{{ selectedNode.id }}</p>
 
