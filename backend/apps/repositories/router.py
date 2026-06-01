@@ -1,7 +1,10 @@
+import ipaddress
 import logging
 import re
+import socket
 import uuid
 from typing import Optional
+from urllib.parse import urlparse as _urlparse
 
 from django.db.models import Q
 from django.http import HttpResponse
@@ -47,6 +50,33 @@ def _resolve_api_token_user(request):
 GITHUB_URL_RE = re.compile(
     r'^https?://github\.com/([a-zA-Z0-9_.-]+)/([a-zA-Z0-9_.-]+?)(?:\.git)?/?$'
 )
+
+_SSRF_BLOCKED = [
+    ipaddress.ip_network('10.0.0.0/8'),
+    ipaddress.ip_network('172.16.0.0/12'),
+    ipaddress.ip_network('192.168.0.0/16'),
+    ipaddress.ip_network('127.0.0.0/8'),
+    ipaddress.ip_network('169.254.0.0/16'),
+    ipaddress.ip_network('::1/128'),
+    ipaddress.ip_network('fc00::/7'),
+]
+
+
+def _validate_webhook_url(url: str) -> None:
+    parsed = _urlparse(url)
+    if parsed.scheme != 'https':
+        raise HttpError(422, 'webhook_url must use https')
+    host = parsed.hostname or ''
+    if not host:
+        raise HttpError(422, 'webhook_url has no hostname')
+    try:
+        addrs = socket.getaddrinfo(host, None)
+    except socket.gaierror:
+        raise HttpError(422, 'webhook_url hostname could not be resolved')
+    for *_, sockaddr in addrs:
+        ip = ipaddress.ip_address(sockaddr[0])
+        if any(ip in net for net in _SSRF_BLOCKED):
+            raise HttpError(422, 'webhook_url targets a private or internal address')
 
 
 class AnalyzeRequest(Schema):
@@ -180,7 +210,14 @@ def analyze(request, payload: AnalyzeRequest):
         repo.name = name
         repo.save(update_fields=['owner', 'name'])
 
+    if payload.webhook_url:
+        _validate_webhook_url(payload.webhook_url)
+
     token = _resolve_token(request, payload.pat) or repo.auth_token or None
+    if token and token != repo.auth_token:
+        repo.auth_token = token
+        repo.save(update_fields=['auth_token'])
+
     latest_sha = fetch_latest_sha(owner, name, token=token)
 
     if latest_sha and latest_sha == repo.last_commit_sha:
@@ -190,12 +227,21 @@ def analyze(request, payload: AnalyzeRequest):
         # latest run is failed/pending/running — fall through and re-queue
 
     user = request.user if request.user.is_authenticated else _resolve_api_token_user(request)
+
+    notification_email = ''
+    if payload.notification_email:
+        if not request.user.is_authenticated:
+            raise HttpError(403, 'notification_email requires authentication')
+        if payload.notification_email != request.user.email:
+            raise HttpError(422, 'notification_email must match your account email')
+        notification_email = payload.notification_email
+
     run = AnalysisRun.objects.create(
         repo=repo, status='pending', user=user,
         webhook_url=payload.webhook_url or '',
-        notification_email=payload.notification_email or '',
+        notification_email=notification_email,
     )
-    task = analyze_repository.delay(str(run.id), pat=token)
+    task = analyze_repository.delay(str(run.id))
     run.celery_task_id = task.id
     run.save(update_fields=['celery_task_id'])
 
@@ -334,6 +380,9 @@ def retry_run(request, run_id: uuid.UUID):
         original = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
         raise HttpError(404, 'Run not found')
+    if original.repo.is_private:
+        if not request.user.is_authenticated or original.user != request.user:
+            raise HttpError(403, 'Access denied')
     is_super = request.user.is_authenticated and request.user.is_superuser
     if not is_super:
         cooldown = _cooldown_until(original.repo)
@@ -342,10 +391,9 @@ def retry_run(request, run_id: uuid.UUID):
                 429,
                 f'This repository was analyzed recently. Re-analysis available after {cooldown}.',
             )
-    token = _resolve_token(request, None) or original.repo.auth_token or None
     user = request.user if request.user.is_authenticated else None
     run = AnalysisRun.objects.create(repo=original.repo, status='pending', user=user)
-    task = analyze_repository.delay(str(run.id), pat=token)
+    task = analyze_repository.delay(str(run.id))
     run.celery_task_id = task.id
     run.save(update_fields=['celery_task_id'])
     return AnalyzeResponse(run_id=run.id, status='pending', cached=False)
@@ -354,9 +402,12 @@ def retry_run(request, run_id: uuid.UUID):
 @router.get('/runs/{run_id}/timeline')
 def get_timeline(request, run_id: uuid.UUID):
     try:
-        run = AnalysisRun.objects.get(id=run_id, status='completed')
+        run = AnalysisRun.objects.select_related('repo').get(id=run_id, status='completed')
     except AnalysisRun.DoesNotExist:
         raise HttpError(404, 'Run not found or not completed')
+    if run.repo.is_private:
+        if not request.user.is_authenticated or run.user != request.user:
+            raise HttpError(403, 'Access denied')
     result = run.result or {}
     commits = result.get('commits', {})
     deps = result.get('dependencies', {})
@@ -1093,6 +1144,7 @@ def remove_favorite(request, repo_id: uuid.UUID):
 
 
 @router.get('/admin/stats')
+@ratelimit(key='user', rate='30/h', method='GET', block=True)
 def admin_stats(request):
     import os
     from django.conf import settings as django_settings
@@ -1214,6 +1266,7 @@ def get_run_vulnerabilities(request, run_id: uuid.UUID):
 
 
 @router.get('/admin/rate-limit')
+@ratelimit(key='user', rate='30/h', method='GET', block=True)
 def admin_rate_limit(request):
     """Live GitHub API rate limit status for the server token."""
     import requests as _requests
@@ -1352,10 +1405,9 @@ def github_webhook(request):
     except Repository.DoesNotExist:
         return 200, None
 
-    token = repo.auth_token or None
     run = AnalysisRun.objects.create(repo=repo, status='pending')
     from apps.analysis.tasks import analyze_repository
-    task = analyze_repository.delay(str(run.id), pat=token)
+    task = analyze_repository.delay(str(run.id))
     run.celery_task_id = task.id
     run.save(update_fields=['celery_task_id'])
 

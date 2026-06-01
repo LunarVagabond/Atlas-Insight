@@ -46,6 +46,19 @@ def _inject_pat(url: str, pat: str) -> str:
     return url.replace('https://', f'https://{pat}@', 1)
 
 
+def _scrub(text: str | None, pat: str) -> str:
+    return (text or '').replace(pat, '***')
+
+
+def _sanitize_exc(exc: git.GitCommandError, pat: str) -> git.GitCommandError:
+    cmd = [_scrub(c, pat) if isinstance(c, str) else c for c in (exc.command or [])]
+    return git.GitCommandError(
+        command=cmd, status=exc.status,
+        stderr=_scrub(exc.stderr, pat),
+        stdout=_scrub(exc.stdout, pat),
+    )
+
+
 def _is_auth_error(exc: git.GitCommandError) -> bool:
     msg = str(exc).lower()
     return any(p in msg for p in (
@@ -118,7 +131,7 @@ def clone_or_fetch(url: str, pat: Optional[str] = None) -> tuple:
                         'Connect your GitHub account to analyze private repositories.'
                     ) from None
                 shutil.rmtree(cache_path, ignore_errors=True)
-                raise
+                raise _sanitize_exc(exc, pat) if pat else exc
             if pat:
                 repo.remotes.origin.set_url(url)
             sha = _sync_to_origin_head(repo)
@@ -139,7 +152,7 @@ def clone_or_fetch(url: str, pat: Optional[str] = None) -> tuple:
                 'Repository is private or inaccessible. '
                 'Connect your GitHub account to analyze private repositories.'
             ) from None
-        raise
+        raise _sanitize_exc(exc, pat) if pat else exc
     if pat:
         repo.remotes.origin.set_url(url)
 

@@ -21,7 +21,7 @@ CORS_ALLOWED_ORIGINS = config(
     default='https://atlas.dsyndicate.dev,http://localhost:4501',
     cast=Csv(),
 )
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_CREDENTIALS = True  # NEVER set CORS_ALLOWED_ORIGINS to '*' with this enabled
 
 CSRF_TRUSTED_ORIGINS = config(
     'CSRF_TRUSTED_ORIGINS',
@@ -117,7 +117,7 @@ ACCOUNT_SIGNUP_FIELDS = ['username*', 'password1*', 'password2*']
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = config('ACCOUNT_DEFAULT_HTTP_PROTOCOL', default='https')
 ACCOUNT_EMAIL_VERIFICATION = 'none'
 SOCIALACCOUNT_AUTO_SIGNUP = True
-SOCIALACCOUNT_LOGIN_ON_GET = True
+SOCIALACCOUNT_LOGIN_ON_GET = False
 SOCIALACCOUNT_STORE_TOKENS = True
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

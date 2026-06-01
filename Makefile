@@ -12,7 +12,7 @@ POSTGRES_USER_VAL ?= $(shell grep '^POSTGRES_USER=' $(ROOT_DIR)/backend/.env 2>/
 GLITCHTIP_DOMAIN_VAL ?= $(shell grep '^GLITCHTIP_DOMAIN=' $(ROOT_DIR)/backend/.env 2>/dev/null | cut -d= -f2- | tr -d '[:space:]')
 COMPOSE_BARE := docker compose -f $(ROOT_DIR)/docker-compose.yml
 
-.PHONY: help setup init teardown start stop restart status logs \
+.PHONY: help setup init teardown production-release prod-update start stop restart status logs \
         start-django  stop-django \
         start-celery  stop-celery \
 	start-beat    stop-beat \
@@ -89,6 +89,10 @@ help:
 	@echo "  ── Clean wipe (dev) ─────────────────────────────────────────────────"
 	@echo "    make teardown        (stop + docker down -v + rm _running/.venv/node_modules)"
 	@echo ""
+	@echo "  ── Production ───────────────────────────────────────────────────────"
+	@echo "    production-release   Interactive prod deploy: systemd + nginx + full stack"
+	@echo "    prod-update          git pull + pip + migrate + build + restart services"
+	@echo ""
 
 # ── Full stack ─────────────────────────────────────────────────────────────────
 
@@ -111,6 +115,29 @@ teardown:
 	@rm -rf $(ROOT_DIR)/_running $(ROOT_DIR)/backend/.venv $(ROOT_DIR)/frontend/node_modules
 	@echo ""
 	@echo "Torn down. Next: make init && make start"
+
+production-release:
+	@bash $(ROOT_DIR)/scripts/production-release.sh
+
+prod-update:
+	@echo "Pulling latest code..."
+	@git -C $(ROOT_DIR) pull
+	@echo "Installing backend deps..."
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend setup
+	@echo "Running migrations..."
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend migrate
+	@echo "Collecting static files..."
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend collectstatic
+	@echo "Building frontend..."
+	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/frontend build
+	@echo "Restarting services..."
+	@if systemctl is-active --quiet atlas-django 2>/dev/null; then \
+	  sudo systemctl restart atlas-django atlas-celery atlas-celery-beat; \
+	  echo "  systemd services restarted"; \
+	else \
+	  $(MAKE) --no-print-directory restart; \
+	fi
+	@echo "Done."
 
 
 start: _ensure_running_dirs

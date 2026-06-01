@@ -56,7 +56,7 @@ def _update_queue_depth():
 
 
 @shared_task(bind=True)
-def analyze_repository(self, run_id: str, pat: str | None = None):
+def analyze_repository(self, run_id: str):
     _update_queue_depth()
     _start = time.monotonic()
 
@@ -65,6 +65,8 @@ def analyze_repository(self, run_id: str, pat: str | None = None):
     except AnalysisRun.DoesNotExist:
         logger.error('AnalysisRun %s not found', run_id)
         return
+
+    pat = run.repo.auth_token or None
 
     run.status = 'running'
     run.save(update_fields=['status'])

@@ -13,7 +13,7 @@ Self-hosted deployment on a Linux server with Nginx, Postgres, Redis, and system
 
 ---
 
-## Fresh deploy (dev or prod) — 4 steps
+## Fresh deploy (dev or prod) — 5 steps
 
 ```bash
 # 1. Clone
@@ -29,15 +29,23 @@ make init
 
 # 4. Start full stack
 make start
-# Then promote your first user:
+
+# 5. Create GlitchTip admin + promote Atlas user
+make glitchtip-create-admin EMAIL=you@example.com PASSWORD=yourpassword
 make promote-user EMAIL=you@example.com
 ```
 
-`make start` handles the rest automatically:
+`make start` handles ordering automatically:
 - Starts Postgres + Redis
 - Starts GlitchTip, waits for health, provisions org/projects, writes `SENTRY_DSN` to `backend/.env`
 - Starts Django, Celery worker, Celery beat, Flower, Vite (dev) or serves static build (prod)
 - Starts Cloudflare tunnel if `CLOUDFLARE_TUNNEL_TOKEN` is set
+
+**Production shortcut** — interactive script handles steps 1–5, systemd services, and nginx:
+
+```bash
+make production-release
+```
 
 ---
 
@@ -92,25 +100,10 @@ python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().
 |---|---|
 | `GLITCHTIP_SECRET_KEY` | Strong random string for GlitchTip (required in prod) |
 | `GLITCHTIP_DOMAIN` | Public GlitchTip URL (e.g. `https://glitch.yoursite.com`) |
-| `GLITCHTIP_CSRF_TRUSTED_ORIGINS` | **Must include every scheme+host users access GlitchTip from.** Missing entries cause 403 on GitHub OAuth login. Example: `https://glitch.yoursite.com,http://localhost:4505` |
-| `GLITCHTIP_GITHUB_CLIENT_ID` / `GLITCHTIP_GITHUB_SECRET` | GitHub OAuth app for GlitchTip login |
+| `GLITCHTIP_CSRF_TRUSTED_ORIGINS` | **Must include every scheme+host users access GlitchTip from.** Missing entries cause 403 on login. Example: `https://glitch.yoursite.com,http://localhost:4505` |
 | `SENTRY_DSN` | Written automatically by `make start` — do not edit manually |
 
 > **`SECURE_SSL_REDIRECT` must stay `False`** when running behind nginx or Cloudflare. Both terminate TLS and forward HTTP to Django. Setting it `True` causes an infinite redirect loop (Cloudflare → Django redirects to HTTPS → Cloudflare → ...).
-
----
-
-## GlitchTip GitHub OAuth app
-
-GlitchTip needs its **own** GitHub OAuth app (separate from Atlas's app).
-
-1. GitHub → Settings → Developer settings → OAuth Apps → New OAuth App
-2. Homepage URL: your GlitchTip domain (e.g. `https://glitch.yoursite.com`)
-3. Authorization callback URL: `https://glitch.yoursite.com/accounts/github/login/callback/`
-4. Copy Client ID and Secret into `.env` as `GLITCHTIP_GITHUB_CLIENT_ID` / `GLITCHTIP_GITHUB_SECRET`
-5. Ensure `GLITCHTIP_CSRF_TRUSTED_ORIGINS` includes `https://glitch.yoursite.com`
-
-> Common 403 cause: `GLITCHTIP_CSRF_TRUSTED_ORIGINS` missing the GlitchTip domain, or wrong callback URL in the GitHub app.
 
 ---
 
@@ -122,6 +115,37 @@ GlitchTip needs its **own** GitHub OAuth app (separate from Atlas's app).
 4. Copy Client ID and Secret into `.env` as `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`
 5. In Django admin → Sites → change domain to your production domain
 6. In Django admin → Social Applications → add GitHub with your credentials
+
+---
+
+## Production release (automated)
+
+```bash
+make production-release
+```
+
+Interactive script that walks through the full deployment:
+
+1. Prompts for install path, domains, admin email, GlitchTip password, service user
+2. Generates `SECRET_KEY`, `FIELD_ENCRYPTION_KEY`, `GITHUB_WEBHOOK_SECRET`, `GLITCHTIP_SECRET_KEY`
+3. Runs `make init` (venv + npm + postgres + migrate)
+4. Starts GlitchTip and creates admin user
+5. Starts full stack
+6. **Confirms paths before writing** systemd service files to `/etc/systemd/system/`
+7. `systemctl enable --now` the services
+8. Prints nginx config and offers to write + enable it
+
+Re-run safely — each step asks before acting.
+
+---
+
+## Production updates
+
+```bash
+make prod-update
+```
+
+Pulls latest code, re-installs deps, runs migrations, rebuilds frontend, then restarts services (via `systemctl` if running under systemd, or `make restart` otherwise).
 
 ---
 
@@ -167,6 +191,7 @@ Full clean wipe and fresh start:
 make teardown           # stop everything, docker down -v, rm _running/.venv/node_modules
 make init               # re-setup from scratch
 make start
+make glitchtip-create-admin EMAIL=you@example.com PASSWORD=yourpassword
 make promote-user EMAIL=you@example.com
 ```
 
