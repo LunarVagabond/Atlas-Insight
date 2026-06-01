@@ -155,9 +155,9 @@ def analyze_dependencies(repo_dir: str) -> dict:
     if go_mod.exists():
         all_deps.extend(_parse_go_mod(go_mod))
 
-    cargo = base / 'Cargo.toml'
-    if cargo.exists():
-        all_deps.extend(_parse_cargo_toml(cargo))
+    for cargo in [base / 'Cargo.toml', base / 'src-tauri' / 'Cargo.toml']:
+        if cargo.exists():
+            all_deps.extend(_parse_cargo_toml(cargo))
 
     pyproject = base / 'pyproject.toml'
     if pyproject.exists():

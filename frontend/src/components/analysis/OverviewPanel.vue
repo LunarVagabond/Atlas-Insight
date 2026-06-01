@@ -46,9 +46,10 @@ const notableFindings = computed<Finding[]>(() => {
     findings.push({ icon: '⚠️', text: `${secIssues} security hygiene issue${secIssues > 1 ? 's' : ''} detected`, variant: 'warning' })
   }
 
+  const totalContributors = r.commits.total_contributors ?? 0
   const busFactor = r.ownership?.bus_factor ?? r.structure?.bus_factor ?? 0
-  if (busFactor > 0 && busFactor <= 2) {
-    findings.push({ icon: '🚌', text: `Bus factor ${busFactor} — only ${busFactor === 1 ? '1 contributor(s)' : '2 contributors'} own the majority of files`, variant: 'warning' })
+  if (busFactor > 0 && busFactor <= 2 && totalContributors > 1) {
+    findings.push({ icon: '🚌', text: `Bus factor ${busFactor} — only ${busFactor === 1 ? '1 contributor' : '2 contributors'} own the majority of files`, variant: 'warning' })
   }
 
   const highRisk = heuristics.filter(h => h.score >= 70)

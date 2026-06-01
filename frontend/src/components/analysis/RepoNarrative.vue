@@ -25,7 +25,7 @@ const narrative = computed(() => {
   const structure: Record<string, any> = props.result.structure ?? {}
 
   const name = `${props.repoOwner}/${props.repoName}`
-  const lang = meta.primary_language ? `${meta.primary_language} ` : ''
+  const techStack: string[] = structure.tech_stack ?? []
   const desc = meta.github_description ? (meta.github_description as string).replace(/\.$/, '') : null
   const health = cls.project_health?.label ?? null
   const difficulty = cls.contribution_difficulty?.label ?? null
@@ -34,10 +34,36 @@ const narrative = computed(() => {
   const age = meta.created_at ? ageFromDate(meta.created_at as string) : null
   const busFactor = structure.bus_factor ?? null
 
+  // Build a meaningful project-type label from the tech stack
+  const hasTauri = techStack.includes('Tauri')
+  const hasVue = techStack.includes('Vue')
+  const hasReact = techStack.includes('React')
+  const hasNextjs = techStack.includes('Next.js')
+  const hasNuxt = techStack.includes('Nuxt')
+  const primaryLang = meta.primary_language as string | null
+
+  let projectType: string
+  if (hasTauri) {
+    const ui = hasVue ? 'Vue' : hasReact ? 'React' : primaryLang ?? 'web'
+    projectType = `${ui} + Tauri desktop app`
+  } else if (hasNextjs) {
+    projectType = 'Next.js app'
+  } else if (hasNuxt) {
+    projectType = 'Nuxt app'
+  } else if (hasVue) {
+    projectType = 'Vue app'
+  } else if (hasReact) {
+    projectType = 'React app'
+  } else if (primaryLang) {
+    projectType = `${primaryLang} repository`
+  } else {
+    projectType = 'repository'
+  }
+
   const sentences: string[] = []
 
   // Sentence 1: identity
-  let s1 = `**${name}** is a ${lang}repository`
+  let s1 = `**${name}** is a ${projectType}`
   if (desc) s1 += ` — ${desc}`
   if (age) s1 += `, ${age}`
   if (contributors > 0 && totalCommits > 0) {
@@ -55,8 +81,10 @@ const narrative = computed(() => {
 
   // Sentence 3: bus factor signal
   if (busFactor !== null) {
-    if (busFactor <= 1) {
-      sentences.push('Knowledge is concentrated in very few contributors — consider the bus factor risk before depending on this project.')
+    if (contributors === 1) {
+      // Solo project — bus factor is inherently 1, not a risk signal
+    } else if (busFactor <= 1) {
+      sentences.push('Knowledge is concentrated in very few contributors — high bus factor risk.')
     } else if (busFactor <= 3) {
       sentences.push(`The bus factor is **${busFactor}** — a small core team carries most of the knowledge.`)
     } else {

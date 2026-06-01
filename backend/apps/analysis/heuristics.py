@@ -190,8 +190,12 @@ def compute_heuristics(
     if structure is not None:
         bus_factor = structure.get('bus_factor', 1)
         total_commits = commits.get('total_commits', 0)
+        total_contributors = commits.get('total_contributors', 1)
         bf_score = max(0, min(100, (5 - bus_factor) * 20))
-        if bus_factor == 1:
+        if total_contributors == 1:
+            bf_score = 0
+            bf_desc = 'Solo project — all changes by one author by design'
+        elif bus_factor == 1:
             bf_desc = '1 contributor accounts for 80%+ of all file changes'
         elif bus_factor <= 2:
             bf_desc = f'{bus_factor} contributors account for 80%+ of file changes — low redundancy'

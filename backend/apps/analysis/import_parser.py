@@ -22,6 +22,7 @@ LUA_REQUIRE = re.compile(
     r"""^\s*(?:local\s+\w+\s*=\s*)?require\s*[(\s]['"]([^'"]+)['"]""", re.MULTILINE
 )
 DART_IMPORT = re.compile(r"""^\s*import\s+['"]([^'"]+)['"]""", re.MULTILINE)
+VUE_SCRIPT = re.compile(r'<script\b[^>]*>(.*?)</script>', re.DOTALL | re.IGNORECASE)
 
 MAX_FILE_SIZE = 500_000  # 500KB
 
@@ -210,8 +211,12 @@ def parse_imports(repo_dir: str) -> list[dict]:
                                 edges.append(
                                     {'source': source, 'target': parts[0], 'lang': 'python'}
                                 )
-            elif ext in {'.js', '.ts', '.jsx', '.tsx', '.mjs'}:
-                for m in JS_IMPORT.finditer(content):
+            elif ext in {'.js', '.ts', '.jsx', '.tsx', '.mjs', '.vue'}:
+                scan_content = content
+                if ext == '.vue':
+                    script_match = VUE_SCRIPT.search(content)
+                    scan_content = script_match.group(1) if script_match else ''
+                for m in JS_IMPORT.finditer(scan_content):
                     dep = m.group(1) or m.group(2)
                     # "." / ".." are directory-index imports, not graph nodes
                     if dep and dep not in {'.', '..'} and not _is_external_js(dep):

@@ -205,6 +205,9 @@ const ghostRows = computed(() => Math.max(0, perPage - items.value.length))
         :initial-url="initialUrl"
         @submitted="handleSubmit"
       />
+      <p class="hero__disclaimer">
+        🧪 Experimental hobby project — results are public and cached. Private repos at your own risk.
+      </p>
     </main>
 
     <div v-if="spotlight" class="featured-section">

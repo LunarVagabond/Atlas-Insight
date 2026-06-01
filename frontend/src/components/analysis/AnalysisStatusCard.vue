@@ -31,7 +31,7 @@ const narrative = computed(() => {
   const commits: Record<string, any> = r.commits ?? {}
   const structure: Record<string, any> = r.structure ?? {}
 
-  const lang = meta.primary_language ? `${meta.primary_language} ` : ''
+  const stackArr: string[] = structure.tech_stack ?? []
   const desc = meta.github_description ? (meta.github_description as string).replace(/\.$/, '') : null
   const health = cls.project_health?.label ?? null
   const difficulty = cls.contribution_difficulty?.label ?? null
@@ -39,10 +39,35 @@ const narrative = computed(() => {
   const totalCommits: number = commits.total_commits ?? 0
   const age = meta.created_at ? ageFromDate(meta.created_at as string) : null
   const busFactor: number | null = structure.bus_factor ?? null
+  const primaryLang: string | null = meta.primary_language ?? null
+
+  const hasTauri = stackArr.includes('Tauri')
+  const hasVue = stackArr.includes('Vue')
+  const hasReact = stackArr.includes('React')
+  const hasNextjs = stackArr.includes('Next.js')
+  const hasNuxt = stackArr.includes('Nuxt')
+
+  let projectType: string
+  if (hasTauri) {
+    const ui = hasVue ? 'Vue' : hasReact ? 'React' : primaryLang ?? 'web'
+    projectType = `${ui} + Tauri desktop app`
+  } else if (hasNextjs) {
+    projectType = 'Next.js app'
+  } else if (hasNuxt) {
+    projectType = 'Nuxt app'
+  } else if (hasVue) {
+    projectType = 'Vue app'
+  } else if (hasReact) {
+    projectType = 'React app'
+  } else if (primaryLang) {
+    projectType = `${primaryLang} repository`
+  } else {
+    projectType = 'repository'
+  }
 
   const sentences: string[] = []
 
-  let s1 = `${lang}repository`
+  let s1 = projectType
   if (desc) s1 += ` — ${desc}`
   if (age) s1 += `, ${age}`
   if (contributors > 0 && totalCommits > 0) {
@@ -58,7 +83,9 @@ const narrative = computed(() => {
   }
 
   if (busFactor !== null) {
-    if (busFactor <= 1) {
+    if (contributors === 1) {
+      // solo project — skip bus factor sentence
+    } else if (busFactor <= 1) {
       sentences.push('Knowledge concentrated in very few contributors — high bus factor risk.')
     } else if (busFactor <= 3) {
       sentences.push(`Bus factor ${busFactor} — small core team carries most knowledge.`)

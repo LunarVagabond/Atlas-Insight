@@ -6,6 +6,7 @@ export const KNOWN_FRAMEWORKS: Record<string, string> = {
   'gin-gonic/gin': 'Gin', 'labstack/echo': 'Echo', 'gofiber/fiber': 'Fiber',
   'gorilla/mux': 'Gorilla Mux',
   'actix-web': 'Actix', 'rocket': 'Rocket', 'axum': 'Axum', 'warp': 'Warp',
+  'tauri': 'Tauri', '@tauri-apps/api': 'Tauri',
   'spring-boot': 'Spring Boot', 'spring': 'Spring', 'ktor': 'Ktor',
   'vue': 'Vue', 'react': 'React', 'svelte': 'Svelte',
   'solid-js': 'Solid', 'astro': 'Astro',

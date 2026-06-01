@@ -138,6 +138,7 @@ FRAMEWORK_SIGNALS: dict[str, str] = {
     'gorilla/mux': 'Gorilla Mux',
     # Rust
     'actix-web': 'Actix', 'rocket': 'Rocket', 'axum': 'Axum', 'warp': 'Warp',
+    'tauri': 'Tauri', '@tauri-apps/api': 'Tauri', '@tauri-apps/plugin-shell': 'Tauri',
     # Java/Kotlin
     'spring-boot': 'Spring Boot', 'spring': 'Spring', 'ktor': 'Ktor',
     'micronaut': 'Micronaut', 'quarkus': 'Quarkus',
@@ -183,6 +184,8 @@ _FRAMEWORK_FILE_PATTERNS: dict[str, str] = {
     'vite.config.ts': 'Vite', 'vite.config.js': 'Vite',
     'webpack.config.js': 'Webpack',
     'tailwind.config.js': 'Tailwind', 'tailwind.config.ts': 'Tailwind',
+    'src-tauri/tauri.conf.json': 'Tauri', 'tauri.conf.json': 'Tauri',
+    'src-tauri/Cargo.toml': 'Tauri',
 }
 
 
