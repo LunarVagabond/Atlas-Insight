@@ -162,8 +162,8 @@ const processed = computed<ProcessedRow[]>(() => {
 })
 
 // ── SVG geometry ──────────────────────────────────────────────────────────────
-const BODY_LINE_H = 17
-const MAX_BODY_H  = 180
+const BODY_LINE_H = 18
+const BODY_CHARS_PER_LINE = 65 // conservative wrap estimate for the content column
 
 const maxLane = computed(() => {
   let m = 0
@@ -187,8 +187,9 @@ function rowH(r: ProcessedRow): number {
   if ((r.row as MonthSep).isMonth) return SEP_H
   const commit = r.row as GraphCommit
   if (commit.body && expandedShas.value.has(commit.sha)) {
-    const lines = commit.body.split('\n').filter(l => l.trim()).length
-    return ROW_H + Math.min(lines * BODY_LINE_H + 12, MAX_BODY_H)
+    const visualLines = commit.body.split('\n').filter(l => l.trim()).reduce((acc, line) =>
+      acc + Math.max(1, Math.ceil(line.length / BODY_CHARS_PER_LINE)), 0)
+    return ROW_H + visualLines * BODY_LINE_H + 20
   }
   return ROW_H
 }
