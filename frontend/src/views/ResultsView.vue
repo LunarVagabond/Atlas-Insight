@@ -158,6 +158,17 @@ async function reanalyze() {
   }
 }
 
+async function forceReanalyze() {
+  if (!runId.value) return
+  reanalyzing.value = true
+  try {
+    const newId = await store.retryRun(runId.value)
+    router.push(`/results/${newId}`)
+  } finally {
+    reanalyzing.value = false
+  }
+}
+
 // Export JSON
 function exportJson() {
   if (!result.value || !store.run) return
@@ -224,30 +235,34 @@ const isArchived = computed(() => result.value?.github_meta?.archived === true)
         </a>
         <span v-else class="results-header__title">Analysis Results</span>
         <div class="results-header__actions">
-          <AppButton v-if="result" variant="secondary" @click="copyLink" style="font-size:0.8125rem;padding:4px 12px">
-            {{ copied ? '✓ Copied' : '🔗 Share' }}
-          </AppButton>
-          <AppButton v-if="result" variant="secondary" @click="showEmbed = !showEmbed" style="font-size:0.8125rem;padding:4px 12px">
-            {{ showEmbed ? '✕ Embed' : '&lt;/&gt; Embed' }}
-          </AppButton>
-          <AppButton v-if="result" variant="secondary" @click="exportJson" style="font-size:0.8125rem;padding:4px 12px">
-            ↓ Export JSON
-          </AppButton>
-          <AppButton v-if="result" variant="secondary" @click="printPage" style="font-size:0.8125rem;padding:4px 12px">
-            ⎙ Print / PDF
-          </AppButton>
-          <template v-if="store.run?.status === 'completed'">
-            <AppButton v-if="!cooldownUntil" variant="secondary" :disabled="reanalyzing" @click="reanalyze" style="font-size:0.8125rem;padding:4px 12px">
-              {{ reanalyzing ? 'Queuing…' : '↻ Re-analyze' }}
+          <div class="results-header__action-group">
+            <AppButton v-if="result" variant="secondary" size="sm" @click="copyLink">
+              {{ copied ? '✓ Copied' : '🔗 Share' }}
             </AppButton>
-            <template v-else>
-              <span class="cooldown-label" :title="'Re-analysis ' + cooldownLabel">{{ cooldownLabel }}</span>
-              <AppButton v-if="auth.user?.is_superuser" variant="secondary" :disabled="reanalyzing" @click="reanalyze" style="font-size:0.8125rem;padding:4px 12px;border-color:var(--color-warning,#dfb317);color:var(--color-warning,#dfb317)" title="Superuser: bypass cooldown">
-                {{ reanalyzing ? 'Queuing…' : '⚡ Force Re-scan' }}
+            <AppButton v-if="result" variant="secondary" size="sm" @click="showEmbed = !showEmbed">
+              {{ showEmbed ? '✕ Embed' : '</> Embed' }}
+            </AppButton>
+            <AppButton v-if="result" variant="secondary" size="sm" @click="exportJson">
+              ↓ Export JSON
+            </AppButton>
+            <AppButton v-if="result" variant="secondary" size="sm" @click="printPage">
+              ⎙ Print / PDF
+            </AppButton>
+          </div>
+          <div class="results-header__action-group">
+            <template v-if="store.run?.status === 'completed'">
+              <AppButton v-if="!cooldownUntil" variant="secondary" size="sm" :disabled="reanalyzing" @click="reanalyze">
+                {{ reanalyzing ? 'Queuing…' : '↻ Re-analyze' }}
               </AppButton>
+              <template v-else>
+                <span class="cooldown-label" :title="'Re-analysis ' + cooldownLabel">{{ cooldownLabel }}</span>
+                <AppButton v-if="auth.user?.is_superuser" variant="secondary" size="sm" :disabled="reanalyzing" @click="forceReanalyze" class="btn--force" title="Superuser: bypass cooldown">
+                  {{ reanalyzing ? 'Queuing…' : '⚡ Force Re-scan' }}
+                </AppButton>
+              </template>
             </template>
-          </template>
-          <a href="/" class="btn btn--secondary" style="font-size:0.875rem">← New Analysis</a>
+            <a href="/" class="btn btn--secondary btn--sm">← New Analysis</a>
+          </div>
         </div>
       </div>
     </div>

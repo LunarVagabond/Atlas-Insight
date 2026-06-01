@@ -218,10 +218,9 @@
 
 .results-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: $space-4;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: $space-3;
 
   &__title {
     font-size: 1.5rem;
@@ -234,6 +233,14 @@
     align-items: center;
     gap: $space-2;
     flex-wrap: wrap;
+    row-gap: $space-2;
+  }
+
+  &__action-group {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    flex-wrap: nowrap;
   }
 
   &__repo-link {
@@ -861,11 +868,6 @@
 
   .results-layout {
     padding: $space-3;
-  }
-
-  .results-header {
-    flex-direction: column;
-    align-items: flex-start;
   }
 
   .status-card {

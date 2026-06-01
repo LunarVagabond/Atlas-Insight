@@ -104,6 +104,20 @@
   }
 
   &--sm {
+    padding: 4px 12px;
+    font-size: 0.8125rem;
+  }
+
+  &--force {
+    border-color: var(--color-warning, #dfb317);
+    color: var(--color-warning, #dfb317);
+
+    &:hover:not(:disabled) {
+      background: rgba(223, 179, 23, 0.1);
+    }
+  }
+
+  &--sm {
     padding: $space-1 $space-3;
     font-size: 0.8125rem;
   }

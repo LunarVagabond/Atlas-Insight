@@ -1,7 +1,7 @@
 <script setup lang="ts">
 defineProps<{
   variant?: 'primary' | 'secondary'
-  size?: 'default' | 'lg'
+  size?: 'default' | 'sm' | 'lg'
   loading?: boolean
   disabled?: boolean
   type?: 'button' | 'submit'
@@ -10,7 +10,7 @@ defineProps<{
 
 <template>
   <button
-    :class="['btn', `btn--${variant ?? 'primary'}`, size === 'lg' && 'btn--lg']"
+    :class="['btn', `btn--${variant ?? 'primary'}`, size === 'lg' && 'btn--lg', size === 'sm' && 'btn--sm']"
     :disabled="disabled || loading"
     :type="type ?? 'button'"
   >
