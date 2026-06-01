@@ -42,6 +42,9 @@ ENTRY_FILENAMES = frozenset({
     'mod.rs', 'lib.rs', 'main.rs',
 })
 
+# These files are frequently empty or trivial boilerplate — deprioritise in tours
+BORING_FILENAMES = frozenset({'__init__.py', '__main__.py'})
+
 EXT_LABELS: dict[str, str] = {
     '.py': 'Python', '.js': 'JavaScript', '.ts': 'TypeScript', '.tsx': 'TypeScript/JSX',
     '.jsx': 'JavaScript/JSX', '.go': 'Go', '.rs': 'Rust', '.java': 'Java',
@@ -51,6 +54,64 @@ EXT_LABELS: dict[str, str] = {
     '.md': 'Documentation', '.yaml': 'Config', '.yml': 'Config', '.toml': 'Config',
     '.json': 'Config/Data', '.xml': 'Config/Data',
 }
+
+
+def _is_boring(path: str) -> bool:
+    return path.split('/')[-1] in BORING_FILENAMES
+
+
+def _generate_description(
+    dir_name: str,
+    subsystem_type: str,
+    files: list[str],
+    key_files: list[dict],
+) -> str:
+    base = SUBSYSTEM_DESCRIPTIONS.get(subsystem_type, '')
+
+    filenames_lower = [f.split('/')[-1].lower() for f in files]
+
+    # Dominant language by file extension
+    ext_counts: collections.Counter = collections.Counter(
+        '.' + fn.rsplit('.', 1)[-1]
+        for fn in filenames_lower
+        if '.' in fn
+    )
+    top_ext = ext_counts.most_common(1)
+    lang = EXT_LABELS.get(top_ext[0][0], '') if top_ext else ''
+
+    # Infer specific roles from filenames
+    signals: list[str] = []
+    if any('migration' in fn or fn == 'migrate.py' for fn in filenames_lower):
+        signals.append('database migrations')
+    if any('model' in fn for fn in filenames_lower):
+        signals.append('data models')
+    route_names = {'router.py', 'routes.py', 'views.py', 'controllers.py', 'handlers.py'}
+    if any(fn in route_names for fn in filenames_lower):
+        signals.append('request handling')
+    if any('task' in fn for fn in filenames_lower):
+        signals.append('background tasks')
+    if any('schema' in fn or 'serializer' in fn for fn in filenames_lower):
+        signals.append('schemas / serializers')
+    if any(fn.startswith('test_') or fn.endswith('_test.py') or '_spec.' in fn
+           for fn in filenames_lower):
+        signals.append('tests')
+
+    parts = [base] if base else []
+
+    if lang and subsystem_type == 'other':
+        parts.append(f'Primarily {lang}.')
+
+    if signals:
+        parts.append(f'Contains: {", ".join(signals)}.')
+
+    if key_files:
+        top_name = key_files[0]['file'].split('/')[-1]
+        top_count = key_files[0]['commit_count']
+        parts.append(f'Most active file: {top_name} ({top_count} commits).')
+    elif not base:
+        parts.append(f'{len(files)} files in {dir_name}/.')
+
+    return ' '.join(parts)
 
 
 def _detect_subsystem_type(dir_name: str) -> str:
@@ -161,14 +222,22 @@ def _generate(structure: dict, graph: dict, commits: dict) -> list[dict]:
         subsystem_type = _detect_subsystem_type(dir_name)
         subsystem_set = set(files)
 
-        # Entry files: highest graph in-degree within subsystem
+        # Entry files: highest graph in-degree within subsystem, skip boring boilerplate
         with_degree = sorted(files, key=lambda f: -graph_in_degree.get(f, 0))
-        entry_files = [f for f in with_degree if graph_in_degree.get(f, 0) > 0][:5]
+        entry_files = [
+            f for f in with_degree if graph_in_degree.get(f, 0) > 0 and not _is_boring(f)
+        ][:5]
         if not entry_files:
-            # Fallback: known entry filenames
+            # Retry including boring files (all __init__.py may be the only option)
+            entry_files = [f for f in with_degree if graph_in_degree.get(f, 0) > 0][:5]
+        if not entry_files:
+            entry_files = [
+                f for f in files if f.split('/')[-1] in ENTRY_FILENAMES and not _is_boring(f)
+            ][:5]
+        if not entry_files:
             entry_files = [f for f in files if f.split('/')[-1] in ENTRY_FILENAMES][:5]
         if not entry_files:
-            entry_files = sorted(files)[:3]
+            entry_files = sorted(f for f in files if not _is_boring(f))[:3] or sorted(files)[:3]
 
         # Key files: hot files within this subsystem
         key_files = [
@@ -200,13 +269,17 @@ def _generate(structure: dict, graph: dict, commits: dict) -> list[dict]:
             if tgt in subsystem_set:
                 internal_in_deg[tgt] += 1
 
+        # Prefer substantive files; fall back to full list only if too few remain
+        interesting = [f for f in ordered if not _is_boring(f)]
+        ordered_filtered = interesting if len(interesting) >= 3 else ordered
+
         reading_order = []
-        for f in ordered[:10]:
+        for f in ordered_filtered[:10]:
             note = _file_note(f, subsystem_set, internal_in_deg, graph_in_degree)
             reading_order.append({'file': f, 'note': note})
 
         label = SUBSYSTEM_LABELS.get(subsystem_type, dir_name)
-        desc = SUBSYSTEM_DESCRIPTIONS.get(subsystem_type, f'{len(files)} files in {dir_name}/')
+        desc = _generate_description(dir_name, subsystem_type, files, key_files)
 
         tours.append({
             'id': f'tour_{dir_name.replace("/", "_")}',
@@ -245,13 +318,14 @@ def _generate(structure: dict, graph: dict, commits: dict) -> list[dict]:
         if f in all_files_set
         and not any(part in SKIP_DIRS for part in f.split('/'))
         and graph_in_degree[f] > 0
+        and not _is_boring(f)
     ][:8]
     # Also include canonical entry filenames if not already present
     entry_set = set(global_entry_files)
     for f in sorted(all_files_set):
         if len(global_entry_files) >= 8:
             break
-        if f not in entry_set and f.split('/')[-1] in ENTRY_FILENAMES:
+        if f not in entry_set and f.split('/')[-1] in ENTRY_FILENAMES and not _is_boring(f):
             global_entry_files.append(f)
             entry_set.add(f)
 

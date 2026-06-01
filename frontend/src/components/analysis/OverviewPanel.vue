@@ -48,7 +48,7 @@ const notableFindings = computed<Finding[]>(() => {
 
   const busFactor = r.ownership?.bus_factor ?? r.structure?.bus_factor ?? 0
   if (busFactor > 0 && busFactor <= 2) {
-    findings.push({ icon: '🚌', text: `Bus factor ${busFactor} — only ${busFactor === 1 ? '1 contributor' : '2 contributors'} own the majority of files`, variant: 'warning' })
+    findings.push({ icon: '🚌', text: `Bus factor ${busFactor} — only ${busFactor === 1 ? '1 contributor(s)' : '2 contributors'} own the majority of files`, variant: 'warning' })
   }
 
   const highRisk = heuristics.filter(h => h.score >= 70)
