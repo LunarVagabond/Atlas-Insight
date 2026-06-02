@@ -16,7 +16,6 @@ import type { CommitData, GitHubContributor, MonthlyCommit } from '../../stores/
 import TimelineFilter, { type FilterSelection } from './TimelineFilter.vue'
 import CommitMonthDrawer from './CommitMonthDrawer.vue'
 import GitGraphSvg, { type GraphRow, type GraphCommit, type MonthSep } from './GitGraphSvg.vue'
-import CommitBodyDrawer from './CommitBodyDrawer.vue'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 
@@ -180,7 +179,7 @@ const contributors = computed<ContribEntry[]>(() => {
 
   return Array.from(counts.entries())
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 20)
+    .slice(0, 10)
     .map(([name, count]) => {
       const gh = ghMap.get(name) ?? ghMap.get(name.replace(/\[bot\]/, ''))
       return {
@@ -264,6 +263,20 @@ const graphRows = computed<GraphRow[]>(() => {
 
 const totalCommits = computed(() => graphRows.value.filter(r => !(r as MonthSep).isMonth).length)
 
+const contributorsTotal = computed(() => {
+  const mc = props.commits.monthly_commits ?? {}
+  const filteredActive = selection.value.year !== 'All' || selection.value.months.size > 0 || selection.value.days.size > 0
+  const seen = new Set<string>()
+  for (const [month, commits] of Object.entries(mc)) {
+    if (filteredActive && !monthInFilter(month)) continue
+    for (const c of commits) {
+      if (!commitInDayFilter(c.date)) continue
+      seen.add(c.author)
+    }
+  }
+  return seen.size
+})
+
 const commitDateRange = computed<string>(() => {
   const dates = graphRows.value
     .filter(r => !(r as MonthSep).isMonth)
@@ -285,7 +298,7 @@ const commitDateRange = computed<string>(() => {
   <div class="panel git-history-panel">
     <h2 class="panel__title">Commit History</h2>
 
-    <!-- Frequency chart -->
+    <!-- Filter + chart + contributors row -->
     <div v-if="commits.monthly_frequency.length">
       <TimelineFilter
         :data="commits.monthly_frequency"
@@ -293,9 +306,49 @@ const commitDateRange = computed<string>(() => {
         @update:filtered="filteredMonthly = $event"
         @change="onFilterChange"
       />
-      <div class="chart-wrapper" style="margin-top: 1rem">
-        <Line v-if="dayChartData ? dayChartData.length : filteredMonthly.length" :data="chartData" :options="chartOptions" />
-        <div v-else class="empty-state">No data for selected range</div>
+      <div class="git-history-chart-row">
+        <div class="git-history-chart-row__chart">
+          <Line v-if="dayChartData ? dayChartData.length : filteredMonthly.length" :data="chartData" :options="chartOptions" />
+          <div v-else class="empty-state">No data for selected range</div>
+        </div>
+
+        <div v-if="contributors.length" class="git-contribs git-contribs--sidebar">
+          <div class="git-contribs__label">
+            Contributors
+            <span v-if="selection.year !== 'All' || selection.months.size > 0 || selection.days.size > 0" class="git-contribs__filter-note">
+              (filtered)
+            </span>
+          </div>
+          <div class="git-contribs__list">
+            <a
+              v-for="c in contributors"
+              :key="c.name"
+              :href="c.profileUrl ?? undefined"
+              :target="c.profileUrl ? '_blank' : undefined"
+              rel="noopener noreferrer"
+              :class="['git-contrib', 'git-contrib--row', c.profileUrl && 'git-contrib--link']"
+              :title="`${c.name} — ${c.commitCount} commits`"
+            >
+              <img
+                v-if="c.avatarUrl"
+                :src="c.avatarUrl"
+                :alt="c.name"
+                class="git-contrib__avatar"
+                :style="{ borderColor: c.color }"
+              />
+              <span
+                v-else
+                class="git-contrib__initials"
+                :style="{ background: c.color + '22', color: c.color, borderColor: c.color }"
+              >{{ c.initials }}</span>
+              <span class="git-contrib__name">{{ c.name.replace(/\[bot\]/, '').split(' ')[0] }}</span>
+              <span class="git-contrib__count">{{ c.commitCount }}</span>
+            </a>
+            <div v-if="contributorsTotal > contributors.length" class="git-contribs__more">
+              … and {{ contributorsTotal - contributors.length }} more
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <div v-else class="empty-state">No commit data available</div>
@@ -321,42 +374,6 @@ const commitDateRange = computed<string>(() => {
       </template>
     </div>
 
-    <!-- Contributors (filtered by date range) -->
-    <div v-if="contributors.length" class="git-contribs">
-      <div class="git-contribs__label">
-        Contributors
-        <span v-if="selection.year !== 'All' || selection.months.size > 0 || selection.days.size > 0" class="git-contribs__filter-note">
-          (in selected range)
-        </span>
-      </div>
-      <div class="git-contribs__row">
-        <a
-          v-for="c in contributors"
-          :key="c.name"
-          :href="c.profileUrl ?? undefined"
-          :target="c.profileUrl ? '_blank' : undefined"
-          rel="noopener noreferrer"
-          :class="['git-contrib', c.profileUrl && 'git-contrib--link']"
-          :title="`${c.name} — ${c.commitCount} commits`"
-        >
-          <img
-            v-if="c.avatarUrl"
-            :src="c.avatarUrl"
-            :alt="c.name"
-            class="git-contrib__avatar"
-            :style="{ borderColor: c.color }"
-          />
-          <span
-            v-else
-            class="git-contrib__initials"
-            :style="{ background: c.color + '22', color: c.color, borderColor: c.color }"
-          >{{ c.initials }}</span>
-          <span class="git-contrib__name">{{ c.name.replace(/\[bot\]/, '').split(' ')[0] }}</span>
-          <span class="git-contrib__count">{{ c.commitCount }}</span>
-        </a>
-      </div>
-    </div>
-
     <!-- Git log graph -->
     <div class="git-log-section">
       <div class="git-log-toolbar">
@@ -370,14 +387,52 @@ const commitDateRange = computed<string>(() => {
         <input v-model="searchQuery" class="git-log-search" placeholder="Filter commits, authors, shas…" />
       </div>
 
-      <div v-if="graphRows.length" ref="graphScrollEl" class="git-graph-scroll">
-        <GitGraphSvg :rows="graphRows" @click-month="activeMonth = $event" @click-body="activeCommitBody = $event" />
-      </div>
-      <div v-else-if="searchQuery" class="empty-state" style="margin-top:1rem">
-        No commits match "{{ searchQuery }}"
-      </div>
-      <div v-else class="empty-state" style="margin-top:1rem">
-        No commit data for selected range
+      <div class="git-graph-wrap">
+        <div v-if="graphRows.length" ref="graphScrollEl" class="git-graph-scroll">
+          <GitGraphSvg :rows="graphRows" @click-month="activeMonth = $event" @click-body="activeCommitBody = $event" />
+        </div>
+        <div v-else-if="searchQuery" class="empty-state" style="margin-top:1rem">
+          No commits match "{{ searchQuery }}"
+        </div>
+        <div v-else class="empty-state" style="margin-top:1rem">
+          No commit data for selected range
+        </div>
+
+        <!-- Inline commit body drawer -->
+        <Transition name="git-body-drawer">
+          <div v-if="activeCommitBody" class="git-body-drawer">
+            <div class="git-body-drawer__header">
+              <div class="git-body-drawer__meta">
+                <div class="git-body-drawer__author-row">
+                  <span
+                    class="git-body-drawer__avatar"
+                    :style="{ background: activeCommitBody.color + '22', color: activeCommitBody.color, borderColor: activeCommitBody.color }"
+                  >{{ authorInitials(activeCommitBody.author) }}</span>
+                  <span class="git-body-drawer__author">{{ activeCommitBody.author }}</span>
+                  <span class="git-body-drawer__rel">{{ activeCommitBody.relativeDate }}</span>
+                </div>
+                <div class="git-body-drawer__sha-row">
+                  <a
+                    v-if="activeCommitBody.commitUrl"
+                    :href="activeCommitBody.commitUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="git-body-drawer__sha"
+                    :style="{ color: activeCommitBody.color }"
+                  >{{ activeCommitBody.sha }}</a>
+                  <code v-else class="git-body-drawer__sha" :style="{ color: activeCommitBody.color }">{{ activeCommitBody.sha }}</code>
+                  <span v-if="activeCommitBody.parents.length > 1" class="git-body-drawer__merge-badge">merge</span>
+                  <span class="git-body-drawer__date">{{ new Date(activeCommitBody.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) }}</span>
+                </div>
+              </div>
+              <button class="git-body-drawer__close" @click="activeCommitBody = null" title="Close">✕</button>
+            </div>
+            <div class="git-body-drawer__body">
+              <p class="git-body-drawer__message">{{ activeCommitBody.message }}</p>
+              <pre v-if="activeCommitBody.body" class="git-body-drawer__pre">{{ activeCommitBody.body }}</pre>
+            </div>
+          </div>
+        </Transition>
       </div>
     </div>
   </div>
@@ -387,10 +442,5 @@ const commitDateRange = computed<string>(() => {
     :commits="activeMonthCommits"
     :repo-url="repoUrl"
     @close="activeMonth = null"
-  />
-
-  <CommitBodyDrawer
-    :commit="activeCommitBody"
-    @close="activeCommitBody = null"
   />
 </template>
