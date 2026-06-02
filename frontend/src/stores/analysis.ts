@@ -1,440 +1,43 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
+import type {
+  AnalysisRun,
+  RunResult,
+  RunListItem,
+  FeaturedRepo,
+  SimilarRun,
+  DiffData,
+  FileHistory,
+  JitIssue,
+  JitPrData,
+} from '../types'
 
-export interface AnalysisRun {
-  id: string
-  status: 'pending' | 'running' | 'completed' | 'failed'
-  progress_step: '' | 'cloning' | 'parsing' | 'heuristics' | 'metadata' | 'finalizing'
-  triggered_at: string
-  completed_at: string | null
-  result: RunResult | null
-  repo_url: string
-  repo_owner: string
-  repo_name: string
-  is_stale: boolean
-  is_private: boolean
-  last_fetched_at: string | null
-  auth_token_warning: string
-  cooldown_until: string | null
+export type {
+  AnalysisRun,
+  RunResult,
+  RunListItem,
+  FeaturedRepo,
+  SimilarRun,
+  DiffData,
+  FileHistory,
+  JitIssue,
+  JitPrData,
 }
 
-export interface RoadmapMilestone {
-  title: string
-  date: string | null
-  status: 'done' | 'in-progress' | 'planned'
-  done_count: number
-  todo_count: number
-  done_items: string[]
-  todo_items: string[]
-}
-
-export interface ContributionOpportunity {
-  id: string
-  title: string
-  description: string
-  difficulty: 'beginner' | 'intermediate' | 'advanced'
-  risk: 'low' | 'medium' | 'high'
-  category: 'documentation' | 'testing' | 'ci' | 'community' | 'refactoring' | 'security' | 'dependencies' | 'github-issue' | 'feature'
-  issue_url?: string
-  issue_number?: number
-  has_open_pr?: boolean
-  labels?: string[]
-  hints?: string[]
-  knowledge_domains?: string[]
-  effort_estimate?: 'quick-win' | 'small' | 'medium' | 'large'
-  affected_file_count?: number
-  readiness_score?: number
-  readiness_label?: string
-}
-
-export interface HeuristicDelta {
-  signal: string
-  label: string
-  before: number
-  after: number
-  delta: number
-  direction: 'up' | 'down' | 'same'
-}
-
-export interface ClassificationDelta {
-  before_label: string
-  after_label: string
-  delta: number
-  changed: boolean
-}
-
-export interface DiffData {
-  available: boolean
-  previous_run_id?: string
-  previous_triggered_at?: string
-  heuristics?: HeuristicDelta[]
-  dependencies?: { added: string[]; removed: string[]; added_count: number; removed_count: number }
-  contributors?: { before: number; after: number; delta: number }
-  graph?: { nodes_before: number; nodes_after: number; nodes_delta: number; god_modules_before: number; god_modules_after: number; god_modules_delta: number }
-  structure?: { files_before: number; files_after: number; files_delta: number; test_ratio_before: number; test_ratio_after: number }
-  classification?: { project_health?: ClassificationDelta | null; contribution_difficulty?: ClassificationDelta | null; documentation_grade?: ClassificationDelta | null; code_complexity?: ClassificationDelta | null }
-}
-
-export interface FileHistoryCommit {
-  sha: string
-  full_sha: string
-  message: string
-  date: string
-  author: string
-  url: string
-  issue_refs: number[]
-}
-
-export interface FileHistory {
-  path: string
-  commits: FileHistoryCommit[]
-}
-
-export interface JitIssue {
-  number: number
-  title: string
-  url: string
-  labels: string[]
-  body_excerpt: string
-}
-
-export interface JitPrData {
-  pr_issue_refs: number[]
-  open_prs: number
-}
-
-export interface OwnershipSubsystem {
-  id: string
-  name: string
-  subsystem_type: string
-  file_count: number
-  activity_score: number
-  hot_files: { file: string; commit_count: number }[]
-  god_modules: { module: string; in_degree: number }[]
-  primary_language: string
-}
-
-export interface OwnershipData {
-  subsystems: OwnershipSubsystem[]
-  top_contributors: { author: string; email?: string; files_touched: number }[]
-  bus_factor: number
-}
-
-export interface OssScore {
-  score: number
-  badge: 'champion' | 'thriving' | 'growing' | 'seedling' | 'struggling' | 'dormant'
-  label: string
-}
-
-export interface RunResult {
-  commits: CommitData
-  graph: GraphData
-  dependencies: DepsData
-  heuristics: HeuristicSignal[]
-  oss_score?: OssScore
-  readme?: ReadmeData
-  structure?: StructureData
-  security?: SecurityData
-  github_meta?: GitHubMeta
-  classification?: Classification
-  contribution_opportunities?: ContributionOpportunity[]
-  todos?: TodoData
-  arch_tours?: ArchTour[]
-  ownership?: OwnershipData
-  error?: string
-}
-
-export interface ReadmeData {
-  found: boolean
-  filename: string | null
-  content: string | null
-  description: string | null
-  sections: string[]
-  badge_count: number
-  word_count: number
-  has_installation: boolean
-  has_usage: boolean
-  has_contributing: boolean
-  has_changelog: boolean
-  has_license: boolean
-  has_api_docs: boolean
-  docs_links: LinkSignal[]
-  social_links: LinkSignal[]
-}
-
-export interface LinkSignal {
-  label: string
-  url: string
-  source: string
-  description?: string
-  platform?: string
-}
-
-export interface LanguageInfo {
-  name: string
-  pct: number
-  files?: number
-  lines?: number
-  bytes?: number
-}
-
-export interface CommunityFilesContent {
-  contributing: string | null
-  license: string | null
-  coc: string | null
-  security: string | null
-  changelog: string | null
-}
-
-export interface StructureData {
-  total_files: number
-  total_lines: number
-  languages: LanguageInfo[]
-  test_files: number
-  test_ratio: number
-  has_ci: boolean
-  ci_systems: string[]
-  gh_workflow_count: number
-  has_docker: boolean
-  has_lint_config: boolean
-  has_contributing: boolean
-  contributing_file: string | null
-  license_file: string | null
-  license_type: string | null
-  has_coc: boolean
-  coc_file: string | null
-  has_security_policy: boolean
-  security_policy_file: string | null
-  has_changelog: boolean
-  changelog_file: string | null
-  roadmap_file?: string | null
-  roadmap_parsed?: {
-    milestones: RoadmapMilestone[]
-  } | null
-  community_files_content: CommunityFilesContent
-  releases: { name: string; date: string }[]
-  release_count: number
-  last_release: { name: string; date: string } | null
-  repo_age_days: number | null
-  bus_factor: number
-  top_contributors: { author: string; email?: string; files_touched: number }[]
-  hot_files: { file: string; commit_count: number }[]
-  tech_stack?: string[]
-  all_files?: string[]
-  stale_branches?: { name: string; last_commit: string; days_ago: number }[]
-  stale_branch_count?: number
-  docs_dir?: string | null
-}
-
-export interface VulnFinding {
-  name: string
-  version: string
-  ecosystem: string
-  vuln_id: string
-  summary: string
-  severity: string | null
-  url: string
-}
-
-export interface SecurityData {
-  issues: { severity: string; type: string; detail: string }[]
-  issue_count: number
-  score: number
-  gitignore_exists: boolean
-  gitignore_gaps: string[]
-  vulnerabilities?: VulnFinding[]
-}
-
-export interface GitHubContributor {
-  login: string
-  avatar_url: string
-  html_url: string
-  contributions: number
-}
-
-export interface GitHubMeta {
-  html_url: string | null
-  stars: number
-  forks: number
-  open_issues: number
-  open_prs: number | null
-  watchers: number
-  primary_language: string | null
-  topics: string[]
-  license_spdx: string | null
-  license_name: string | null
-  github_description: string | null
-  size_kb: number
-  default_branch: string
-  has_wiki: boolean
-  has_discussions: boolean
-  archived: boolean
-  is_fork: boolean
-  created_at: string | null
-  pushed_at: string | null
-  homepage: string | null
-  contributors: GitHubContributor[]
-  releases_meta?: {
-    stable_count: number
-    prerelease_count: number
-    total_count: number
-    latest_stable: { name: string; date: string } | null
-    latest_prerelease: { name: string; date: string } | null
-  }
-}
-
-export interface ClassificationLevel {
-  key: string
-  label: string
-  score: number
-}
-
-export interface Classification {
-  contribution_difficulty: ClassificationLevel
-  project_health: ClassificationLevel
-  code_complexity: ClassificationLevel
-  documentation_grade: ClassificationLevel
-  tags: string[]
-}
-
-export interface TodoItem {
-  file: string
-  line: number
-  type: string
-  text: string
-}
-
-export interface TodoData {
-  total: number
-  by_type: Record<string, number>
-  items: TodoItem[]
-}
-
-export interface ArchTourFile {
-  file: string
-  commit_count?: number
-}
-
-export interface ArchTourStep {
-  file: string
-  note: string
-}
-
-export interface ArchTour {
-  id: string
-  name: string
-  description: string
-  subsystem_type: string
-  file_count: number
-  entry_files: string[]
-  key_files: ArchTourFile[]
-  reading_order: ArchTourStep[]
-}
-
-export interface FeaturedRepo {
-  run_id: string
-  repo_url: string
-  repo_owner: string
-  repo_name: string
-  stars: number | null
-  health_label: string | null
-  health_key: string | null
-  primary_language: string | null
-  topics: string[]
-  github_description: string | null
-}
-
-export interface MonthlyCommit {
-  sha: string
-  message: string
-  body?: string | null
-  author: string
-  date: string
-  parents?: string[]
-}
-
-export interface CommitData {
-  total_commits: number
-  total_contributors: number
-  last_commit_date: string | null
-  days_since_last_commit: number | null
-  abandoned: boolean
-  activity_decay_ratio: number
-  weekly_frequency: { week: string; count: number }[]
-  monthly_frequency: { month: string; count: number }[]
-  contributor_churn: { month: string; active: number; new: number; lost: number }[]
-  monthly_commits?: Record<string, MonthlyCommit[]>
-  reverted_commits?: { sha: string; message: string; date: string; files: string[] }[]
-}
-
-export interface GraphData {
-  node_count: number
-  edge_count: number
-  cycles: string[][]
-  cycle_count: number
-  god_modules: { module: string; in_degree: number }[]
-  hotspots: { file: string; degree: number }[]
-  nodes: { id: string; in_degree: number }[]
-  edges: { source: string; target: string }[]
-}
-
-export interface DepsData {
-  dependencies: { name: string; version_spec: string; source: string; dev?: boolean; version?: string; ecosystem?: string }[]
-  dependency_count: number
-  docker_issues: { file: string; issue: string }[]
-  missing_lockfile_warnings: string[]
-}
-
-
-export type HeuristicSignalKey =
-  | 'burnout'
-  | 'abandonment_risk'
-  | 'monolith_growth'
-  | 'dependency_health'
-  | 'documentation_quality'
-  | 'ci_health'
-  | 'bus_factor_risk'
-  | 'security_hygiene'
-  | 'release_cadence'
-  | 'community_health'
-  | 'commit_velocity'
-
-export interface HeuristicSignal {
-  signal: HeuristicSignalKey
-  label: string
-  score: number
-  confidence: 'low' | 'medium' | 'high'
-  description: string
-  items?: string[]
-}
-
-export interface SimilarRun {
-  run_id: string
-  owner: string
-  name: string
-  repo_url: string
-  oss_score: number
-  health_key: string
-  primary_language: string | null
-  stars: number
-}
-
-export interface RunListItem {
-  id: string
-  repo_id: string
-  status: 'pending' | 'running' | 'completed' | 'failed'
-  triggered_at: string
-  completed_at: string | null
-  repo_url: string
-  repo_owner: string
-  repo_name: string
-  is_stale: boolean
-  is_private: boolean
-  is_favorited: boolean
-  last_fetched_at: string | null
-  tags: string[]
-  has_previous_run: boolean
-}
+export type { RoadmapMilestone } from '../types/structure'
+export type { ContributionOpportunity, ArchTour, ArchTourFile, ArchTourStep } from '../types/contributions'
+export type { HeuristicDelta } from '../types/heuristics'
+export type { ClassificationDelta } from '../types/classification'
+export type { CommitData, MonthlyCommit, FileHistoryCommit } from '../types/commits'
+export type { GraphData, DepsData } from '../types/graph'
+export type { HeuristicSignal, HeuristicSignalKey } from '../types/heuristics'
+export type { OssScore, Classification, ClassificationLevel } from '../types/classification'
+export type { ReadmeData, LinkSignal } from '../types/readme'
+export type { LanguageInfo, StructureData, CommunityFilesContent } from '../types/structure'
+export type { VulnFinding, SecurityData } from '../types/security'
+export type { GitHubContributor, GitHubMeta } from '../types/github'
+export type { TodoItem, TodoData } from '../types/todos'
+export type { OwnershipSubsystem, OwnershipData } from '../types/ownership'
 
 export const useAnalysisStore = defineStore('analysis', {
   state: () => ({
@@ -539,7 +142,8 @@ export const useAnalysisStore = defineStore('analysis', {
       this.run = null
       this.error = null
       this.status = 'polling'
-      await this._fetchRun(runId)
+      const ok = await this._fetchRun(runId)
+      if (!ok) return
       const run = this.run as AnalysisRun | null
       if (!run || (run.status !== 'completed' && run.status !== 'failed')) {
         this._startPolling(runId)
@@ -574,15 +178,17 @@ export const useAnalysisStore = defineStore('analysis', {
       }
     },
 
-    async _fetchRun(runId: string) {
+    async _fetchRun(runId: string): Promise<boolean> {
       try {
         const { data } = await axios.get(`/api/v1/repositories/runs/${runId}`)
         this.run = data
+        return true
       } catch (err: unknown) {
         this.status = 'error'
         const axiosErr = err as { response?: { data?: { detail?: string } } }
         this.error = axiosErr.response?.data?.detail ?? 'Failed to fetch run'
         this._stopPolling()
+        return false
       }
     },
 
