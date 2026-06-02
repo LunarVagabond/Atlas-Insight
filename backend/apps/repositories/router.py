@@ -260,6 +260,7 @@ def list_runs(
     mine: bool = False,
 ):
     _assert_not_limited(request)
+    per_page = min(per_page, 25)
     from django.db.models import Exists, OuterRef, Subquery
 
     # Latest non-failed run per repo — failed runs are hidden from public listings
@@ -806,6 +807,7 @@ def get_spotlight_current(request):
 
 @router.get('/spotlight/history', response=SpotlightHistorySchema)
 def get_spotlight_history(request, page: int = 1, per_page: int = 20):
+    per_page = min(per_page, 20)
     qs = RepoOfTheWeek.objects.select_related('repo').order_by('-week_start')
     total = qs.count()
     offset = (page - 1) * per_page

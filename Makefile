@@ -26,6 +26,7 @@ COMPOSE_BARE := docker compose -f $(ROOT_DIR)/docker-compose.yml
         migrate makemigrations createsuperuser shell dbshell collectstatic \
         test lint format build type-check \
 		logs-django logs-celery logs-beat logs-flower logs-vite \
+        docker-up docker-down docker-build release \
         _ensure_running_dirs
 
 # ── Help ───────────────────────────────────────────────────────────────────────
@@ -88,6 +89,14 @@ help:
 	@echo ""
 	@echo "  ── Clean wipe (dev) ─────────────────────────────────────────────────"
 	@echo "    make teardown        (stop + docker down -v + rm _running/.venv/node_modules)"
+	@echo ""
+	@echo "  ── Docker (containerised stack) ─────────────────────────────────────"
+	@echo "    docker-build         Build backend + frontend images"
+	@echo "    docker-up            Start full containerised stack (app + glitchtip profiles)"
+	@echo "    docker-down          Stop and remove app + glitchtip containers"
+	@echo ""
+	@echo "  ── Release ──────────────────────────────────────────────────────────"
+	@echo "    release              Interactive: bump version, build + tag images, push to ghcr.io"
 	@echo ""
 	@echo "  ── Production ───────────────────────────────────────────────────────"
 	@echo "    production-release   Interactive prod deploy: systemd + nginx + full stack"
@@ -420,6 +429,33 @@ logs-flower:
 
 logs-vite:
 	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/frontend logs-vite
+
+# ── Docker (full containerised stack) ─────────────────────────────────────────
+# profile: app  — backend, celery, celery-beat, flower, frontend (nginx)
+# profile: glitchtip — error tracking
+# Uses backend/.env for secrets; compose overrides POSTGRES_HOST/REDIS_URL for container networking.
+
+docker-build:
+	@$(COMPOSE) --profile app build
+
+docker-up: _ensure_running_dirs
+	@$(COMPOSE) up -d postgres redis
+	@echo "Waiting for Postgres..."
+	@until $(COMPOSE) exec -T postgres pg_isready -q 2>/dev/null; do sleep 1; done
+	@$(COMPOSE) --profile app --profile glitchtip up -d
+	@echo ""
+	@echo "Atlas Insight (Docker) running:"
+	@echo "  App:    http://localhost:4501"
+	@echo "  API:    http://localhost:4500/api/docs"
+	@echo "  Flower: http://localhost:4504"
+
+docker-down:
+	@$(COMPOSE) --profile app --profile glitchtip down
+
+# ── Release ────────────────────────────────────────────────────────────────────
+
+release:
+	@bash $(ROOT_DIR)/scripts/release.sh
 
 # ── Internal ───────────────────────────────────────────────────────────────────
 

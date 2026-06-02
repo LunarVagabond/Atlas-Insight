@@ -210,10 +210,6 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.analysis.tasks.evict_stale_clones',
         'schedule': crontab(minute=0, hour=3),  # daily at 03:00 UTC
     },
-    'cleanup-old-logs': {
-        'task': 'apps.analysis.tasks.cleanup_old_logs',
-        'schedule': crontab(minute=30, hour=3),  # daily at 03:30 UTC
-    },
     'select-repo-of-week': {
         'task': 'apps.analysis.tasks.select_repo_of_week',
         'schedule': crontab(minute=0, hour=0, day_of_week=1),  # Monday 00:00 UTC
@@ -290,16 +286,15 @@ class _SentryServiceFilter:
                 import sentry_sdk
                 message = record.getMessage()
                 # Attach service context and send as explicit log capture
-                with sentry_sdk.configure_scope() as scope:
-                    scope.set_tag('service', service_name)
-                    scope.set_context('service', {'name': service_name})
-                    # Capture at appropriate level
-                    if record.levelno >= 40:
-                        sentry_sdk.capture_message(message, level='error')
-                    elif record.levelno >= 30:
-                        sentry_sdk.capture_message(message, level='warning')
-                    else:
-                        sentry_sdk.capture_message(message, level='info')
+                sentry_sdk.set_tag('service', service_name)
+                sentry_sdk.set_context('service', {'name': service_name})
+                # Capture at appropriate level
+                if record.levelno >= 40:
+                    sentry_sdk.capture_message(message, level='error')
+                elif record.levelno >= 30:
+                    sentry_sdk.capture_message(message, level='warning')
+                else:
+                    sentry_sdk.capture_message(message, level='info')
             except Exception:
                 pass
         return True
@@ -437,6 +432,5 @@ if SENTRY_DSN:
         enable_logs=True,
     )
 
-    with sentry_sdk.configure_scope() as scope:
-        scope.set_tag('service', _sentry_service)
-        scope.set_context('service', {'name': _sentry_service})
+    sentry_sdk.set_tag('service', _sentry_service)
+    sentry_sdk.set_context('service', {'name': _sentry_service})

@@ -39,8 +39,11 @@ services:
 
   redis:
     image: redis:7-alpine
+    command: redis-server --appendonly yes
     ports:
       - "4502:6379"
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -88,6 +91,98 @@ services:
     profiles:
       - glitchtip
 
+  # ── App services (profile: app) ───────────────────────────────────────────────
+  # Use: docker compose --profile app up -d
+  # All services share the backend image; only CMD differs for celery/flower.
+
+  backend:
+    build: ./backend
+    ports:
+      - "4500:4500"
+    env_file: ./backend/.env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      REDIS_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - repo_cache:/app/_running/repo_cache
+      - static_files:/app/staticfiles
+    restart: unless-stopped
+    profiles:
+      - app
+
+  celery:
+    build: ./backend
+    command: celery -A config worker --loglevel=info
+    env_file: ./backend/.env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      ATLAS_SERVICE: celery-workers
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      REDIS_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://redis:6379/0
+    depends_on:
+      - backend
+    volumes:
+      - repo_cache:/app/_running/repo_cache
+    restart: unless-stopped
+    profiles:
+      - app
+
+  celery-beat:
+    build: ./backend
+    command: celery -A config beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    env_file: ./backend/.env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      ATLAS_SERVICE: celery-beat
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      REDIS_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://redis:6379/0
+    depends_on:
+      - backend
+    restart: unless-stopped
+    profiles:
+      - app
+
+  flower:
+    build: ./backend
+    command: celery -A config flower --port=4504
+    ports:
+      - "4504:4504"
+    env_file: ./backend/.env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      ATLAS_SERVICE: celery-flower
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      REDIS_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://redis:6379/0
+    depends_on:
+      - backend
+    restart: unless-stopped
+    profiles:
+      - app
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "4501:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    profiles:
+      - app
+
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared
@@ -100,3 +195,6 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
+  repo_cache:
+  static_files:

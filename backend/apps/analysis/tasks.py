@@ -433,7 +433,7 @@ def reanalyze_watched_repos():
             continue
 
         run = AnalysisRun.objects.create(repo=repo, status='pending')
-        task = analyze_repository.delay(str(run.id), pat=repo.auth_token or None)
+        task = analyze_repository.delay(str(run.id))
         run.celery_task_id = task.id
         run.save(update_fields=['celery_task_id'])
         queued += 1
@@ -467,27 +467,3 @@ def cleanup_never_succeeded_repos():
     logger.info('Orphan repo cleanup: %d repos deleted (never completed, older than 1 h)', count)
 
 
-@shared_task
-def cleanup_old_logs():
-    """Delete rotated log backup files older than LOG_RETENTION_DAYS."""
-    import time
-
-    from django.conf import settings
-
-    retention_seconds = settings.LOG_RETENTION_DAYS * 86400
-    cutoff = time.time() - retention_seconds
-    log_dir = settings.LOG_DIR
-    deleted = 0
-
-    for entry in log_dir.iterdir():
-        # RotatingFileHandler backups: django.log.1, celery.log.2, etc.
-        if entry.is_file() and entry.suffix.lstrip('.').isdigit():
-            if entry.stat().st_mtime < cutoff:
-                entry.unlink()
-                deleted += 1
-                logger.info('Deleted old log backup: %s', entry.name)
-
-    logger.info(
-        'Log cleanup complete: %d backup files removed (retention: %d days)',
-        deleted, settings.LOG_RETENTION_DAYS,
-    )
