@@ -242,277 +242,8 @@ const interactionLinks = computed<DisplayLink[]>(() => {
 <template>
   <div class="panel project-panel">
 
-    <!-- About -->
-    <section v-if="description || gh?.homepage" class="project-panel__section">
-      <h2 class="panel__title">About</h2>
-      <AppCard>
-        <p v-if="description" class="project-panel__description">{{ description }}</p>
-        <a
-          v-if="gh?.homepage"
-          :href="gh.homepage"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="project-panel__homepage"
-        >
-          🔗 {{ gh.homepage }}
-        </a>
-      </AppCard>
-    </section>
-
-    <!-- Documentation -->
-    <section class="project-panel__section">
-      <h2 class="panel__title">Documentation</h2>
-      <AppCard>
-        <div v-if="docsLinks.length" class="project-links">
-          <a
-            v-for="link in docsLinks"
-            :key="link.url"
-            :href="link.url"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="project-links__item"
-          >
-            <div class="project-links__top">
-              <AppBadge variant="info">{{ link.badge }}</AppBadge>
-              <span class="project-links__label">{{ link.label }}</span>
-            </div>
-            <div class="project-links__desc">{{ link.description }}</div>
-            <div class="project-links__url">{{ link.url }}</div>
-          </a>
-        </div>
-        <div v-else class="project-empty">
-          <AppBadge variant="failed">Not Found</AppBadge>
-          <p class="project-empty__text">No documentation links were detected in repository metadata or README.</p>
-        </div>
-      </AppCard>
-    </section>
-
-    <!-- How to Interact -->
-    <section class="project-panel__section">
-      <h2 class="panel__title">How To Interact</h2>
-      <AppCard>
-        <div v-if="interactionLinks.length" class="project-links">
-          <a
-            v-for="link in interactionLinks"
-            :key="link.url"
-            :href="link.url"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="project-links__item"
-          >
-            <div class="project-links__top">
-              <AppBadge variant="completed">{{ link.badge }}</AppBadge>
-              <span class="project-links__label">{{ link.label }}</span>
-            </div>
-            <div class="project-links__desc">{{ link.description }}</div>
-            <div class="project-links__url">{{ link.url }}</div>
-          </a>
-        </div>
-        <div v-else class="project-empty">
-          <AppBadge variant="warning">Not Found</AppBadge>
-          <p class="project-empty__text">No social or community links were detected from this repository.</p>
-        </div>
-      </AppCard>
-    </section>
-
-    <!-- Classifications -->
-    <section v-if="cls" class="project-panel__section">
-      <h2 class="panel__title">Repository Assessment</h2>
-
-      <div class="classify-grid">
-        <AppCard>
-          <div class="classify-card">
-            <div class="classify-card__icon">🚀</div>
-            <div class="classify-card__body">
-              <div class="classify-card__heading">Contribution Difficulty</div>
-              <AppBadge :variant="difficultyVariant(cls.contribution_difficulty.key)">
-                {{ cls.contribution_difficulty.label }}
-              </AppBadge>
-            </div>
-          </div>
-        </AppCard>
-        <AppCard>
-          <div class="classify-card">
-            <div class="classify-card__icon">❤️</div>
-            <div class="classify-card__body">
-              <div class="classify-card__heading">Project Health</div>
-              <AppBadge :variant="healthVariant(cls.project_health.key)">
-                {{ cls.project_health.label }}
-              </AppBadge>
-            </div>
-          </div>
-        </AppCard>
-        <AppCard>
-          <div class="classify-card">
-            <div class="classify-card__icon">🧩</div>
-            <div class="classify-card__body">
-              <div class="classify-card__heading">Code Complexity</div>
-              <AppBadge :variant="complexityVariant(cls.code_complexity.key)">
-                {{ cls.code_complexity.label }}
-              </AppBadge>
-            </div>
-          </div>
-        </AppCard>
-        <AppCard>
-          <div class="classify-card">
-            <div class="classify-card__icon">📚</div>
-            <div class="classify-card__body">
-              <div class="classify-card__heading">Documentation</div>
-              <AppBadge :variant="docVariant(cls.documentation_grade.key)">
-                {{ cls.documentation_grade.label }}
-              </AppBadge>
-            </div>
-          </div>
-        </AppCard>
-      </div>
-
-      <!-- Tags -->
-      <div v-if="cls.tags.length" class="project-panel__tags">
-        <AppBadge
-          v-for="tag in cls.tags"
-          :key="tag"
-          :variant="(tagVariant(tag) as any)"
-          class="project-panel__tag"
-        >
-          {{ tagLabel(tag) }}
-        </AppBadge>
-      </div>
-    </section>
-
-    <!-- GitHub Stats -->
-    <section v-if="gh && (gh.stars || gh.forks || gh.open_issues)" class="project-panel__section">
-      <h2 class="panel__title">GitHub Stats</h2>
-      <div class="panel__grid">
-        <AppCard>
-          <div class="stat">
-            <div class="stat__value">{{ formatStat(gh.stars) }}</div>
-            <div class="stat__label">★ Stars</div>
-          </div>
-        </AppCard>
-        <AppCard>
-          <div class="stat">
-            <div class="stat__value">{{ formatStat(gh.forks) }}</div>
-            <div class="stat__label">⑂ Forks</div>
-          </div>
-        </AppCard>
-        <AppCard>
-          <div class="stat">
-            <div class="stat__value">{{ formatStat(gh.open_issues) }}</div>
-            <div class="stat__label">⚠ Open Issues</div>
-          </div>
-        </AppCard>
-        <AppCard v-if="gh.open_prs !== null">
-          <div class="stat">
-            <div class="stat__value">{{ gh.open_prs }}</div>
-            <div class="stat__label">⊞ Open PRs</div>
-          </div>
-        </AppCard>
-        <AppCard v-if="gh.watchers">
-          <div class="stat">
-            <div class="stat__value">{{ formatStat(gh.watchers) }}</div>
-            <div class="stat__label">👁 Watchers</div>
-          </div>
-        </AppCard>
-      </div>
-
-      <!-- Topics -->
-      <div v-if="gh.topics?.length" class="project-panel__tags" style="margin-top:1rem">
-        <AppBadge
-          v-for="topic in gh.topics"
-          :key="topic"
-          variant="info"
-          class="project-panel__tag"
-        >
-          {{ topic }}
-        </AppBadge>
-      </div>
-    </section>
-
-    <!-- Languages -->
-    <section v-if="structure?.languages?.length" class="project-panel__section">
-      <h2 class="panel__title">Languages</h2>
-      <p class="project-panel__coverage-note">
-        Don't see the framework or language you expected?
-        Our static analysis covers the most common ecosystems but has gaps.
-        <a href="https://github.com/LunarVagabond/Atlas-Insight" target="_blank" rel="noopener noreferrer" class="project-panel__coverage-link">
-          Open an issue or PR
-        </a>
-        — the repo is private for now but opening soon.
-      </p>
-      <AppCard>
-        <div class="lang-list">
-          <div
-            v-for="(lang, idx) in structure.languages.slice(0, 10)"
-            :key="lang.name"
-            class="lang-item"
-          >
-            <div class="lang-item__meta">
-              <span class="lang-item__dot" :style="{ background: langColor(idx) }" />
-              <span class="lang-item__name">{{ lang.name }}</span>
-              <span class="lang-item__pct">{{ lang.pct }}%</span>
-              <span v-if="lang.files != null" class="lang-item__files">{{ lang.files.toLocaleString() }} files</span>
-            </div>
-            <div class="lang-bar">
-              <div
-                class="lang-bar__fill"
-                :style="{ width: `${lang.pct}%`, background: langColor(idx) }"
-              />
-            </div>
-          </div>
-        </div>
-      </AppCard>
-    </section>
-
-    <!-- Community Health -->
-    <section class="project-panel__section">
-      <h2 class="panel__title">Community Health Files</h2>
-      <AppCard>
-        <div class="health-grid">
-          <div
-            v-for="item in communityFiles"
-            :key="item.label"
-            :class="[
-              'health-item',
-              item.present ? 'health-item--present' : 'health-item--missing',
-              item.present && item.key && fileContent(item.key) ? 'health-item--clickable' : '',
-            ]"
-            @click="item.present && item.key && fileContent(item.key) ? toggleFile(item.key) : undefined"
-          >
-            <span class="health-item__check">{{ item.present ? '✓' : '✗' }}</span>
-            <span class="health-item__icon">{{ item.icon }}</span>
-            <span class="health-item__label">{{ item.label }}</span>
-            <span
-              v-if="item.present && item.key && fileContent(item.key)"
-              class="health-item__expand"
-            >
-              {{ expandedFile === item.key ? '▲' : '▼' }}
-            </span>
-          </div>
-        </div>
-
-        <!-- File content viewers -->
-        <template v-for="item in communityFiles" :key="`content-${item.label}`">
-          <div
-            v-if="item.key && expandedFile === item.key && fileContent(item.key)"
-            class="file-viewer"
-          >
-            <div class="file-viewer__header">
-              {{ item.icon }} {{ item.label }}
-              <button class="file-viewer__close" @click="expandedFile = null">✕</button>
-            </div>
-            <div
-              v-if="isMarkdown(item.key)"
-              class="file-viewer__markdown"
-              v-html="renderMarkdown(fileContent(item.key)!)"
-            />
-            <pre v-else class="file-viewer__content">{{ fileContent(item.key) }}</pre>
-          </div>
-        </template>
-      </AppCard>
-    </section>
-
-    <!-- Project Metadata -->
-    <section v-if="structure" class="project-panel__section">
+    <!-- Project Info — full width top row -->
+    <section v-if="structure" class="project-panel__section project-panel__section--top">
       <h2 class="panel__title">Project Info</h2>
       <div class="panel__grid">
         <AppCard v-if="repoAge">
@@ -563,8 +294,6 @@ const interactionLinks = computed<DisplayLink[]>(() => {
           </div>
         </AppCard>
       </div>
-
-      <!-- CI & tooling row -->
       <div class="ci-row" style="margin-top:1rem">
         <AppBadge v-if="structure.has_ci" variant="completed">
           CI: {{ structure.ci_systems.join(', ') }}
@@ -582,5 +311,274 @@ const interactionLinks = computed<DisplayLink[]>(() => {
       </div>
     </section>
 
+    <div class="project-panel__split">
+
+      <!-- ── Left column: content sections ── -->
+      <div class="project-panel__col">
+
+        <!-- About -->
+        <section v-if="description || gh?.homepage" class="project-panel__section">
+          <h2 class="panel__title">About</h2>
+          <AppCard>
+            <p v-if="description" class="project-panel__description">{{ description }}</p>
+            <a
+              v-if="gh?.homepage"
+              :href="gh.homepage"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="project-panel__homepage"
+            >
+              🔗 {{ gh.homepage }}
+            </a>
+          </AppCard>
+        </section>
+
+        <!-- Documentation -->
+        <section class="project-panel__section">
+          <h2 class="panel__title">Documentation</h2>
+          <AppCard>
+            <div v-if="docsLinks.length" class="project-links">
+              <a
+                v-for="link in docsLinks"
+                :key="link.url"
+                :href="link.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="project-links__item"
+              >
+                <div class="project-links__top">
+                  <AppBadge variant="info">{{ link.badge }}</AppBadge>
+                  <span class="project-links__label">{{ link.label }}</span>
+                </div>
+                <div class="project-links__desc">{{ link.description }}</div>
+                <div class="project-links__url">{{ link.url }}</div>
+              </a>
+            </div>
+            <div v-else class="project-empty">
+              <AppBadge variant="failed">Not Found</AppBadge>
+              <p class="project-empty__text">No documentation links were detected in repository metadata or README.</p>
+            </div>
+          </AppCard>
+        </section>
+
+        <!-- How to Interact -->
+        <section class="project-panel__section">
+          <h2 class="panel__title">How To Interact</h2>
+          <AppCard>
+            <div v-if="interactionLinks.length" class="project-links">
+              <a
+                v-for="link in interactionLinks"
+                :key="link.url"
+                :href="link.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="project-links__item"
+              >
+                <div class="project-links__top">
+                  <AppBadge variant="completed">{{ link.badge }}</AppBadge>
+                  <span class="project-links__label">{{ link.label }}</span>
+                </div>
+                <div class="project-links__desc">{{ link.description }}</div>
+                <div class="project-links__url">{{ link.url }}</div>
+              </a>
+            </div>
+            <div v-else class="project-empty">
+              <AppBadge variant="warning">Not Found</AppBadge>
+              <p class="project-empty__text">No social or community links were detected from this repository.</p>
+            </div>
+          </AppCard>
+        </section>
+
+        <!-- Community Health -->
+        <section class="project-panel__section">
+          <h2 class="panel__title">Community Health Files</h2>
+          <AppCard>
+            <div class="health-grid">
+              <div
+                v-for="item in communityFiles"
+                :key="item.label"
+                :class="[
+                  'health-item',
+                  item.present ? 'health-item--present' : 'health-item--missing',
+                  item.present && item.key && fileContent(item.key) ? 'health-item--clickable' : '',
+                ]"
+                @click="item.present && item.key && fileContent(item.key) ? toggleFile(item.key) : undefined"
+              >
+                <span class="health-item__check">{{ item.present ? '✓' : '✗' }}</span>
+                <span class="health-item__icon">{{ item.icon }}</span>
+                <span class="health-item__label">{{ item.label }}</span>
+                <span
+                  v-if="item.present && item.key && fileContent(item.key)"
+                  class="health-item__expand"
+                >
+                  {{ expandedFile === item.key ? '▲' : '▼' }}
+                </span>
+              </div>
+            </div>
+
+            <!-- File content viewers -->
+            <template v-for="item in communityFiles" :key="`content-${item.label}`">
+              <div
+                v-if="item.key && expandedFile === item.key && fileContent(item.key)"
+                class="file-viewer"
+              >
+                <div class="file-viewer__header">
+                  {{ item.icon }} {{ item.label }}
+                  <button class="file-viewer__close" @click="expandedFile = null">✕</button>
+                </div>
+                <div
+                  v-if="isMarkdown(item.key)"
+                  class="file-viewer__markdown"
+                  v-html="renderMarkdown(fileContent(item.key)!)"
+                />
+                <pre v-else class="file-viewer__content">{{ fileContent(item.key) }}</pre>
+              </div>
+            </template>
+          </AppCard>
+        </section>
+
+      </div>
+
+      <!-- ── Right column: data / metric sections ── -->
+      <div class="project-panel__col">
+
+        <!-- Repository Assessment -->
+        <section v-if="cls" class="project-panel__section">
+          <h2 class="panel__title">Repository Assessment</h2>
+          <div class="classify-grid">
+            <AppCard>
+              <div class="classify-card">
+                <div class="classify-card__icon">🚀</div>
+                <div class="classify-card__body">
+                  <div class="classify-card__heading">Contribution Difficulty</div>
+                  <AppBadge :variant="difficultyVariant(cls.contribution_difficulty.key)">
+                    {{ cls.contribution_difficulty.label }}
+                  </AppBadge>
+                </div>
+              </div>
+            </AppCard>
+            <AppCard>
+              <div class="classify-card">
+                <div class="classify-card__icon">❤️</div>
+                <div class="classify-card__body">
+                  <div class="classify-card__heading">Project Health</div>
+                  <AppBadge :variant="healthVariant(cls.project_health.key)">
+                    {{ cls.project_health.label }}
+                  </AppBadge>
+                </div>
+              </div>
+            </AppCard>
+            <AppCard>
+              <div class="classify-card">
+                <div class="classify-card__icon">🧩</div>
+                <div class="classify-card__body">
+                  <div class="classify-card__heading">Code Complexity</div>
+                  <AppBadge :variant="complexityVariant(cls.code_complexity.key)">
+                    {{ cls.code_complexity.label }}
+                  </AppBadge>
+                </div>
+              </div>
+            </AppCard>
+            <AppCard>
+              <div class="classify-card">
+                <div class="classify-card__icon">📚</div>
+                <div class="classify-card__body">
+                  <div class="classify-card__heading">Documentation</div>
+                  <AppBadge :variant="docVariant(cls.documentation_grade.key)">
+                    {{ cls.documentation_grade.label }}
+                  </AppBadge>
+                </div>
+              </div>
+            </AppCard>
+          </div>
+          <div v-if="cls.tags.length" class="project-panel__tags">
+            <AppBadge
+              v-for="tag in cls.tags"
+              :key="tag"
+              :variant="(tagVariant(tag) as any)"
+              class="project-panel__tag"
+            >
+              {{ tagLabel(tag) }}
+            </AppBadge>
+          </div>
+        </section>
+
+        <!-- GitHub Stats -->
+        <section v-if="gh && (gh.stars || gh.forks || gh.open_issues)" class="project-panel__section">
+          <h2 class="panel__title">GitHub Stats</h2>
+          <div class="panel__grid">
+            <AppCard>
+              <div class="stat">
+                <div class="stat__value">{{ formatStat(gh.stars) }}</div>
+                <div class="stat__label">★ Stars</div>
+              </div>
+            </AppCard>
+            <AppCard>
+              <div class="stat">
+                <div class="stat__value">{{ formatStat(gh.forks) }}</div>
+                <div class="stat__label">⑂ Forks</div>
+              </div>
+            </AppCard>
+            <AppCard>
+              <div class="stat">
+                <div class="stat__value">{{ formatStat(gh.open_issues) }}</div>
+                <div class="stat__label">⚠ Open Issues</div>
+              </div>
+            </AppCard>
+            <AppCard v-if="gh.open_prs !== null">
+              <div class="stat">
+                <div class="stat__value">{{ gh.open_prs }}</div>
+                <div class="stat__label">⊞ Open PRs</div>
+              </div>
+            </AppCard>
+            <AppCard v-if="gh.watchers">
+              <div class="stat">
+                <div class="stat__value">{{ formatStat(gh.watchers) }}</div>
+                <div class="stat__label">👁 Watchers</div>
+              </div>
+            </AppCard>
+          </div>
+          <div v-if="gh.topics?.length" class="project-panel__tags" style="margin-top:1rem">
+            <AppBadge
+              v-for="topic in gh.topics"
+              :key="topic"
+              variant="info"
+              class="project-panel__tag"
+            >
+              {{ topic }}
+            </AppBadge>
+          </div>
+        </section>
+
+        <!-- Languages -->
+        <section v-if="structure?.languages?.length" class="project-panel__section">
+          <h2 class="panel__title">Languages</h2>
+          <AppCard>
+            <div class="lang-list">
+              <div
+                v-for="(lang, idx) in structure.languages.slice(0, 10)"
+                :key="lang.name"
+                class="lang-item"
+              >
+                <div class="lang-item__meta">
+                  <span class="lang-item__dot" :style="{ background: langColor(idx) }" />
+                  <span class="lang-item__name">{{ lang.name }}</span>
+                  <span class="lang-item__pct">{{ lang.pct }}%</span>
+                  <span v-if="lang.files != null" class="lang-item__files">{{ lang.files.toLocaleString() }} files</span>
+                </div>
+                <div class="lang-bar">
+                  <div
+                    class="lang-bar__fill"
+                    :style="{ width: `${lang.pct}%`, background: langColor(idx) }"
+                  />
+                </div>
+              </div>
+            </div>
+          </AppCard>
+        </section>
+
+
+      </div>
+    </div>
   </div>
 </template>

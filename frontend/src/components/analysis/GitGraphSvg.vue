@@ -40,15 +40,16 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   clickMonth: [month: string]
+  clickBody: [commit: GraphCommit]
 }>()
 
 // ── Layout constants ──────────────────────────────────────────────────────────
-const ROW_H  = 40   // pixels per commit row
-const SEP_H  = 30   // pixels for month separator row
-const LANE_W = 16   // pixels between lane centres
-const NODE_R = 4    // node circle radius
-const GRAPH_PAD = 10 // left padding inside SVG
-const DATE_COL_W = 112 // width of date/timeline column on left
+const ROW_H  = 40
+const SEP_H  = 30
+const LANE_W = 16
+const NODE_R = 4
+const GRAPH_PAD = 10
+const DATE_COL_W = 112
 
 // ── Author → lane color ───────────────────────────────────────────────────────
 const PALETTE = [
@@ -162,9 +163,6 @@ const processed = computed<ProcessedRow[]>(() => {
 })
 
 // ── SVG geometry ──────────────────────────────────────────────────────────────
-const BODY_LINE_H = 18
-const BODY_CHARS_PER_LINE = 65 // conservative wrap estimate for the content column
-
 const maxLane = computed(() => {
   let m = 0
   for (const r of processed.value) {
@@ -182,21 +180,11 @@ const maxLane = computed(() => {
 
 const graphWidth = computed(() => GRAPH_PAD * 2 + (maxLane.value + 1) * LANE_W)
 
-// Dynamic row height: expands when body is open
 function rowH(r: ProcessedRow): number {
-  if ((r.row as MonthSep).isMonth) return SEP_H
-  const commit = r.row as GraphCommit
-  if (commit.body && expandedShas.value.has(commit.sha)) {
-    const visualLines = commit.body.split('\n').filter(l => l.trim()).reduce((acc, line) =>
-      acc + Math.max(1, Math.ceil(line.length / BODY_CHARS_PER_LINE)), 0)
-    return ROW_H + visualLines * BODY_LINE_H + 20
-  }
-  return ROW_H
+  return (r.row as MonthSep).isMonth ? SEP_H : ROW_H
 }
 
-// cumulative Y — reactive to expandedShas changes
 const rowY = computed<number[]>(() => {
-  void expandedShas.value  // explicit dep
   const ys: number[] = []
   let y = 0
   for (const r of processed.value) {
@@ -207,7 +195,6 @@ const rowY = computed<number[]>(() => {
 })
 
 const totalH = computed(() => {
-  void expandedShas.value
   const last = processed.value.length - 1
   if (last < 0) return 0
   return rowY.value[last] + rowH(processed.value[last])
@@ -226,14 +213,6 @@ function path(x1: number, y1: number, x2: number, y2: number): string {
 
 // ── Hover / selection ─────────────────────────────────────────────────────────
 const hoveredSha = ref<string | null>(null)
-const expandedShas = ref<Set<string>>(new Set())
-
-function toggleBody(sha: string) {
-  const next = new Set(expandedShas.value)
-  if (next.has(sha)) next.delete(sha)
-  else next.add(sha)
-  expandedShas.value = next
-}
 
 function isCommitRow(r: ProcessedRow): r is ProcessedRow & Required<Pick<ProcessedRow,'lane'>> {
   return !(r.row as MonthSep).isMonth
@@ -412,13 +391,13 @@ function formatDate(iso: string): string {
               </code>
               <span v-if="isMerge(r)" class="gg-row__merge-tag">merge</span>
               <span class="gg-row__msg">{{ (r.row as GraphCommit).message.slice(0, 72) }}</span>
-              <!-- Expand button shown when body exists -->
+              <!-- Open body drawer when body exists -->
               <button
                 v-if="(r.row as GraphCommit).body"
-                :class="['gg-row__expand-btn', expandedShas.has((r.row as GraphCommit).sha) && 'gg-row__expand-btn--open']"
-                :title="expandedShas.has((r.row as GraphCommit).sha) ? 'Collapse commit body' : 'Expand commit body'"
-                @click.stop="toggleBody((r.row as GraphCommit).sha)"
-              >{{ expandedShas.has((r.row as GraphCommit).sha) ? '▲' : '▼' }}</button>
+                class="gg-row__expand-btn"
+                title="View commit body"
+                @click.stop="emit('clickBody', r.row as GraphCommit)"
+              >···</button>
             </div>
             <!-- Author chip -->
             <span
@@ -428,11 +407,6 @@ function formatDate(iso: string): string {
             >{{ authorInitials((r.row as GraphCommit).author) }}</span>
           </div>
 
-          <!-- Body expansion -->
-          <div
-            v-if="(r.row as GraphCommit).body && expandedShas.has((r.row as GraphCommit).sha)"
-            class="gg-row__body"
-          >{{ (r.row as GraphCommit).body }}</div>
         </div>
       </template>
     </div>

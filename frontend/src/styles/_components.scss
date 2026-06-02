@@ -1850,8 +1850,25 @@
 
 // ===== PROJECT PANEL =====
 .project-panel {
+  &__split {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: $space-8;
+    align-items: start;
+  }
+
+  &__col {
+    display: flex;
+    flex-direction: column;
+    gap: $space-6;
+  }
+
   &__section {
-    margin-bottom: $space-8;
+    margin-bottom: 0;
+
+    &--top {
+      margin-bottom: $space-8;
+    }
   }
 
   &__description {
@@ -4207,6 +4224,20 @@
 .cm-drawer-leave-to {
   .cm-drawer__panel { transform: translateX(100%); }
   .cm-drawer__backdrop { opacity: 0; }
+}
+
+.cb-drawer__body-pre {
+  margin: $space-4 0 0;
+  padding: $space-4;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: $radius-md;
+  font-family: $font-mono;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 // Clickable churn table rows

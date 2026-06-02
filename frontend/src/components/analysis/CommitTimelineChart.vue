@@ -16,6 +16,7 @@ import type { CommitData, GitHubContributor, MonthlyCommit } from '../../stores/
 import TimelineFilter, { type FilterSelection } from './TimelineFilter.vue'
 import CommitMonthDrawer from './CommitMonthDrawer.vue'
 import GitGraphSvg, { type GraphRow, type GraphCommit, type MonthSep } from './GitGraphSvg.vue'
+import CommitBodyDrawer from './CommitBodyDrawer.vue'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 
@@ -104,6 +105,9 @@ const activeMonth = ref<string | null>(null)
 const activeMonthCommits = computed<MonthlyCommit[]>(() =>
   activeMonth.value ? (props.commits.monthly_commits?.[activeMonth.value] ?? []) : []
 )
+
+// ── Commit body drawer ────────────────────────────────────────────────────────
+const activeCommitBody = ref<GraphCommit | null>(null)
 
 // ── Author palette ────────────────────────────────────────────────────────────
 const PALETTE = [
@@ -367,7 +371,7 @@ const commitDateRange = computed<string>(() => {
       </div>
 
       <div v-if="graphRows.length" ref="graphScrollEl" class="git-graph-scroll">
-        <GitGraphSvg :rows="graphRows" @click-month="activeMonth = $event" />
+        <GitGraphSvg :rows="graphRows" @click-month="activeMonth = $event" @click-body="activeCommitBody = $event" />
       </div>
       <div v-else-if="searchQuery" class="empty-state" style="margin-top:1rem">
         No commits match "{{ searchQuery }}"
@@ -383,5 +387,10 @@ const commitDateRange = computed<string>(() => {
     :commits="activeMonthCommits"
     :repo-url="repoUrl"
     @close="activeMonth = null"
+  />
+
+  <CommitBodyDrawer
+    :commit="activeCommitBody"
+    @close="activeCommitBody = null"
   />
 </template>
