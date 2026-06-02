@@ -1,13 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import type { DiffData } from '../../stores/analysis'
 
 const props = defineProps<{
   diffData: DiffData
   loading: boolean
 }>()
-
-const expanded = ref(false)
 
 const hasChanges = computed(() => {
   if (!props.diffData.available) return false
@@ -61,14 +59,13 @@ function clsChanged(cls?: { changed: boolean; before_label: string; after_label:
   </div>
 
   <div v-else-if="diffData.available" class="delta-bar" :class="hasChanges ? 'delta-bar--has-changes' : 'delta-bar--no-changes'">
-    <div class="delta-bar__header" @click="expanded = !expanded">
+    <div class="delta-bar__header">
       <span class="delta-bar__icon">{{ hasChanges ? '↕' : '✓' }}</span>
       <span class="delta-bar__label">Since last analysis</span>
       <span class="delta-bar__summary">{{ summaryLine }}</span>
-      <span class="delta-bar__toggle">{{ expanded ? '▲' : '▼' }}</span>
     </div>
 
-    <div v-if="expanded" class="delta-bar__body">
+    <div class="delta-bar__body">
       <!-- Heuristic score changes -->
       <div v-if="signalChanges.length" class="delta-section">
         <div class="delta-section__title">Health Signal Changes</div>
@@ -124,9 +121,9 @@ function clsChanged(cls?: { changed: boolean; before_label: string; after_label:
         <div class="delta-sbs">
           <div class="delta-sbs__col delta-sbs__col--header">
             <span>Metric</span>
-            <span>Previous</span>
-            <span>Current</span>
-            <span>Change</span>
+            <span>Before</span>
+            <span>Now</span>
+            <span>Δ</span>
           </div>
           <div class="delta-sbs__col delta-sbs__col--row">
             <span>Files</span>
@@ -134,12 +131,6 @@ function clsChanged(cls?: { changed: boolean; before_label: string; after_label:
             <span class="delta-sbs__val">{{ diffData.structure?.files_after }}</span>
             <span :class="['delta-pill', 'delta-pill--neutral']" v-if="diffData.structure?.files_delta !== 0">{{ deltaSign(diffData.structure!.files_delta) }}</span>
             <span v-else class="delta-sbs__neutral">—</span>
-          </div>
-          <div class="delta-sbs__col delta-sbs__col--row">
-            <span>Test ratio</span>
-            <span class="delta-sbs__val">{{ ((diffData.structure?.test_ratio_before ?? 0) * 100).toFixed(1) }}%</span>
-            <span class="delta-sbs__val">{{ ((diffData.structure?.test_ratio_after ?? 0) * 100).toFixed(1) }}%</span>
-            <span class="delta-sbs__neutral">—</span>
           </div>
           <div class="delta-sbs__col delta-sbs__col--row">
             <span>Contributors</span>

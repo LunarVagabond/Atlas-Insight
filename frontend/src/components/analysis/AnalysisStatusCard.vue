@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
@@ -88,7 +88,6 @@ const techStack = computed(() => {
 
 const ossScore = computed(() => props.run.result?.oss_score ?? null)
 
-
 const ossBadgeEmoji: Record<string, string> = {
   champion: '🏆',
   thriving: '⭐',
@@ -122,24 +121,23 @@ const cooldownLabel = computed(() => {
   if (hours > 0) return `${hours}h ${mins}m`
   return `${mins}m`
 })
-
-const collapsed = ref(false)
 </script>
 
 <template>
   <AppCard>
     <div class="status-card">
-      <button class="status-card__toggle" @click="collapsed = !collapsed">
-        <span class="status-card__toggle-label">{{ run.repo_owner }}/{{ run.repo_name }}</span>
-        <div v-if="run.result?.classification" class="cls-chips status-card__header-chips">
-          <span class="cls-chips__chip cls-chips__chip--health" :title="`Project health: ${run.result.classification.project_health.label}`">Health: {{ run.result.classification.project_health.label }}</span>
-          <span class="cls-chips__chip cls-chips__chip--difficulty" :title="`How easy it is to make your first contribution`">Contrib: {{ run.result.classification.contribution_difficulty.label }}</span>
-          <span class="cls-chips__chip cls-chips__chip--complexity" :title="`Code complexity: ${run.result.classification.code_complexity.label}`">Code: {{ run.result.classification.code_complexity.label }}</span>
-          <span class="cls-chips__chip cls-chips__chip--docs" :title="`Documentation grade: ${run.result.classification.documentation_grade.label}`">Docs: {{ run.result.classification.documentation_grade.label }}</span>
-        </div>
-        <span :class="['status-card__toggle-chevron', collapsed && 'status-card__toggle-chevron--collapsed']">▾</span>
-      </button>
-      <div v-show="!collapsed" class="status-card__main-row">
+      <div class="status-card__head">
+        <span class="status-card__repo-title">{{ run.repo_owner }}/{{ run.repo_name }}</span>
+      </div>
+
+      <div v-if="run.result?.classification" class="cls-chips status-card__chips-row">
+        <span class="cls-chips__chip cls-chips__chip--health" :title="`Project health: ${run.result.classification.project_health.label}`">Health: {{ run.result.classification.project_health.label }}</span>
+        <span class="cls-chips__chip cls-chips__chip--difficulty" :title="`How easy it is to make your first contribution`">Contrib: {{ run.result.classification.contribution_difficulty.label }}</span>
+        <span class="cls-chips__chip cls-chips__chip--complexity" :title="`Code complexity: ${run.result.classification.code_complexity.label}`">Code: {{ run.result.classification.code_complexity.label }}</span>
+        <span class="cls-chips__chip cls-chips__chip--docs" :title="`Documentation grade: ${run.result.classification.documentation_grade.label}`">Docs: {{ run.result.classification.documentation_grade.label }}</span>
+      </div>
+
+      <div class="status-card__main-row">
         <div class="status-card__meta">
           <div class="status-card__row">
             <span class="status-card__label">Author</span>

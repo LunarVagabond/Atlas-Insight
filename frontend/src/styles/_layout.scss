@@ -283,9 +283,11 @@
 
 .results-header {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: $space-3;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-4;
+  flex-wrap: wrap;
 
   &__title {
     font-size: 1.5rem;
@@ -306,6 +308,43 @@
     align-items: center;
     gap: $space-2;
     flex-wrap: nowrap;
+  }
+
+  &__overflow {
+    position: relative;
+  }
+
+  &__overflow-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 100;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: $radius-md;
+    box-shadow: 0 4px 16px var(--color-shadow);
+    min-width: 150px;
+    padding: $space-1 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__overflow-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: $space-2 $space-4;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--color-text);
+    background: none;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: background $transition-fast;
+
+    &:hover { background: var(--color-surface-hover); }
   }
 
   &__repo-link {
@@ -354,6 +393,10 @@
     display: grid;
     gap: $space-4;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+
+    &--2col {
+      grid-template-columns: repeat(2, 1fr);
+    }
   }
 }
 
@@ -987,6 +1030,39 @@
   }
 }
 
+// ===== OVERVIEW SPLIT (Results → Overview tab) =====
+.overview-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: $space-6;
+  align-items: start;
+
+  @media (max-width: $bp-md) {
+    grid-template-columns: 1fr;
+  }
+
+  &__right {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+  }
+}
+
+// ===== HOME DISCOVERY (spotlight + featured side-by-side) =====
+.home-discovery {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 $space-6;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: $space-5;
+  margin-bottom: $space-8;
+
+  @media (max-width: $bp-sm) {
+    padding: 0 $space-4;
+  }
+}
+
 // ===== MOBILE RESPONSIVE =====
 @media (max-width: $bp-nav) {
   .navbar {
@@ -1008,6 +1084,10 @@
 
   .panel__grid {
     grid-template-columns: repeat(2, 1fr);
+
+    &--2col {
+      grid-template-columns: repeat(2, 1fr);
+    }
   }
 
   .home-runs {
@@ -1050,6 +1130,10 @@
 
   .panel__grid {
     grid-template-columns: 1fr;
+
+    &--2col {
+      grid-template-columns: repeat(2, 1fr);
+    }
   }
 
   .results-layout {

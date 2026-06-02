@@ -99,10 +99,8 @@ function formatMonth(ym: string): string {
 
 <template>
   <div class="panel">
-    <h2 class="panel__title">At a Glance</h2>
-
     <!-- Key metrics -->
-    <div class="panel__grid">
+    <div class="panel__grid panel__grid--2col">
       <AppCard>
         <div class="stat">
           <div class="stat__value">{{ commits.total_commits.toLocaleString() }}</div>
@@ -134,7 +132,9 @@ function formatMonth(ym: string): string {
     <!-- Commit sparkline -->
     <div v-if="sparklineMonths.length" class="overview-sparkline">
       <div class="overview-sparkline__header">
-        <span class="overview-sparkline__tooltip">{{ sparklineTooltip ?? ' ' }}</span>
+        <span class="overview-sparkline__label">
+          {{ sparklineTooltip ?? 'Commit activity — last 12 months' }}
+        </span>
         <span class="overview-sparkline__sub">{{ commits.days_since_last_commit != null ? `Last commit ${commits.days_since_last_commit}d ago` : '' }}</span>
       </div>
       <div class="overview-sparkline__bars">
@@ -152,11 +152,15 @@ function formatMonth(ym: string): string {
           />
         </div>
       </div>
+      <div class="overview-sparkline__axis">
+        <span>{{ formatMonth(sparklineMonths[0].month) }}</span>
+        <span>{{ formatMonth(sparklineMonths[sparklineMonths.length - 1].month) }}</span>
+      </div>
     </div>
 
-    <!-- Notable findings -->
+    <!-- Notable findings (only when parent hasn't taken over rendering) -->
     <div v-if="notableFindings.length" class="overview-findings">
-      <h3 class="overview-findings__title">What stood out</h3>
+      <h3 class="overview-findings__title">What Stands Out</h3>
       <ul class="overview-findings__list">
         <li
           v-for="(f, i) in notableFindings"

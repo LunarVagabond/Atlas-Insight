@@ -84,20 +84,24 @@ const SIGNAL_DESCRIPTIONS: Partial<Record<HeuristicSignalKey, string>> = {
 
     <!-- Score Breakdown -->
     <div v-if="overallScore !== null" class="score-breakdown">
-      <div class="score-breakdown__header">
-        <span class="score-breakdown__title">Composite Score</span>
-        <span :class="['score-breakdown__total', `score-breakdown__total--${level(overallScore)}`]">{{ overallScore }}<span style="font-size:0.75em;opacity:0.6">/100</span></span>
-      </div>
-      <div class="score-breakdown__bars">
-        <div v-for="item in scoreBreakdown" :key="item.label" class="score-breakdown__row">
-          <span class="score-breakdown__label">{{ item.label }}</span>
-          <div class="score-breakdown__track">
-            <div
-              :class="['score-breakdown__fill', `score-breakdown__fill--${item.level}`]"
-              :style="{ width: `${item.pct}%` }"
-            />
+      <div class="score-breakdown__body">
+        <div class="score-breakdown__summary">
+          <span class="score-breakdown__title">Composite Score</span>
+          <span :class="['score-breakdown__total', `score-breakdown__total--${level(overallScore)}`]">
+            {{ overallScore }}<span class="score-breakdown__denom">/100</span>
+          </span>
+        </div>
+        <div class="score-breakdown__bars">
+          <div v-for="item in scoreBreakdown" :key="item.label" class="score-breakdown__row">
+            <span class="score-breakdown__label">{{ item.label }}</span>
+            <div class="score-breakdown__track">
+              <div
+                :class="['score-breakdown__fill', `score-breakdown__fill--${item.level}`]"
+                :style="{ width: `${item.pct}%` }"
+              />
+            </div>
+            <span :class="['score-breakdown__val', `score-breakdown__val--${item.level}`]">{{ item.score }}</span>
           </div>
-          <span :class="['score-breakdown__val', `score-breakdown__val--${item.level}`]">{{ item.score }}</span>
         </div>
       </div>
     </div>

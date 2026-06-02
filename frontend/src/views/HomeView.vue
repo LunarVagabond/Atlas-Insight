@@ -212,12 +212,9 @@ const ghostRows = computed(() => Math.max(0, perPage - items.value.length))
       </p>
     </main>
 
-    <div v-if="spotlight" class="featured-section">
-      <RepoOfWeekCard :spotlight="spotlight" />
-    </div>
-
-    <div v-if="featured" class="featured-section">
-      <div class="featured-repo-card">
+    <div v-if="spotlight || featured" class="home-discovery">
+      <RepoOfWeekCard v-if="spotlight" :spotlight="spotlight" />
+      <div v-if="featured" class="featured-repo-card">
         <div class="featured-repo-card__eyebrow">Featured Analysis</div>
         <div class="featured-repo-card__content">
           <div class="featured-repo-card__left">

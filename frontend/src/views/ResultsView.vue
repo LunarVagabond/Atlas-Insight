@@ -186,6 +186,10 @@ function printPage() {
   window.open(`/print/${runId.value}`, '_blank', 'noopener')
 }
 
+// Overflow menu (secondary actions)
+const showOverflow = ref(false)
+function closeOverflow() { showOverflow.value = false }
+
 // Copy permalink
 const copied = ref(false)
 function copyLink() {
@@ -246,9 +250,13 @@ function onTabKey(e: KeyboardEvent) {
   else if (e.key === 'k') activeTab.value = CHAPTER_TABS[Math.min(idx + 1, CHAPTER_TABS.length - 1)]
 }
 
-onMounted(() => window.addEventListener('keydown', onTabKey))
+onMounted(() => {
+  window.addEventListener('keydown', onTabKey)
+  document.addEventListener('click', closeOverflow)
+})
 onUnmounted(() => {
   window.removeEventListener('keydown', onTabKey)
+  document.removeEventListener('click', closeOverflow)
   store._stopPolling()
   if (stepTimer) { clearInterval(stepTimer); stepTimer = null }
 })
@@ -274,12 +282,15 @@ onUnmounted(() => {
             <AppButton v-if="result" variant="secondary" size="sm" @click="showEmbed = !showEmbed">
               {{ showEmbed ? '✕ Embed' : '</> Embed' }}
             </AppButton>
-            <AppButton v-if="result" variant="secondary" size="sm" @click="exportJson">
-              ↓ Export JSON
-            </AppButton>
-            <AppButton v-if="result" variant="secondary" size="sm" @click="printPage">
-              ⎙ Print / PDF
-            </AppButton>
+            <div v-if="result" class="results-header__overflow" @click.stop>
+              <AppButton variant="secondary" size="sm" @click="showOverflow = !showOverflow" title="More actions">
+                ⋯
+              </AppButton>
+              <div v-if="showOverflow" class="results-header__overflow-menu">
+                <button class="results-header__overflow-item" @click="exportJson(); showOverflow = false">↓ Export JSON</button>
+                <button class="results-header__overflow-item" @click="printPage(); showOverflow = false">⎙ Print / PDF</button>
+              </div>
+            </div>
           </div>
           <div class="results-header__action-group">
             <template v-if="store.run?.status === 'completed'">
@@ -293,7 +304,7 @@ onUnmounted(() => {
                 </AppButton>
               </template>
             </template>
-            <a href="/" class="btn btn--secondary btn--sm">← New Analysis</a>
+            <a href="/" class="btn btn--secondary btn--sm">← New</a>
           </div>
         </div>
       </div>
@@ -401,15 +412,18 @@ onUnmounted(() => {
       <AppTabs :tabs="TABS" v-model="activeTab" :badges="tabBadges" />
       <div style="margin-top: 1.5rem">
         <template v-if="activeTab === 'Overview'">
-          <AnalysisStatusCard v-if="store.run" :run="store.run" />
-          <DeltaPanel
-            v-if="store.diffData || store.diffLoading"
-            :diff-data="store.diffData ?? { available: false }"
-            :loading="store.diffLoading"
-            style="margin-top: 1rem"
-          />
-          <div style="margin-top: 1.5rem">
-            <OverviewPanel :result="result" />
+          <div class="overview-split">
+            <div class="overview-split__left">
+              <OverviewPanel :result="result" />
+            </div>
+            <div class="overview-split__right">
+              <AnalysisStatusCard v-if="store.run" :run="store.run" />
+              <DeltaPanel
+                v-if="store.diffData || store.diffLoading"
+                :diff-data="store.diffData ?? { available: false }"
+                :loading="store.diffLoading"
+              />
+            </div>
           </div>
           <SimilarReposPanel
             v-if="store.similarRuns !== null || store.similarLoading"
