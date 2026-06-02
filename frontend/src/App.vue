@@ -8,6 +8,10 @@ import logoUrl from './assets/logo.png'
 const authStore = useAuthStore()
 const router = useRouter()
 
+const appVersion = __APP_VERSION__
+const gitSha = __GIT_SHA__
+const isDev = import.meta.env.DEV
+
 const isDark = ref(false)
 const showShortcuts = ref(false)
 
@@ -57,16 +61,21 @@ onUnmounted(() => {
 })
 
 const menuOpen = ref(false)
+const mobileNavOpen = ref(false)
+
+function closeMobileNav() { mobileNavOpen.value = false }
 </script>
 
 <template>
   <div class="page">
     <nav class="navbar">
-      <RouterLink to="/" class="navbar__brand">
+      <RouterLink to="/" class="navbar__brand" @click="closeMobileNav">
         <img :src="logoUrl" alt="" class="navbar__logo" />
         Atlas <span>Insight</span>
       </RouterLink>
       <div class="navbar__spacer" />
+
+      <!-- Desktop nav links -->
       <div class="navbar__nav-links">
         <RouterLink to="/runs" class="navbar__nav-link">Browse</RouterLink>
         <RouterLink to="/spotlight" class="navbar__nav-link">Spotlight</RouterLink>
@@ -75,6 +84,7 @@ const menuOpen = ref(false)
         <RouterLink to="/about" class="navbar__nav-link">About</RouterLink>
         <RouterLink v-if="authStore.user?.is_staff || authStore.user?.is_superuser" to="/admin" class="navbar__nav-link navbar__nav-link--admin">Ops</RouterLink>
       </div>
+
       <div class="navbar__actions">
         <button class="theme-toggle" @click="toggleTheme" :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'">
           {{ isDark ? '☀️' : '🌙' }}
@@ -97,7 +107,7 @@ const menuOpen = ref(false)
               0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48
               0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
           </svg>
-          Login with GitHub
+          <span class="navbar__login-label">Login with GitHub</span>
         </button>
 
         <!-- Authenticated -->
@@ -120,17 +130,48 @@ const menuOpen = ref(false)
             </button>
           </div>
         </div>
+
+        <!-- Hamburger: mobile only -->
+        <button
+          class="navbar__hamburger"
+          @click="mobileNavOpen = !mobileNavOpen"
+          :aria-expanded="mobileNavOpen"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar__hamburger-icon">{{ mobileNavOpen ? '✕' : '☰' }}</span>
+        </button>
       </div>
     </nav>
+
+    <!-- Mobile nav overlay (full-screen) -->
+    <Teleport to="body">
+      <div v-if="mobileNavOpen" class="mobile-nav-overlay">
+        <button class="mobile-nav-overlay__close" @click="closeMobileNav" aria-label="Close navigation">✕</button>
+        <nav class="mobile-nav-overlay__links">
+          <RouterLink to="/runs" class="mobile-nav-overlay__link" @click="closeMobileNav">Browse</RouterLink>
+          <RouterLink to="/spotlight" class="mobile-nav-overlay__link" @click="closeMobileNav">Spotlight</RouterLink>
+          <RouterLink to="/trending" class="mobile-nav-overlay__link" @click="closeMobileNav">Trending</RouterLink>
+          <RouterLink v-if="authStore.isAuthenticated" to="/dashboard" class="mobile-nav-overlay__link" @click="closeMobileNav">My Analyses</RouterLink>
+          <RouterLink to="/about" class="mobile-nav-overlay__link" @click="closeMobileNav">About</RouterLink>
+          <RouterLink v-if="authStore.user?.is_staff || authStore.user?.is_superuser" to="/admin" class="mobile-nav-overlay__link mobile-nav-overlay__link--admin" @click="closeMobileNav">Ops</RouterLink>
+        </nav>
+      </div>
+    </Teleport>
     <div class="page__main">
       <RouterView />
     </div>
     <footer class="app-footer">
       <span class="app-footer__shortcuts-hint">Press <kbd>?</kbd> for shortcuts</span>
-      <span class="app-footer__copy">© {{ new Date().getFullYear() }} Lunar Vagabond. All rights reserved.</span>
+      <span class="app-footer__copy">
+        <span v-if="isDev" class="app-footer__version-badge app-footer__version-badge--dev">{{ gitSha }}</span>
+        <span v-else class="app-footer__version-badge">v{{ appVersion }}</span>
+        © {{ new Date().getFullYear() }} Lunar Vagabond. All rights reserved.
+      </span>
       <span class="app-footer__support">
-        If you enjoy Atlas Insight, consider
-        <a href="https://www.buymeacoffee.com/lunarvagabond" target="_blank" rel="noopener noreferrer" class="app-footer__bmc">☕ buying me a coffee</a>
+        <span class="app-footer__support-text">If you enjoy Atlas Insight, consider</span>
+        <a href="https://www.buymeacoffee.com/lunarvagabond" target="_blank" rel="noopener noreferrer" class="app-footer__bmc">
+          ☕<span class="app-footer__bmc-text"> buying me a coffee</span>
+        </a>
       </span>
     </footer>
 

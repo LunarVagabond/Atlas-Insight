@@ -95,7 +95,7 @@ const QUIPS: Record<string, string[]> = {
     "The GitHub equivalent of a ghost town",
     "Every unmaintained repo is just a fork waiting to happen",
     "Somewhere, a star-giver is still hoping",
-    "Last seen: a while ago. Reward if found.",
+    "Last seen: a while ago. (No) Reward if found.",
   ],
 }
 

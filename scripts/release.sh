@@ -103,24 +103,16 @@ fi
 
 banner "Step 1 — Update version files"
 
-# Root VERSION file
-echo "$RAW_VERSION" > "$REPO_ROOT/VERSION"
-ok "VERSION → $RAW_VERSION"
-
-# frontend/package.json — update "version" field in-place using node
-node -e "
-const fs = require('fs');
-const pkg = JSON.parse(fs.readFileSync('$REPO_ROOT/frontend/package.json', 'utf8'));
-pkg.version = '$RAW_VERSION';
-fs.writeFileSync('$REPO_ROOT/frontend/package.json', JSON.stringify(pkg, null, 2) + '\n');
-"
-ok "frontend/package.json version → $RAW_VERSION"
+# Update package.json + package-lock.json atomically via npm version.
+# --no-git-tag-version: skip npm's own commit/tag — we handle that below.
+(cd "$REPO_ROOT/frontend" && npm version "$RAW_VERSION" --no-git-tag-version --allow-same-version)
+ok "frontend/package.json + package-lock.json → $RAW_VERSION"
 
 # ── Step 2: Git commit + tag ───────────────────────────────────────────────────
 
 banner "Step 2 — Git commit + tag"
 
-git -C "$REPO_ROOT" add "$REPO_ROOT/VERSION" "$REPO_ROOT/frontend/package.json"
+git -C "$REPO_ROOT" add "$REPO_ROOT/frontend/package.json" "$REPO_ROOT/frontend/package-lock.json"
 git -C "$REPO_ROOT" commit -m "Updating version for release: ${GIT_TAG}"
 ok "Committed: Updating version for release: ${GIT_TAG}"
 
@@ -148,17 +140,15 @@ info "Building backend image..."
 docker build \
     --tag "atlas-insight-backend:${GIT_TAG}" \
     --tag "${BACKEND_IMAGE}:${GIT_TAG}" \
-    --tag "${BACKEND_IMAGE}:latest" \
     "$REPO_ROOT/backend"
-ok "Backend image built: atlas-insight-backend:${GIT_TAG}"
+ok "Backend image built: ${BACKEND_IMAGE}:${GIT_TAG}"
 
 info "Building frontend image..."
 docker build \
     --tag "atlas-insight-frontend:${GIT_TAG}" \
     --tag "${FRONTEND_IMAGE}:${GIT_TAG}" \
-    --tag "${FRONTEND_IMAGE}:latest" \
     "$REPO_ROOT/frontend"
-ok "Frontend image built: atlas-insight-frontend:${GIT_TAG}"
+ok "Frontend image built: ${FRONTEND_IMAGE}:${GIT_TAG}"
 
 # ── Step 5: Summary + confirm push ────────────────────────────────────────────
 
@@ -168,9 +158,7 @@ echo "  Release: ${GIT_TAG}"
 echo
 echo "  Images to push:"
 printf "    %-60s\n" "${BACKEND_IMAGE}:${GIT_TAG}"
-printf "    %-60s\n" "${BACKEND_IMAGE}:latest"
 printf "    %-60s\n" "${FRONTEND_IMAGE}:${GIT_TAG}"
-printf "    %-60s\n" "${FRONTEND_IMAGE}:latest"
 echo
 echo "  Git:"
 echo "    git push              (commit: Updating version for release: ${GIT_TAG})"
@@ -180,12 +168,10 @@ echo
 if confirm "Push everything to ghcr.io and GitHub?"; then
     info "Pushing backend image..."
     docker push "${BACKEND_IMAGE}:${GIT_TAG}"
-    docker push "${BACKEND_IMAGE}:latest"
     ok "Backend pushed"
 
     info "Pushing frontend image..."
     docker push "${FRONTEND_IMAGE}:${GIT_TAG}"
-    docker push "${FRONTEND_IMAGE}:latest"
     ok "Frontend pushed"
 
     info "Pushing git commit + tag..."
@@ -202,8 +188,6 @@ else
     echo "  Run these manually when ready:"
     echo ""
     echo "  docker push ${BACKEND_IMAGE}:${GIT_TAG}"
-    echo "  docker push ${BACKEND_IMAGE}:latest"
     echo "  docker push ${FRONTEND_IMAGE}:${GIT_TAG}"
-    echo "  docker push ${FRONTEND_IMAGE}:latest"
     echo "  git push && git push --tags"
 fi
