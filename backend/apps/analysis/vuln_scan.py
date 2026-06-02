@@ -19,6 +19,7 @@ _ECOSYSTEM_MAP = {
 }
 
 _OP_RE = re.compile(r'^[^0-9]*')
+_OPEN_RANGE_RE = re.compile(r'^(>=|>|~=|~|\^)')
 
 _SEVERITY_SCORE = {
     'critical': 9.5,
@@ -37,6 +38,21 @@ def _extract_version(spec: str) -> str:
     if not clean or clean in ('*', 'latest'):
         return ''
     return clean
+
+
+def _is_open_range(spec: str) -> bool:
+    """True when spec allows a range of versions rather than a single pinned version.
+
+    Exact pins (==x.y.z or bare x.y.z) return False.
+    Loose specs (>=, >, ~=, ~, ^) return True — the CVE may only affect
+    some versions within the range, not necessarily the installed one.
+    """
+    if not spec:
+        return False
+    first = spec.split(',')[0].split(';')[0].strip()
+    if first.startswith('=='):
+        return False
+    return bool(_OPEN_RANGE_RE.match(first))
 
 
 def _source_ecosystem(source: str) -> str:
@@ -108,8 +124,15 @@ def scan_vulnerabilities(deps: dict) -> list[dict]:
         ecosystem = _source_ecosystem(dep.get('source', ''))
         if not name or not version or not ecosystem:
             continue
+        version_spec = dep.get('version_spec', '')
         queries.append({'package': {'name': name, 'ecosystem': ecosystem}, 'version': version})
-        query_meta.append({'name': name, 'version': version, 'ecosystem': ecosystem})
+        query_meta.append({
+            'name': name,
+            'version': version,
+            'version_spec': version_spec,
+            'ecosystem': ecosystem,
+            'is_range': _is_open_range(version_spec),
+        })
 
     if not queries:
         return []
@@ -144,15 +167,21 @@ def scan_vulnerabilities(deps: dict) -> list[dict]:
         vid = item['id']
         meta = item['meta']
         d = details.get(vid, {})
+        is_range = meta['is_range']
         results.append({
             'name': meta['name'],
-            'version': meta['version'],
+            'version': meta['version_spec'] if is_range else meta['version'],
             'ecosystem': meta['ecosystem'],
             'vuln_id': vid,
             'summary': d.get('summary', ''),
             'severity': d.get('severity'),
             'severity_score': d.get('severity_score'),
             'url': f'https://osv.dev/vulnerability/{vid}',
+            'version_is_range': is_range,
+            'note': (
+                f"CVE affects some versions within the declared range "
+                f"({meta['version_spec']}). Verify your installed version is not affected."
+            ) if is_range else None,
         })
 
     return results

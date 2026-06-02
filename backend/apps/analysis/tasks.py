@@ -1,15 +1,17 @@
 import logging
 import os
 import time
-from datetime import datetime, timezone as _tz
+from datetime import datetime
+from datetime import timezone as _tz
 
 from celery import shared_task
-from prometheus_client import Counter, Gauge, Histogram
 from django.db.models import Exists, OuterRef
 from django.utils import timezone
+from prometheus_client import Counter, Gauge, Histogram
 
 from apps.repositories.models import AnalysisRun
 
+from .arch_tours import generate_arch_tours
 from .classifications import classify_repo
 from .commit_analysis import analyze_commits
 from .contribution_analysis import analyze_contributions
@@ -19,10 +21,9 @@ from .github_meta import fetch_github_meta
 from .graph_analysis import analyze_graph
 from .heuristics import compute_heuristics, compute_oss_score
 from .import_parser import parse_imports
+from .ownership_analysis import analyze_ownership
 from .project_structure import analyze_structure
 from .readme_parser import parse_readme
-from .arch_tours import generate_arch_tours
-from .ownership_analysis import analyze_ownership
 from .security_scan import scan_security
 from .todo_scan import scan_todos
 from .vuln_scan import scan_vulnerabilities
@@ -335,23 +336,45 @@ def cleanup_old_runs():
 
 @shared_task
 def evict_stale_clones():
-    """Delete local cache clones not fetched within EVICT_AFTER_DAYS.
-
-    AnalysisRun.result JSON is untouched. clone_or_fetch re-clones on next run.
+    """Three-pass clone eviction:
+    1. Time-based  — remove clones idle > EVICT_AFTER_HOURS (skip in-flight runs).
+    2. Orphan sweep — remove dirs in REPO_CACHE_DIR with no matching Repository row.
+    3. Size cap     — if cache total > MAX_CACHE_GB, evict LRU clones until under limit.
     """
     import shutil
     from datetime import timedelta
 
     from django.conf import settings
 
-    from apps.repositories.models import Repository
+    from apps.repositories.models import AnalysisRun, Repository
 
     from .git_ops import get_cache_path
 
-    threshold = timezone.now() - timedelta(days=settings.EVICT_AFTER_DAYS)
+    cache_dir = settings.REPO_CACHE_DIR
     evicted = 0
 
-    for repo in Repository.objects.filter(last_fetched_at__lt=threshold):
+    def _dir_size(path: str) -> int:
+        total = 0
+        for dirpath, _, filenames in os.walk(path):
+            for f in filenames:
+                try:
+                    total += os.path.getsize(os.path.join(dirpath, f))
+                except OSError:
+                    pass
+        return total
+
+    active_repo_ids = set(
+        AnalysisRun.objects.filter(status__in=['pending', 'running'])
+        .values_list('repo_id', flat=True)
+    )
+
+    # Pass 1: time-based — repos not fetched within EVICT_AFTER_HOURS
+    threshold = timezone.now() - timedelta(hours=settings.EVICT_AFTER_HOURS)
+    for repo in (
+        Repository.objects
+        .filter(last_fetched_at__lt=threshold)
+        .exclude(pk__in=active_repo_ids)
+    ):
         try:
             path = get_cache_path(repo.url)
         except ValueError:
@@ -359,12 +382,49 @@ def evict_stale_clones():
         if os.path.exists(path):
             shutil.rmtree(path)
             evicted += 1
-            logger.info('Evicted clone cache for %s/%s (%s)', repo.owner, repo.name, path)
+            logger.info('Evicted inactive clone %s/%s', repo.owner, repo.name)
 
-    logger.info(
-        'Clone eviction complete: %d clones removed (threshold: %d days)',
-        evicted, settings.EVICT_AFTER_DAYS,
-    )
+    # Pass 2: orphan sweep — dirs with no matching Repository row
+    if cache_dir.exists():
+        known_paths = set()
+        for repo in Repository.objects.all():
+            try:
+                known_paths.add(get_cache_path(repo.url))
+            except ValueError:
+                pass
+        for entry in cache_dir.iterdir():
+            if entry.is_dir() and str(entry) not in known_paths:
+                shutil.rmtree(entry)
+                evicted += 1
+                logger.info('Evicted orphan clone dir %s', entry.name)
+
+    # Pass 3: size cap — LRU eviction when total exceeds MAX_CACHE_GB
+    max_bytes = int(settings.MAX_CACHE_GB * 1024 ** 3)
+    if cache_dir.exists():
+        candidates = []
+        for repo in (
+            Repository.objects
+            .exclude(pk__in=active_repo_ids)
+            .order_by('last_fetched_at')
+        ):
+            try:
+                path = get_cache_path(repo.url)
+            except ValueError:
+                continue
+            if os.path.exists(path):
+                candidates.append((path, repo))
+
+        total_bytes = sum(_dir_size(p) for p, _ in candidates)
+        for path, repo in candidates:
+            if total_bytes <= max_bytes:
+                break
+            size = _dir_size(path)
+            shutil.rmtree(path)
+            total_bytes -= size
+            evicted += 1
+            logger.info('Evicted clone (size cap) %s/%s', repo.owner, repo.name)
+
+    logger.info('Clone eviction complete: %d clones removed', evicted)
 
 
 @shared_task

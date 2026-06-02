@@ -221,7 +221,8 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 RUNS_TO_KEEP_PER_REPO = config('RUNS_TO_KEEP_PER_REPO', default=10, cast=int)
-EVICT_AFTER_DAYS = config('EVICT_AFTER_DAYS', default=30, cast=int)
+EVICT_AFTER_HOURS = config('EVICT_AFTER_HOURS', default=24, cast=int)
+MAX_CACHE_GB = config('MAX_CACHE_GB', default=10, cast=float)
 LOG_RETENTION_DAYS = config('LOG_RETENTION_DAYS', default=30, cast=int)
 
 # Logging
