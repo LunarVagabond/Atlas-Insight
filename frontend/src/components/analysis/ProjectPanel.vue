@@ -196,6 +196,16 @@ const docsLinks = computed<DisplayLink[]>(() => {
     })
   }
 
+  if (structure?.docs_dir && gh?.html_url) {
+    const folderLabel = structure.docs_dir.split('/').pop() ?? structure.docs_dir
+    pushUniqueLink(links, {
+      label: `/${structure.docs_dir}`,
+      url: `${gh.html_url}/tree/${gh.default_branch ?? 'main'}/${structure.docs_dir}`,
+      description: `Documentation folder found in repository root — browse the \`${folderLabel}\` directory`,
+      badge: 'Docs Folder',
+    })
+  }
+
   return links
 })
 

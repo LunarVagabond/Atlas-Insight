@@ -257,7 +257,6 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onTabKey)
   document.removeEventListener('click', closeOverflow)
   store._stopPolling()
-  if (stepTimer) { clearInterval(stepTimer); stepTimer = null }
 })
 </script>
 

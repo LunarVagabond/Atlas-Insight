@@ -223,6 +223,7 @@ export interface StructureData {
   all_files?: string[]
   stale_branches?: { name: string; last_commit: string; days_ago: number }[]
   stale_branch_count?: number
+  docs_dir?: string | null
 }
 
 export interface VulnFinding {

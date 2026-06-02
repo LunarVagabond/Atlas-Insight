@@ -380,7 +380,7 @@ def _detect_tech_stack(repo_dir: str, dep_list: list[dict]) -> list[str]:
 
     # From config files
     for filename, label in _FRAMEWORK_FILE_PATTERNS.items():
-        if (base / filename).exists():
+        if label is not None and (base / filename).exists():
             detected.add(label)
 
     return sorted(detected)
@@ -459,6 +459,13 @@ def analyze_structure(repo_obj: Repo, repo_dir: str, deps: dict | None = None) -
     has_docker = any(
         (base / f).exists()
         for f in ('Dockerfile', 'docker-compose.yml', 'docker-compose.yaml')
+    )
+
+    # Docs folder (docs/, doc/, documentation/, website/docs/, etc.)
+    _DOCS_DIRS = ['docs', 'doc', 'documentation', 'website/docs', 'site/docs', '.docs']
+    docs_dir = next(
+        (d for d in _DOCS_DIRS if (base / d).is_dir()),
+        None,
     )
 
     # Community health files
@@ -546,6 +553,7 @@ def analyze_structure(repo_obj: Repo, repo_dir: str, deps: dict | None = None) -
         'all_files': all_file_paths,
         'stale_branches': stale_branches,
         'stale_branch_count': stale_branch_count,
+        'docs_dir': docs_dir,
     }
 
 
