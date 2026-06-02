@@ -52,7 +52,7 @@ cd frontend && node_modules/.bin/vue-tsc --noEmit
 
 ## Deployment
 
-See [DEPLOY.md](DEPLOY.md) for the full production guide — Nginx config, systemd units, env vars, and database setup.
+See [docs/ops/deploy.md](docs/ops/deploy.md) for the full production guide — Nginx config, systemd units, env vars, and database setup.
 
 ## API
 

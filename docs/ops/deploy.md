@@ -1,4 +1,4 @@
-# Deployment Guide — Atlas Insight
+# Deployment Guide
 
 Self-hosted deployment on a Linux server with Nginx, Postgres, Redis, and systemd (or Docker Compose). Works identically for local dev and prod — the only difference is `backend/.env`.
 
@@ -13,7 +13,7 @@ Self-hosted deployment on a Linux server with Nginx, Postgres, Redis, and system
 
 ---
 
-## Fresh deploy (dev or prod) — 5 steps
+## Fresh deploy — 5 steps
 
 ```bash
 # 1. Clone
@@ -35,7 +35,7 @@ make glitchtip-create-admin EMAIL=you@example.com PASSWORD=yourpassword
 make promote-user EMAIL=you@example.com
 ```
 
-`make start` handles ordering automatically:
+`make start` handles service ordering automatically:
 - Starts Postgres + Redis
 - Starts GlitchTip, waits for health, provisions org/projects, writes `SENTRY_DSN` to `backend/.env`
 - Starts Django, Celery worker, Celery beat, Flower, Vite (dev) or serves static build (prod)
@@ -76,9 +76,16 @@ cp backend/.env.example backend/.env
 | `GITHUB_WEBHOOK_SECRET` | Secret for GitHub push webhooks |
 | `FIELD_ENCRYPTION_KEY` | Fernet key for PAT storage (see below) |
 
-**Generate the Fernet key:**
+**Generate keys:**
 ```bash
+# SECRET_KEY
+python3 -c "import secrets; print(secrets.token_hex(50))"
+
+# FIELD_ENCRYPTION_KEY
 python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+
+# GITHUB_WEBHOOK_SECRET
+python3 -c "import secrets; print(secrets.token_hex(32))"
 ```
 
 **Optional but recommended:**
@@ -103,11 +110,11 @@ python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().
 | `GLITCHTIP_CSRF_TRUSTED_ORIGINS` | **Must include every scheme+host users access GlitchTip from.** Missing entries cause 403 on login. Example: `https://glitch.yoursite.com,http://localhost:4505` |
 | `SENTRY_DSN` | Written automatically by `make start` — do not edit manually |
 
-> **`SECURE_SSL_REDIRECT` must stay `False`** when running behind nginx or Cloudflare. Both terminate TLS and forward HTTP to Django. Setting it `True` causes an infinite redirect loop (Cloudflare → Django redirects to HTTPS → Cloudflare → ...).
+> **`SECURE_SSL_REDIRECT` must stay `False`** when running behind nginx or Cloudflare. Both terminate TLS and forward HTTP to Django. Setting it `True` causes an infinite redirect loop.
 
 ---
 
-## Atlas GitHub OAuth app (optional — for private repo access)
+## GitHub OAuth app (optional — for private repo access)
 
 1. GitHub → Settings → Developer settings → OAuth Apps → New OAuth App
 2. Homepage URL: your Atlas frontend URL
@@ -124,7 +131,7 @@ python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().
 make production-release
 ```
 
-Interactive script that walks through the full deployment:
+Interactive script — walks through the full deployment:
 
 1. Prompts for install path, domains, admin email, GlitchTip password, service user
 2. Generates `SECRET_KEY`, `FIELD_ENCRYPTION_KEY`, `GITHUB_WEBHOOK_SECRET`, `GLITCHTIP_SECRET_KEY`
@@ -139,78 +146,30 @@ Re-run safely — each step asks before acting.
 
 ---
 
-## Production updates
+## Updating a production instance
 
 ```bash
 make prod-update
 ```
 
-Pulls latest code, re-installs deps, runs migrations, rebuilds frontend, then restarts services (via `systemctl` if running under systemd, or `make restart` otherwise).
+Pulls latest code, re-installs deps, runs migrations, rebuilds frontend, then restarts services via `systemctl` (or `make restart` if not running under systemd).
 
----
-
-## GlitchTip operations
+Manual equivalent:
 
 ```bash
-make start-glitchtip    # start + provision org/projects + write SENTRY_DSN (called by make start)
-make setup-glitchtip    # re-run provisioning + refresh DSN (idempotent)
-make glitchtip-verify   # show projects + service tag inventory
-make sentry-test-services  # emit test logs to all service buckets
-make logs-glitchtip     # tail GlitchTip container logs
-
-make glitchtip-db-dump  # backup → _running/backups/
-make reset-glitchtip    # drop + recreate GlitchTip DB, re-provision
-make fresh-glitchtip    # dump, then reset
-```
-
-**Projects:** Backend + Frontend (auto-provisioned).
-
-**Service tags** — all Django sub-apps route to the `Backend` project, distinguished by `service` tag:
-
-| Service tag | What it covers |
-|---|---|
-| `django` | Django web process |
-| `django-api` | `apps.api` |
-| `django-analysis` | `apps.analysis` |
-| `django-repositories` | `apps.repositories` |
-| `django-users` | `apps.users` |
-| `django-config` | `config.*` modules |
-| `celery-workers` | Celery worker |
-| `celery-beat` | Celery beat scheduler |
-| `celery-flower` | Flower |
-
-Filter by service in GlitchTip Issues/Logs: add tag filter `service = django-analysis` etc.
-
----
-
-## Dev teardown + rebuild
-
-Full clean wipe and fresh start:
-
-```bash
-make teardown           # stop everything, docker down -v, rm _running/.venv/node_modules
-make init               # re-setup from scratch
-make start
-make glitchtip-create-admin EMAIL=you@example.com PASSWORD=yourpassword
-make promote-user EMAIL=you@example.com
+git pull
+cd backend && .venv/bin/pip install -r requirements.txt
+DJANGO_SETTINGS_MODULE=config.settings.production .venv/bin/python manage.py migrate
+DJANGO_SETTINGS_MODULE=config.settings.production .venv/bin/python manage.py collectstatic --no-input
+cd ../frontend && npm ci && npm run build
+systemctl restart atlas-django atlas-celery atlas-celery-beat
 ```
 
 ---
 
-## Startup/shutdown order
+## Systemd service units
 
-`make start` and `make stop` follow the correct order automatically.
-
-Manual order if needed:
-1. Start Postgres + Redis
-2. Start GlitchTip (`glitchtip-web` + `glitchtip-worker`)
-3. Start Django / Celery / Beat / Flower / Vite
-
-Shutdown reverse order — GlitchTip last so app shutdown logs are captured.
-
----
-
-## Production: Gunicorn systemd service
+### Django (Gunicorn)
 
 ```ini
 # /etc/systemd/system/atlas-django.service
@@ -234,7 +193,7 @@ Restart=always
 WantedBy=multi-user.target
 ```
 
-## Production: Celery worker
+### Celery worker
 
 ```ini
 # /etc/systemd/system/atlas-celery.service
@@ -258,7 +217,7 @@ Restart=always
 WantedBy=multi-user.target
 ```
 
-## Production: Celery beat
+### Celery beat
 
 ```ini
 # /etc/systemd/system/atlas-celery-beat.service
@@ -282,14 +241,7 @@ Restart=always
 WantedBy=multi-user.target
 ```
 
-Enable and start:
-
-```bash
-systemctl daemon-reload
-systemctl enable --now atlas-django atlas-celery atlas-celery-beat
-```
-
-Optional Flower service:
+### Flower (optional)
 
 ```ini
 # /etc/systemd/system/atlas-flower.service
@@ -312,12 +264,21 @@ Restart=always
 WantedBy=multi-user.target
 ```
 
+Enable and start:
+
+```bash
+systemctl daemon-reload
+systemctl enable --now atlas-django atlas-celery atlas-celery-beat
+```
+
 ---
 
-## Production: Nginx
+## Nginx configuration
 
 ```nginx
 # /etc/nginx/sites-available/atlas-insight
+
+# API
 server {
     listen 443 ssl;
     server_name api.yoursite.com;
@@ -341,6 +302,7 @@ server {
     }
 }
 
+# Frontend
 server {
     listen 443 ssl;
     server_name yoursite.com;
@@ -359,22 +321,56 @@ server {
 
 ---
 
-## Updates
+## GlitchTip operations
 
 ```bash
-git pull
-cd backend && .venv/bin/pip install -r requirements.txt
-DJANGO_SETTINGS_MODULE=config.settings.production .venv/bin/python manage.py migrate
-DJANGO_SETTINGS_MODULE=config.settings.production .venv/bin/python manage.py collectstatic --no-input
-cd ../frontend && npm ci && npm run build
-systemctl restart atlas-django atlas-celery atlas-celery-beat
+make start-glitchtip       # start + provision org/projects + write SENTRY_DSN
+make setup-glitchtip       # re-run provisioning + refresh DSN (idempotent)
+make glitchtip-verify      # show projects + service tag inventory
+make sentry-test-services  # emit test logs to all service buckets
+make logs-glitchtip        # tail GlitchTip container logs
+
+make glitchtip-db-dump     # backup → _running/backups/
+make reset-glitchtip       # drop + recreate GlitchTip DB, re-provision
+make fresh-glitchtip       # dump, then reset
 ```
+
+**Service tags** — all Django sub-apps route to the `Backend` project, distinguished by `service` tag:
+
+| Service tag | What it covers |
+|---|---|
+| `django` | Django web process |
+| `django-api` | `apps.api` |
+| `django-analysis` | `apps.analysis` |
+| `django-repositories` | `apps.repositories` |
+| `django-users` | `apps.users` |
+| `django-config` | `config.*` modules |
+| `celery-workers` | Celery worker |
+| `celery-beat` | Celery beat scheduler |
+| `celery-flower` | Flower |
+
+Filter in GlitchTip Issues/Logs: add tag filter `service = django-analysis` etc.
 
 ---
 
-## Disk considerations
+## Startup / shutdown order
 
-Cloned repos are cached in `_running/repo_cache/`. On busy instances this can grow large.
+`make start` and `make stop` handle ordering automatically.
 
-- `EVICT_AFTER_DAYS` (default 30) — deletes clones not accessed in N days
-- `RUNS_TO_KEEP_PER_REPO` (default 10) — trims old analysis result rows
+Manual order if needed:
+1. Start Postgres + Redis
+2. Start GlitchTip (`glitchtip-web` + `glitchtip-worker`)
+3. Start Django / Celery / Beat / Flower / Vite
+
+Shutdown is reverse order — stop GlitchTip last so app shutdown logs are captured.
+
+---
+
+## Disk management
+
+Cloned repos are cached in `_running/repo_cache/`. On busy instances this grows large.
+
+| Variable | Default | Description |
+|---|---|---|
+| `EVICT_AFTER_DAYS` | `30` | Delete clones not accessed in N days |
+| `RUNS_TO_KEEP_PER_REPO` | `10` | Trim old analysis result rows per repo |
