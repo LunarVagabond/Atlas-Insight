@@ -4,6 +4,7 @@ import axios from 'axios'
 export interface AnalysisRun {
   id: string
   status: 'pending' | 'running' | 'completed' | 'failed'
+  progress_step: '' | 'cloning' | 'parsing' | 'heuristics' | 'metadata' | 'finalizing'
   triggered_at: string
   completed_at: string | null
   result: RunResult | null

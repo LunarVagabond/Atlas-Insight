@@ -36,6 +36,14 @@ class AnalysisRun(models.Model):
         ('completed', 'Completed'),
         ('failed', 'Failed'),
     ]
+    PROGRESS_STEP_CHOICES = [
+        ('', ''),
+        ('cloning', 'Cloning repository'),
+        ('parsing', 'Parsing imports & structure'),
+        ('heuristics', 'Computing heuristics'),
+        ('metadata', 'Fetching GitHub metadata'),
+        ('finalizing', 'Finalizing results'),
+    ]
     id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
     repo = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name='runs')
     user = models.ForeignKey(
@@ -45,6 +53,7 @@ class AnalysisRun(models.Model):
         related_name='runs',
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    progress_step = models.CharField(max_length=20, choices=PROGRESS_STEP_CHOICES, blank=True, default='')
     triggered_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     result = models.JSONField(null=True, blank=True)

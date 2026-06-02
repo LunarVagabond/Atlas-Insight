@@ -69,7 +69,8 @@ def analyze_repository(self, run_id: str):
     pat = run.repo.auth_token or None
 
     run.status = 'running'
-    run.save(update_fields=['status'])
+    run.progress_step = 'cloning'
+    run.save(update_fields=['status', 'progress_step'])
     logger.info('Starting analysis for run %s: %s', run_id, run.repo.url)
 
     # Set is_private immediately via a lightweight API check so that even
@@ -95,6 +96,9 @@ def analyze_repository(self, run_id: str):
         repo_obj, sha, fetched_at = clone_or_fetch(run.repo.url, pat=pat)
         repo_dir = repo_obj.working_dir
 
+        run.progress_step = 'parsing'
+        run.save(update_fields=['progress_step'])
+
         commits = analyze_commits(repo_obj)
         edges = parse_imports(repo_dir)
         graph = analyze_graph(edges)
@@ -104,6 +108,10 @@ def analyze_repository(self, run_id: str):
         security = scan_security(repo_obj, repo_dir)
         security['vulnerabilities'] = scan_vulnerabilities(deps)
         todos = scan_todos(repo_dir)
+
+        run.progress_step = 'metadata'
+        run.save(update_fields=['progress_step'])
+
         github_meta = fetch_github_meta(run.repo.owner, run.repo.name, token=pat)
         contribution_data = github_meta.pop('contribution_data', None)
         github_languages = github_meta.pop('github_languages', None)
@@ -129,11 +137,17 @@ def analyze_repository(self, run_id: str):
             except Exception:
                 pass
 
+        run.progress_step = 'heuristics'
+        run.save(update_fields=['progress_step'])
+
         signals = compute_heuristics(commits, graph, deps, readme, structure, security)
         oss_score = compute_oss_score(signals)
         classification = classify_repo(
             commits, graph, deps, readme, structure, security, github_meta
         )
+
+        run.progress_step = 'finalizing'
+        run.save(update_fields=['progress_step'])
 
         run.result = {
             'commits': commits,
@@ -154,6 +168,7 @@ def analyze_repository(self, run_id: str):
             ),
         }
         run.status = 'completed'
+        run.progress_step = ''
         analysis_runs_total.labels(status='completed').inc()
 
         from django.db.models import F
@@ -205,7 +220,8 @@ def analyze_repository(self, run_id: str):
 
     analysis_duration_seconds.observe(time.monotonic() - _start)
     run.completed_at = timezone.now()
-    run.save(update_fields=['status', 'result', 'completed_at'])
+    run.progress_step = ''
+    run.save(update_fields=['status', 'result', 'completed_at', 'progress_step'])
 
     # Fire webhook if configured
     if run.webhook_url:

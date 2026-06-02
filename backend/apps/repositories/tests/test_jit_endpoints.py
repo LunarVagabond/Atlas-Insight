@@ -29,7 +29,7 @@ class TestIssuesEndpoint:
     def setup_method(self):
         self.client = Client()
 
-    @patch('apps.repositories.router.fetch_contribution_data')
+    @patch('apps.repositories.router_jit.fetch_contribution_data')
     def test_cache_miss_calls_github(self, mock_fetch, completed_run):
         mock_fetch.return_value = {
             'issues': [{'number': 1, 'title': 'Bug'}],
@@ -41,7 +41,7 @@ class TestIssuesEndpoint:
         assert isinstance(data, list)
         mock_fetch.assert_called_once()
 
-    @patch('apps.repositories.router.fetch_contribution_data')
+    @patch('apps.repositories.router_jit.fetch_contribution_data')
     def test_cache_hit_skips_github(self, mock_fetch, completed_run):
         cache.set(f'jit_{completed_run.id}_issues', [{'number': 99, 'title': 'Cached'}], 900)
         resp = self.client.get(f'/api/v1/repositories/runs/{completed_run.id}/issues')
@@ -60,7 +60,7 @@ class TestPrsEndpoint:
     def setup_method(self):
         self.client = Client()
 
-    @patch('apps.repositories.router.fetch_contribution_data')
+    @patch('apps.repositories.router_jit.fetch_contribution_data')
     def test_returns_pr_structure(self, mock_fetch, completed_run):
         mock_fetch.return_value = {'issues': [], 'pr_issue_refs': [{'number': 5}]}
         resp = self.client.get(f'/api/v1/repositories/runs/{completed_run.id}/prs')
@@ -69,7 +69,7 @@ class TestPrsEndpoint:
         assert 'pr_issue_refs' in data
         assert 'open_prs' in data
 
-    @patch('apps.repositories.router.fetch_contribution_data')
+    @patch('apps.repositories.router_jit.fetch_contribution_data')
     def test_cache_hit_skips_github(self, mock_fetch, completed_run):
         cached_result = {'pr_issue_refs': [{'number': 42}], 'open_prs': 1}
         cache.set(f'jit_{completed_run.id}_prs', cached_result, 900)

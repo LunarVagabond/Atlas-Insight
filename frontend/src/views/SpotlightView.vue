@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import axios from 'axios'
 import AppBadge from '../components/ui/AppBadge.vue'
 import AppButton from '../components/ui/AppButton.vue'
-import LoadingSpinner from '../components/ui/LoadingSpinner.vue'
+import SkeletonCard from '../components/ui/SkeletonCard.vue'
 
 const router = useRouter()
 
@@ -187,7 +187,9 @@ onMounted(() => {
     <div class="spotlight-hero">
       <div class="spotlight-hero__bg-glow" />
 
-      <LoadingSpinner v-if="currentLoading" label="Loading this week's pick…" />
+      <div v-if="currentLoading" class="spotlight-hero__skeleton">
+        <SkeletonCard :lines="4" />
+      </div>
 
       <div v-else-if="!current" class="spotlight-hero__empty">
         <div class="spotlight-hero__empty-icon">🔭</div>
@@ -254,10 +256,14 @@ onMounted(() => {
     <div class="container" style="margin-top: 3rem; padding-bottom: 3rem">
       <h2 style="font-size:1.25rem;font-weight:700;margin-bottom:1.25rem">Past Spotlights</h2>
 
-      <LoadingSpinner v-if="loading && !history.length" label="Loading history…" />
+      <div v-if="loading && !history.length" class="runs-skeleton">
+        <SkeletonCard v-for="i in 4" :key="i" :show-header="false" :lines="2" />
+      </div>
 
-      <div v-else-if="!history.length" class="empty-state" style="padding: 2rem 0">
-        No past spotlights yet.
+      <div v-else-if="!history.length" class="empty-state">
+        <div class="empty-state__icon">🏆</div>
+        <p class="empty-state__title">No past spotlights yet</p>
+        <p class="empty-state__desc">The spotlight history will appear here once repos are featured.</p>
       </div>
 
       <template v-else>

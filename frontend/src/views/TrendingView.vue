@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import AppBadge from '../components/ui/AppBadge.vue'
-import LoadingSpinner from '../components/ui/LoadingSpinner.vue'
+import SkeletonCard from '../components/ui/SkeletonCard.vue'
 
 const router = useRouter()
 
@@ -48,10 +48,14 @@ onMounted(async () => {
       <p class="trending-view__subtitle">Most-analyzed repositories in the last 7 days.</p>
     </div>
 
-    <LoadingSpinner v-if="loading" label="Loading…" />
+    <div v-if="loading" class="trending-view__skeleton">
+      <SkeletonCard v-for="i in 5" :key="i" :lines="2" :show-header="false" />
+    </div>
 
-    <div v-else-if="!items.length" class="empty-state" style="padding: 3rem 0; text-align:center">
-      No trending data yet — check back after some repos have been analyzed.
+    <div v-else-if="!items.length" class="empty-state">
+      <div class="empty-state__icon">📈</div>
+      <p class="empty-state__title">Nothing trending yet</p>
+      <p class="empty-state__desc">Check back after more repositories have been analyzed.</p>
     </div>
 
     <div v-else class="trending-view__grid">

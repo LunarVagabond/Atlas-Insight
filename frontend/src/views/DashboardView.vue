@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import axios from 'axios'
 import AppBadge from '../components/ui/AppBadge.vue'
 import AppButton from '../components/ui/AppButton.vue'
-import LoadingSpinner from '../components/ui/LoadingSpinner.vue'
+import SkeletonCard from '../components/ui/SkeletonCard.vue'
 import { useAnalysisStore } from '../stores/analysis'
 import { useAuthStore } from '../stores/auth'
 import type { RunListItem } from '../stores/analysis'
@@ -128,12 +128,25 @@ async function handleDelete(run: RunListItem) {
     </div>
 
     <div class="results-layout__content">
-      <LoadingSpinner v-if="loading" label="Loading your runs…" />
+      <div v-if="loading" class="runs-skeleton">
+        <SkeletonCard v-for="i in 6" :key="i" :show-header="false" :lines="2" />
+      </div>
 
-      <div v-else-if="error" class="empty-state">{{ error }}</div>
+      <div v-else-if="error" class="empty-state">
+        <div class="empty-state__icon">⚠️</div>
+        <p class="empty-state__title">{{ error }}</p>
+        <div class="empty-state__action">
+          <AppButton variant="secondary" @click="fetchRuns">Retry</AppButton>
+        </div>
+      </div>
 
       <div v-else-if="!items.length" class="empty-state">
-        <p>No analyses yet. <RouterLink to="/">Analyze a repository to get started.</RouterLink></p>
+        <div class="empty-state__icon">📂</div>
+        <p class="empty-state__title">No analyses yet</p>
+        <p class="empty-state__desc">Analyze a repository to track it here. Favorites and private repos will appear in your dashboard.</p>
+        <div class="empty-state__action">
+          <RouterLink to="/" class="btn btn--primary">Analyze a Repository</RouterLink>
+        </div>
       </div>
 
       <template v-else>

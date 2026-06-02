@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import ShortcutsModal from './components/ui/ShortcutsModal.vue'
+import ToastContainer from './components/ui/ToastContainer.vue'
 import logoUrl from './assets/logo.png'
 
 const authStore = useAuthStore()
@@ -176,5 +177,6 @@ function closeMobileNav() { mobileNavOpen.value = false }
     </footer>
 
     <ShortcutsModal v-if="showShortcuts" @close="showShortcuts = false" />
+    <ToastContainer />
   </div>
 </template>

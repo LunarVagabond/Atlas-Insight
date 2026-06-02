@@ -38,29 +38,26 @@ const isPolling = computed(() => ['pending', 'running'].includes(store.run?.stat
 const isInitialLoading = computed(() => store.status === 'polling' && !store.run)
 const showProgress = computed(() => isInitialLoading.value || isPolling.value)
 
-const ANALYSIS_STEPS = [
-  'Connecting to GitHub…',
-  'Cloning repository…',
-  'Scanning file structure…',
-  'Parsing dependencies…',
-  'Analyzing commit history…',
-  'Computing heuristics…',
-  'Building dependency graph…',
-  'Finalizing results…',
+const PROGRESS_STEPS: { key: string; label: string }[] = [
+  { key: 'cloning',    label: 'Cloning repository…' },
+  { key: 'parsing',    label: 'Parsing imports & structure…' },
+  { key: 'metadata',   label: 'Fetching GitHub metadata…' },
+  { key: 'heuristics', label: 'Computing heuristics…' },
+  { key: 'finalizing', label: 'Finalizing results…' },
 ]
-const currentStep = ref(0)
-let stepTimer: ReturnType<typeof setInterval> | null = null
 
-watch(isPolling, (polling) => {
-  if (polling) {
-    currentStep.value = 0
-    stepTimer = setInterval(() => {
-      if (currentStep.value < ANALYSIS_STEPS.length - 1) currentStep.value++
-    }, 8000)
-  } else {
-    if (stepTimer) { clearInterval(stepTimer); stepTimer = null }
-  }
-}, { immediate: true })
+const currentStepIndex = computed(() => {
+  const step = store.run?.progress_step
+  if (!step) return -1
+  return PROGRESS_STEPS.findIndex(s => s.key === step)
+})
+
+const currentStepLabel = computed(() => {
+  if (isInitialLoading.value) return 'Loading analysis…'
+  const step = store.run?.progress_step
+  if (!step) return store.run?.status === 'pending' ? 'Queued — waiting for a worker…' : 'Analyzing…'
+  return PROGRESS_STEPS.find(s => s.key === step)?.label ?? 'Analyzing…'
+})
 
 const hasRoadmap = computed(() => (result.value?.structure?.roadmap_parsed?.milestones?.length ?? 0) > 0)
 
@@ -321,15 +318,21 @@ onUnmounted(() => {
       <!-- Progress state -->
       <div v-if="showProgress" class="analysis-progress">
         <div class="spinner spinner--xl" />
-        <p class="analysis-progress__step">
-          {{ isInitialLoading ? 'Loading analysis…' : ANALYSIS_STEPS[currentStep] }}
-        </p>
+        <p class="analysis-progress__step">{{ currentStepLabel }}</p>
         <p class="analysis-progress__hint">Typical analyses take 30–90 seconds.</p>
-        <div v-if="isPolling" class="analysis-progress__track">
+        <div v-if="isPolling && currentStepIndex >= 0" class="analysis-progress__track">
           <span
-            v-for="(_, i) in ANALYSIS_STEPS"
-            :key="i"
-            :class="['analysis-progress__dot', i === currentStep && 'analysis-progress__dot--active', i < currentStep && 'analysis-progress__dot--done']"
+            v-for="(step, i) in PROGRESS_STEPS"
+            :key="step.key"
+            :class="['analysis-progress__dot', i === currentStepIndex && 'analysis-progress__dot--active', i < currentStepIndex && 'analysis-progress__dot--done']"
+            :title="step.label"
+          />
+        </div>
+        <div v-else-if="isPolling" class="analysis-progress__track">
+          <span
+            v-for="(step, i) in PROGRESS_STEPS"
+            :key="step.key"
+            class="analysis-progress__dot"
           />
         </div>
       </div>

@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import axios from 'axios'
 import AppBadge from '../components/ui/AppBadge.vue'
 import AppButton from '../components/ui/AppButton.vue'
-import LoadingSpinner from '../components/ui/LoadingSpinner.vue'
+import SkeletonCard from '../components/ui/SkeletonCard.vue'
 import CompareModal from '../components/ui/CompareModal.vue'
 import type { RunListItem } from '../stores/analysis'
 
@@ -155,12 +155,26 @@ function goToRun(id: string) {
     </div>
 
     <div class="results-layout__content">
-      <LoadingSpinner v-if="loading" label="Loading runs…" />
+      <div v-if="loading" class="runs-skeleton">
+        <SkeletonCard v-for="i in 8" :key="i" :show-header="false" :lines="2" />
+      </div>
 
-      <div v-else-if="error" class="empty-state">{{ error }}</div>
+      <div v-else-if="error" class="empty-state">
+        <div class="empty-state__icon">⚠️</div>
+        <p class="empty-state__title">Failed to load runs</p>
+        <p class="empty-state__desc">{{ error }}</p>
+        <div class="empty-state__action">
+          <AppButton variant="secondary" @click="fetchRuns">Retry</AppButton>
+        </div>
+      </div>
 
       <div v-else-if="!items.length" class="empty-state">
-        No runs found{{ q ? ` matching "${q}"` : '' }}.
+        <div class="empty-state__icon">🔭</div>
+        <p class="empty-state__title">{{ q ? 'No matching runs' : 'No analyses yet' }}</p>
+        <p class="empty-state__desc">{{ q ? `No runs match "${q}". Try a different search.` : 'Submit a GitHub URL on the home page to run your first analysis.' }}</p>
+        <div class="empty-state__action">
+          <RouterLink to="/" class="btn btn--primary">Analyze a Repository</RouterLink>
+        </div>
       </div>
 
       <template v-else>
