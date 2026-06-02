@@ -93,9 +93,11 @@ const activeChapterIndex = computed(() => CHAPTER_TABS.indexOf(activeTab.value))
 const prevChapter = computed(() => activeChapterIndex.value > 0 ? CHAPTER_TABS[activeChapterIndex.value - 1] : null)
 const nextChapter = computed(() => activeChapterIndex.value < CHAPTER_TABS.length - 1 ? CHAPTER_TABS[activeChapterIndex.value + 1] : null)
 
+const scrollRef = ref<HTMLElement | null>(null)
+
 function goToChapter(tab: string) {
   activeTab.value = tab
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+  scrollRef.value?.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 
@@ -264,7 +266,9 @@ onUnmounted(() => {
 
 <template>
   <div class="results-layout">
-    <div class="results-layout__header">
+
+    <!-- ── Sticky shell: header + tabs ─────────────────────────────── -->
+    <div class="results-layout__sticky">
       <div class="results-header">
         <a v-if="store.run?.repo_url" :href="store.run.repo_url" target="_blank" rel="noopener noreferrer" class="results-header__repo-link results-header__repo-link--title">
           {{ store.run?.repo_owner }}/{{ store.run?.repo_name }}
@@ -308,10 +312,14 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
+      <AppTabs v-if="result" :tabs="TABS" v-model="activeTab" :badges="tabBadges" />
     </div>
 
-    <div v-if="showProgress" class="results-layout__content">
-      <div class="analysis-progress">
+    <!-- ── Scrollable content ───────────────────────────────────────── -->
+    <div ref="scrollRef" class="results-layout__scroll">
+
+      <!-- Progress state -->
+      <div v-if="showProgress" class="analysis-progress">
         <div class="spinner spinner--xl" />
         <p class="analysis-progress__step">
           {{ isInitialLoading ? 'Loading analysis…' : ANALYSIS_STEPS[currentStep] }}
@@ -325,10 +333,9 @@ onUnmounted(() => {
           />
         </div>
       </div>
-    </div>
 
-    <div v-if="store.status === 'error' && !result" class="results-layout__content">
-      <div class="analysis-error-card">
+      <!-- Error state (no result yet) -->
+      <div v-if="store.status === 'error' && !result" class="analysis-error-card">
         <div class="analysis-error-card__icon">✕</div>
         <h2 class="analysis-error-card__title">Analysis Failed</h2>
         <p class="analysis-error-card__message">{{ store.error }}</p>
@@ -342,75 +349,66 @@ onUnmounted(() => {
           <a href="/" class="btn btn--secondary">← New Analysis</a>
         </div>
       </div>
-    </div>
 
-    <Transition name="fade">
-    <div v-if="result" class="results-layout__content">
-      <div v-if="store.status === 'error'" class="analysis-inline-error">
-        <span class="analysis-inline-error__icon">✕</span>
-        {{ store.error || 'Re-analysis failed.' }}
-      </div>
-      <div v-if="store.run?.auth_token_warning" class="analysis-token-warning">
-        {{ store.run.auth_token_warning }}
-      </div>
-      <div v-if="isArchived" class="archived-banner" role="alert">
-        <span class="archived-banner__icon">📦</span>
-        <span class="archived-banner__text">This repository is <strong>archived</strong> — read-only, no longer accepting contributions.</span>
-      </div>
+      <!-- Result content -->
       <Transition name="fade">
-        <div v-if="showEmbed" class="embed-panel">
-          <div class="embed-panel__header">
-            <span class="embed-panel__title">Embed in README</span>
-            <button class="embed-panel__close" @click="showEmbed = false" aria-label="Close embed panel">✕</button>
-          </div>
-          <div class="embed-panel__row">
-            <span class="embed-panel__row-label">Badge</span>
-            <div class="embed-panel__snippet">
-              <code class="embed-panel__code">{{ embedMarkdown }}</code>
-              <button class="btn btn--secondary embed-panel__copy" @click="copyEmbed">
-                {{ embedCopied ? '✓ Copied' : 'Copy' }}
-              </button>
-            </div>
-          </div>
-          <div class="embed-panel__row">
-            <div class="embed-panel__row-header">
-              <span class="embed-panel__row-label">Card</span>
-              <div class="embed-panel__theme-toggle">
-                <button
-                  class="embed-panel__theme-btn"
-                  :class="{ 'embed-panel__theme-btn--active': cardTheme === 'dark' }"
-                  @click="cardTheme = 'dark'"
-                >Dark</button>
-                <button
-                  class="embed-panel__theme-btn"
-                  :class="{ 'embed-panel__theme-btn--active': cardTheme === 'light' }"
-                  @click="cardTheme = 'light'"
-                >Light</button>
-              </div>
-            </div>
-            <div class="embed-panel__snippet">
-              <code class="embed-panel__code">{{ cardMarkdown }}</code>
-              <button class="btn btn--secondary embed-panel__copy" @click="copyCard">
-                {{ cardCopied ? '✓ Copied' : 'Copy' }}
-              </button>
-            </div>
-          </div>
-          <div class="embed-panel__previews">
-            <div class="embed-panel__preview-item">
-              <span class="embed-panel__preview-label">Badge</span>
-              <img :src="badgeUrl" alt="Atlas Insight badge" class="embed-panel__badge-img" loading="lazy" />
-            </div>
-            <div class="embed-panel__preview-item embed-panel__preview-item--card">
-              <span class="embed-panel__preview-label">Card</span>
-              <div class="embed-panel__card-bg" :class="{ 'embed-panel__card-bg--light': cardTheme === 'light' }">
-                <img :src="cardUrl" alt="Atlas Insight health card" class="embed-panel__card-img" loading="lazy" />
-              </div>
-            </div>
-          </div>
+      <div v-if="result">
+        <div v-if="store.status === 'error'" class="analysis-inline-error">
+          <span class="analysis-inline-error__icon">✕</span>
+          {{ store.error || 'Re-analysis failed.' }}
         </div>
-      </Transition>
-      <AppTabs :tabs="TABS" v-model="activeTab" :badges="tabBadges" />
-      <div style="margin-top: 1.5rem">
+        <div v-if="store.run?.auth_token_warning" class="analysis-token-warning">
+          {{ store.run.auth_token_warning }}
+        </div>
+        <div v-if="isArchived" class="archived-banner" role="alert">
+          <span class="archived-banner__icon">📦</span>
+          <span class="archived-banner__text">This repository is <strong>archived</strong> — read-only, no longer accepting contributions.</span>
+        </div>
+        <Transition name="fade">
+          <div v-if="showEmbed" class="embed-panel">
+            <div class="embed-panel__header">
+              <span class="embed-panel__title">Embed in README</span>
+              <button class="embed-panel__close" @click="showEmbed = false" aria-label="Close embed panel">✕</button>
+            </div>
+            <div class="embed-panel__row">
+              <span class="embed-panel__row-label">Badge</span>
+              <div class="embed-panel__snippet">
+                <code class="embed-panel__code">{{ embedMarkdown }}</code>
+                <button class="btn btn--secondary embed-panel__copy" @click="copyEmbed">
+                  {{ embedCopied ? '✓ Copied' : 'Copy' }}
+                </button>
+              </div>
+            </div>
+            <div class="embed-panel__row">
+              <div class="embed-panel__row-header">
+                <span class="embed-panel__row-label">Card</span>
+                <div class="embed-panel__theme-toggle">
+                  <button class="embed-panel__theme-btn" :class="{ 'embed-panel__theme-btn--active': cardTheme === 'dark' }" @click="cardTheme = 'dark'">Dark</button>
+                  <button class="embed-panel__theme-btn" :class="{ 'embed-panel__theme-btn--active': cardTheme === 'light' }" @click="cardTheme = 'light'">Light</button>
+                </div>
+              </div>
+              <div class="embed-panel__snippet">
+                <code class="embed-panel__code">{{ cardMarkdown }}</code>
+                <button class="btn btn--secondary embed-panel__copy" @click="copyCard">
+                  {{ cardCopied ? '✓ Copied' : 'Copy' }}
+                </button>
+              </div>
+            </div>
+            <div class="embed-panel__previews">
+              <div class="embed-panel__preview-item">
+                <span class="embed-panel__preview-label">Badge</span>
+                <img :src="badgeUrl" alt="Atlas Insight badge" class="embed-panel__badge-img" loading="lazy" />
+              </div>
+              <div class="embed-panel__preview-item embed-panel__preview-item--card">
+                <span class="embed-panel__preview-label">Card</span>
+                <div class="embed-panel__card-bg" :class="{ 'embed-panel__card-bg--light': cardTheme === 'light' }">
+                  <img :src="cardUrl" alt="Atlas Insight health card" class="embed-panel__card-img" loading="lazy" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </Transition>
+
         <template v-if="activeTab === 'Overview'">
           <div class="overview-split">
             <div class="overview-split__left">
@@ -475,23 +473,25 @@ onUnmounted(() => {
         <HeuristicsPanel v-if="activeTab === 'Heuristics'" :signals="result.heuristics" :result="result" />
         <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" :structure="result.structure" :todos="result.todos" :arch-tours="result.arch_tours ?? []" />
         <ArchitectureToursPanel v-if="activeTab === 'Tours'" :tours="result.arch_tours ?? []" :repo-url="store.run?.repo_url" :run-id="runId" />
-
-        <div class="chapter-nav">
-          <button v-if="prevChapter" class="btn btn--secondary chapter-nav__btn" @click="goToChapter(prevChapter)">
-            ← {{ prevChapter }}
-          </button>
-          <span v-else class="chapter-nav__spacer" />
-          <span class="chapter-nav__position">
-            Ch.{{ activeChapterIndex + 1 }} / {{ CHAPTER_TABS.length }}
-          </span>
-          <button v-if="nextChapter" class="btn btn--primary chapter-nav__btn" @click="goToChapter(nextChapter)">
-            {{ nextChapter }} →
-          </button>
-          <span v-else class="chapter-nav__spacer" />
-        </div>
       </div>
+      </Transition>
     </div>
-    </Transition>
+
+    <!-- ── Pinned chapter nav ───────────────────────────────────────── -->
+    <div v-if="result" class="results-layout__chapter-nav">
+      <button v-if="prevChapter" class="btn btn--secondary chapter-nav__btn" @click="goToChapter(prevChapter)">
+        ← {{ prevChapter }}
+      </button>
+      <span v-else class="chapter-nav__spacer" />
+      <span class="chapter-nav__position">
+        Ch.{{ activeChapterIndex + 1 }} / {{ CHAPTER_TABS.length }}
+      </span>
+      <button v-if="nextChapter" class="btn btn--primary chapter-nav__btn" @click="goToChapter(nextChapter)">
+        {{ nextChapter }} →
+      </button>
+      <span v-else class="chapter-nav__spacer" />
+    </div>
+
   </div>
 
   <CompareModal v-if="showCompareModal" @close="showCompareModal = false" />
