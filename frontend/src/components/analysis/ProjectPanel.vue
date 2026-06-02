@@ -16,11 +16,19 @@ interface DisplayLink {
   badge: string
 }
 
-// Community file viewer
+// Community file modal
 const expandedFile = ref<string | null>(null)
 
 function toggleFile(key: string) {
-  expandedFile.value = expandedFile.value === key ? null : key
+  expandedFile.value = key
+}
+
+function closeModal() {
+  expandedFile.value = null
+}
+
+function onModalKey(e: KeyboardEvent) {
+  if (e.key === 'Escape') closeModal()
 }
 
 function fileContent(key: string): string | null {
@@ -407,33 +415,9 @@ const interactionLinks = computed<DisplayLink[]>(() => {
                 <span class="health-item__check">{{ item.present ? '✓' : '✗' }}</span>
                 <span class="health-item__icon">{{ item.icon }}</span>
                 <span class="health-item__label">{{ item.label }}</span>
-                <span
-                  v-if="item.present && item.key && fileContent(item.key)"
-                  class="health-item__expand"
-                >
-                  {{ expandedFile === item.key ? '▲' : '▼' }}
-                </span>
+                <span v-if="item.present && item.key && fileContent(item.key)" class="health-item__expand">↗</span>
               </div>
             </div>
-
-            <!-- File content viewers -->
-            <template v-for="item in communityFiles" :key="`content-${item.label}`">
-              <div
-                v-if="item.key && expandedFile === item.key && fileContent(item.key)"
-                class="file-viewer"
-              >
-                <div class="file-viewer__header">
-                  {{ item.icon }} {{ item.label }}
-                  <button class="file-viewer__close" @click="expandedFile = null">✕</button>
-                </div>
-                <div
-                  v-if="isMarkdown(item.key)"
-                  class="file-viewer__markdown"
-                  v-html="renderMarkdown(fileContent(item.key)!)"
-                />
-                <pre v-else class="file-viewer__content">{{ fileContent(item.key) }}</pre>
-              </div>
-            </template>
           </AppCard>
         </section>
 
@@ -581,4 +565,29 @@ const interactionLinks = computed<DisplayLink[]>(() => {
       </div>
     </div>
   </div>
+
+  <!-- Community file modal -->
+  <Teleport to="body">
+    <Transition name="file-modal">
+      <div v-if="expandedFile && fileContent(expandedFile)" class="file-modal" @keydown="onModalKey" @click.self="closeModal">
+        <div class="file-modal__panel" role="dialog" aria-modal="true">
+          <div class="file-modal__header">
+            <span class="file-modal__title">
+              {{ communityFiles.find(f => f.key === expandedFile)?.icon }}
+              {{ communityFiles.find(f => f.key === expandedFile)?.label }}
+            </span>
+            <button class="file-modal__close" @click="closeModal" aria-label="Close">✕</button>
+          </div>
+          <div class="file-modal__body">
+            <div
+              v-if="isMarkdown(expandedFile)"
+              class="file-viewer__markdown"
+              v-html="renderMarkdown(fileContent(expandedFile)!)"
+            />
+            <pre v-else class="file-viewer__content">{{ fileContent(expandedFile) }}</pre>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
