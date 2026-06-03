@@ -169,7 +169,7 @@ function langIconUrl(name: string | null): string | null {
       <img :src="logoUrl" alt="Atlas Insight" class="hero__logo" />
       <h1 class="hero__title">Atlas <span>Insight</span></h1>
       <p class="hero__subtitle">
-        Paste a repository URL and get a deep analysis of its commit history,
+        Paste a repository URL and get a deep static analysis of its commit history,
         architecture, dependencies, and health signals.
       </p>
       <URLInputForm

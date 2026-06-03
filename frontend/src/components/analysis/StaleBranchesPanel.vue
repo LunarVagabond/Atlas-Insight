@@ -1,10 +1,21 @@
 <script setup lang="ts">
+import { ref, computed } from 'vue'
 import AppBadge from '../ui/AppBadge.vue'
 
-defineProps<{
+const props = defineProps<{
   staleBranches: { name: string; last_commit: string; days_ago: number }[]
   staleBranchCount: number
 }>()
+
+const PAGE_SIZE = 10
+const page = ref(1)
+
+const totalPages = computed(() => Math.ceil(props.staleBranches.length / PAGE_SIZE))
+
+const pagedBranches = computed(() => {
+  const start = (page.value - 1) * PAGE_SIZE
+  return props.staleBranches.slice(start, start + PAGE_SIZE)
+})
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
@@ -20,12 +31,14 @@ function severityVariant(daysAgo: number): 'warning' | 'failed' | 'info' {
 <template>
   <div v-if="staleBranchCount > 0" class="stale-branches">
     <div class="stale-branches__header">
-      <h3 class="stale-branches__title">Stale Branches</h3>
-      <AppBadge :variant="staleBranchCount > 5 ? 'failed' : 'warning'">
-        {{ staleBranchCount }} stale {{ staleBranchCount === 1 ? 'branch' : 'branches' }}
+      <div class="stale-branches__header-left">
+        <h3 class="stale-branches__title">Stale Branches</h3>
+        <p class="stale-branches__subtitle">Remote branches with no commits in 90+ days.</p>
+      </div>
+      <AppBadge :variant="staleBranchCount > 5 ? 'failed' : 'warning'" class="stale-branches__count-badge">
+        {{ staleBranchCount }} {{ staleBranchCount === 1 ? 'branch' : 'branches' }}
       </AppBadge>
     </div>
-    <p class="stale-branches__subtitle">Remote branches with no commits in 90+ days.</p>
 
     <div class="stale-branches__table-wrap">
       <table class="data-table">
@@ -37,7 +50,7 @@ function severityVariant(daysAgo: number): 'warning' | 'failed' | 'info' {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="branch in staleBranches" :key="branch.name">
+          <tr v-for="branch in pagedBranches" :key="branch.name">
             <td><code class="stale-branches__branch-name">{{ branch.name }}</code></td>
             <td>{{ formatDate(branch.last_commit) }}</td>
             <td>
@@ -48,6 +61,20 @@ function severityVariant(daysAgo: number): 'warning' | 'failed' | 'info' {
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <div v-if="totalPages > 1" class="stale-branches__pagination">
+      <button
+        class="stale-branches__page-btn"
+        :disabled="page === 1"
+        @click="page--"
+      >&#8592;</button>
+      <span class="stale-branches__page-info">{{ page }} / {{ totalPages }}</span>
+      <button
+        class="stale-branches__page-btn"
+        :disabled="page === totalPages"
+        @click="page++"
+      >&#8594;</button>
     </div>
   </div>
   <div v-else class="stale-branches stale-branches--clean">
