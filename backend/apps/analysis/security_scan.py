@@ -25,13 +25,15 @@ GITIGNORE_RECOMMENDED = [
 ]
 
 
-def scan_security(repo_obj: Repo, repo_dir: str) -> dict:
+def scan_security(repo_obj: Repo, repo_dir: str, path_prefix: str | None = None) -> dict:
     base = Path(repo_dir)
     issues = []
 
     # Check for sensitive files tracked in git
     try:
         tracked = repo_obj.git.ls_files().splitlines()
+        if path_prefix:
+            tracked = [f for f in tracked if f.startswith(path_prefix)]
         seen: set[str] = set()
         for tracked_file in tracked:
             tf_lower = tracked_file.lower()

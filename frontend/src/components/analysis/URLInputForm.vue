@@ -148,8 +148,8 @@ function togglePat() {
 
     <div v-if="showPat" class="url-form__pat-panel">
       <p class="url-form__pat-why">
-        Required when your GitHub OAuth app isn't approved by the repository's organization,
-        or for fine-grained access control. Your token is used only for this request and never stored.
+        Required for private repositories or when OAuth access is insufficient.
+        Your token is encrypted and stored to enable future re-analyses of this repository.
         <a
           href="https://github.com/settings/tokens/new?scopes=repo&description=Atlas+Insight"
           target="_blank"

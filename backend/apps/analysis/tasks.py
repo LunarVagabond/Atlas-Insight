@@ -23,12 +23,61 @@ from .heuristics import compute_heuristics, compute_oss_score
 from .import_parser import parse_imports
 from .ownership_analysis import analyze_ownership
 from .project_structure import analyze_structure
+from .project_structure.tech_stack import detect_tech_stack
 from .readme_parser import parse_readme
+from .repo_type import detect_repo_type
 from .security_scan import scan_security
 from .todo_scan import scan_todos
 from .vuln_scan import scan_vulnerabilities
 
 logger = logging.getLogger(__name__)
+
+
+def _analyze_sub_projects(
+    repo_type_info: dict,
+    all_edges: list[dict],
+    repo_obj,
+    commits: dict,
+) -> dict:
+    sub_project_results = []
+    for sp in repo_type_info['sub_projects']:
+        sp_path = sp['path']      # e.g. 'frontend/'
+        sp_abs = sp['abs_path']
+
+        sub_deps = analyze_dependencies(sp_abs)
+        sub_vulns = scan_vulnerabilities(sub_deps)
+        sub_deps['vulnerabilities'] = sub_vulns
+
+        sub_edges = [e for e in all_edges if e['source'].startswith(sp_path)]
+        sub_graph = analyze_graph(sub_edges)
+
+        sub_security = scan_security(repo_obj, sp_abs, path_prefix=sp_path)
+
+        sub_signals = compute_heuristics(
+            commits, sub_graph, sub_deps,
+            readme=None, structure=None, security=sub_security,
+        )
+        sub_oss_score = compute_oss_score(sub_signals)
+        sub_tech_stack = detect_tech_stack(sp_abs, sub_deps.get('dependencies', []))
+
+        sub_project_results.append({
+            'name': sp['name'],
+            'path': sp_path,
+            'languages': sp['languages'],
+            'tech_stack': sub_tech_stack,
+            'dependencies': sub_deps,
+            'graph': sub_graph,
+            'security': sub_security,
+            'heuristics': sub_signals,
+            'oss_score': sub_oss_score,
+        })
+
+    return {
+        'type': repo_type_info['type'],
+        'detected_by': repo_type_info['detected_by'],
+        'sub_projects': sub_project_results,
+    }
+
 
 analysis_runs_total = Counter(
     'analysis_runs_total',
@@ -102,6 +151,17 @@ def analyze_repository(self, run_id: str):
 
         commits = analyze_commits(repo_obj)
         edges = parse_imports(repo_dir)
+
+        repo_type_info = detect_repo_type(repo_dir)
+        if repo_type_info['type'] != 'single':
+            try:
+                repo_type_result = _analyze_sub_projects(repo_type_info, edges, repo_obj, commits)
+            except Exception:
+                logger.warning('Sub-project analysis failed — continuing without repo_type', exc_info=True)
+                repo_type_result = None
+        else:
+            repo_type_result = None
+
         graph = analyze_graph(edges)
         deps = analyze_dependencies(repo_dir)
         readme = parse_readme(repo_dir)
@@ -150,7 +210,7 @@ def analyze_repository(self, run_id: str):
         run.progress_step = 'finalizing'
         run.save(update_fields=['progress_step'])
 
-        run.result = {
+        result = {
             'commits': commits,
             'graph': graph,
             'dependencies': deps,
@@ -168,6 +228,9 @@ def analyze_repository(self, run_id: str):
                 commits, graph, deps, readme, structure, security, contribution_data, todos=todos
             ),
         }
+        if repo_type_result is not None:
+            result['repo_type'] = repo_type_result
+        run.result = result
         run.status = 'completed'
         run.progress_step = ''
         analysis_runs_total.labels(status='completed').inc()

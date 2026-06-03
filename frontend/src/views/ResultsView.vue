@@ -5,6 +5,7 @@ import { useAnalysisStore } from '../stores/analysis'
 import { useAuthStore } from '../stores/auth'
 import AppTabs from '../components/ui/AppTabs.vue'
 import AppButton from '../components/ui/AppButton.vue'
+import AppBadge from '../components/ui/AppBadge.vue'
 import AnalysisStatusCard from '../components/analysis/AnalysisStatusCard.vue'
 import OverviewPanel from '../components/analysis/OverviewPanel.vue'
 import CommitTimelineChart from '../components/analysis/CommitTimelineChart.vue'
@@ -240,6 +241,11 @@ const isArchived = computed(() => result.value?.github_meta?.archived === true)
 
 const showCompareModal = ref(false)
 
+// Sub-project selector state — one ref per panel that has a selector
+const activeArchSubProject = ref<string | null>(null)
+const activeDepsSubProject = ref<string | null>(null)
+const activeHeuristicsSubProject = ref<string | null>(null)
+
 function onTabKey(e: KeyboardEvent) {
   const tag = (e.target as HTMLElement).tagName
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return
@@ -271,6 +277,11 @@ onUnmounted(() => {
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3H3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V9"/><polyline points="10 1 15 1 15 6"/><line x1="15" y1="1" x2="7" y2="9"/></svg>
         </a>
         <span v-else class="results-header__title">Analysis Results</span>
+        <AppBadge
+          v-if="result?.repo_type?.type && result.repo_type.type !== 'single'"
+          variant="info"
+          style="flex-shrink: 0"
+        >{{ result.repo_type.type.toUpperCase() }}</AppBadge>
         <div class="results-header__actions">
           <div class="results-header__action-group">
             <AppButton v-if="result" variant="secondary" size="sm" @click="copyLink">
@@ -453,9 +464,20 @@ onUnmounted(() => {
           </div>
         </template>
         <template v-if="activeTab === 'Architecture'">
-          <ArchitecturePanel :graph="result.graph" :hot-files="result.structure?.hot_files" :structure="result.structure" :run-id="runId" :repo-url="store.run?.repo_url" />
+          <ArchitecturePanel
+            :graph="result.graph"
+            :hot-files="result.structure?.hot_files"
+            :structure="result.structure"
+            :run-id="runId"
+            :repo-url="store.run?.repo_url"
+            :sub-projects="result.repo_type?.sub_projects"
+            :selected-sub-project="activeArchSubProject"
+            @update:selected-sub-project="activeArchSubProject = $event"
+          />
           <div style="margin-top: 1.5rem">
-            <DependencyGraphView :graph="result.graph" />
+            <DependencyGraphView
+              :graph="activeArchSubProject && result.repo_type?.sub_projects?.find(sp => sp.name === activeArchSubProject)?.graph || result.graph"
+            />
           </div>
         </template>
         <div v-if="(activeTab === 'Ownership' || activeTab === 'Contributing') && store.jitError" class="jit-error-notice">
@@ -470,9 +492,23 @@ onUnmounted(() => {
           :github-contributors="result.github_meta?.contributors"
           :run-id="runId"
         />
-        <DependenciesPanel v-if="activeTab === 'Dependencies'" :deps="result.dependencies" :security="result.security" />
+        <DependenciesPanel
+          v-if="activeTab === 'Dependencies'"
+          :deps="result.dependencies"
+          :security="result.security"
+          :sub-projects="result.repo_type?.sub_projects"
+          :selected-sub-project="activeDepsSubProject"
+          @update:selected-sub-project="activeDepsSubProject = $event"
+        />
         <SecurityPanel v-if="activeTab === 'Security'" :security="result.security" :heuristics="result.heuristics" :structure="result.structure" />
-        <HeuristicsPanel v-if="activeTab === 'Heuristics'" :signals="result.heuristics" :result="result" />
+        <HeuristicsPanel
+          v-if="activeTab === 'Heuristics'"
+          :signals="result.heuristics"
+          :result="result"
+          :sub-projects="result.repo_type?.sub_projects"
+          :selected-sub-project="activeHeuristicsSubProject"
+          @update:selected-sub-project="activeHeuristicsSubProject = $event"
+        />
         <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" :structure="result.structure" :todos="result.todos" :arch-tours="result.arch_tours ?? []" :commits="result.commits" />
         <ArchitectureToursPanel v-if="activeTab === 'Tours'" :tours="result.arch_tours ?? []" :repo-url="store.run?.repo_url" :run-id="runId" />
       </div>

@@ -2,27 +2,43 @@
 import { ref, computed, watch } from 'vue'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
-import type { GraphData, StructureData, FileHistory } from '../../stores/analysis'
+import SubProjectSelector from './SubProjectSelector.vue'
+import type { GraphData, StructureData, FileHistory, SubProject } from '../../stores/analysis'
 import { useAnalysisStore } from '../../stores/analysis'
 import { useTableFilter } from '../../composables/useTableFilter'
 
-const props = defineProps<{ graph: GraphData; hotFiles?: { file: string; commit_count: number }[]; structure?: StructureData; runId?: string; repoUrl?: string }>()
+const props = defineProps<{
+  graph: GraphData
+  hotFiles?: { file: string; commit_count: number }[]
+  structure?: StructureData
+  runId?: string
+  repoUrl?: string
+  subProjects?: SubProject[]
+  selectedSubProject?: string | null
+}>()
+
+const emit = defineEmits<{ 'update:selectedSubProject': [name: string | null] }>()
+
+const activeGraph = computed<GraphData>(() => {
+  if (!props.selectedSubProject || !props.subProjects?.length) return props.graph
+  return props.subProjects.find(sp => sp.name === props.selectedSubProject)?.graph ?? props.graph
+})
 
 const hotFilesSource = computed(() => (props.hotFiles ?? []) as Record<string, unknown>[])
 const hotFilesFilter = useTableFilter(hotFilesSource, ['file'], 'commit_count', 'desc')
 
-const godModuleSource = computed(() => props.graph.god_modules)
-const hotspotSource = computed(() => props.graph.hotspots)
+const godModuleSource = computed(() => activeGraph.value.god_modules)
+const hotspotSource = computed(() => activeGraph.value.hotspots)
 
-const godFilter = useTableFilter(godModuleSource, ['module'], 'in_degree' as keyof (typeof props.graph.god_modules)[0])
-const hotFilter = useTableFilter(hotspotSource, ['file'], 'degree' as keyof (typeof props.graph.hotspots)[0])
+const godFilter = useTableFilter(godModuleSource, ['module'], 'in_degree' as keyof (typeof activeGraph.value.god_modules)[0])
+const hotFilter = useTableFilter(hotspotSource, ['file'], 'degree' as keyof (typeof activeGraph.value.hotspots)[0])
 
 // ── File explorer + drawer ────────────────────────────────────────────────────
 
 const edgeIndex = computed(() => {
   const imports: Record<string, string[]> = {}
   const importedBy: Record<string, string[]> = {}
-  for (const e of props.graph.edges) {
+  for (const e of activeGraph.value.edges) {
     if (!imports[e.source]) imports[e.source] = []
     imports[e.source].push(e.target)
     if (!importedBy[e.target]) importedBy[e.target] = []
@@ -41,10 +57,10 @@ interface FileInfo {
   degree: number
 }
 
-const godIds = computed(() => new Set(props.graph.god_modules.map(g => g.module)))
+const godIds = computed(() => new Set(activeGraph.value.god_modules.map(g => g.module)))
 const hotspotDegrees = computed(() => {
   const m: Record<string, number> = {}
-  for (const h of props.graph.hotspots) m[h.file] = h.degree
+  for (const h of activeGraph.value.hotspots) m[h.file] = h.degree
   return m
 })
 
@@ -281,9 +297,9 @@ const explorerResults = computed(() => {
   if (!q) return []
 
   // Build unified search set: graph node IDs + all_files paths (deduped)
-  const graphIds = new Set(props.graph.nodes.map(n => n.id))
+  const graphIds = new Set(activeGraph.value.nodes.map(n => n.id))
   const allPaths: string[] = [
-    ...props.graph.nodes.map(n => n.id),
+    ...activeGraph.value.nodes.map(n => n.id),
     ...(props.structure?.all_files ?? []).filter(f => !graphIds.has(f)),
   ]
 
@@ -298,25 +314,33 @@ const explorerResults = computed(() => {
   <div class="arch-panel">
     <h2 class="panel__title">Architecture</h2>
 
+    <SubProjectSelector
+      v-if="subProjects?.length"
+      :sub-projects="subProjects"
+      :model-value="selectedSubProject ?? null"
+      style="margin-bottom: 1rem"
+      @update:model-value="emit('update:selectedSubProject', $event)"
+    />
+
     <!-- Stats + File Explorer top row -->
     <div class="arch-top-row">
       <div class="arch-top-row__stats">
         <div class="panel__grid arch-stats-grid">
           <AppCard>
             <div class="stat">
-              <div class="stat__value">{{ graph.node_count }}</div>
+              <div class="stat__value">{{ activeGraph.node_count }}</div>
               <div class="stat__label">Modules Analyzed</div>
             </div>
           </AppCard>
           <AppCard>
             <div class="stat">
-              <div class="stat__value">{{ graph.cycle_count }}</div>
+              <div class="stat__value">{{ activeGraph.cycle_count }}</div>
               <div class="stat__label">Circular Deps</div>
             </div>
           </AppCard>
           <AppCard>
             <div class="stat">
-              <div class="stat__value">{{ graph.god_modules.length }}</div>
+              <div class="stat__value">{{ activeGraph.god_modules.length }}</div>
               <div class="stat__label">Core Files</div>
             </div>
           </AppCard>
@@ -355,7 +379,7 @@ const explorerResults = computed(() => {
     <div class="arch-split">
 
       <!-- Row 1 left: Most-Connected Files -->
-      <div v-if="graph.hotspots.length" class="arch-section arch-section--col1">
+      <div v-if="activeGraph.hotspots.length" class="arch-section arch-section--col1">
         <h3 class="panel__title">
           Most-Connected Files
           <span class="panel__title-note">click to inspect</span>
@@ -419,7 +443,7 @@ const explorerResults = computed(() => {
       </div>
 
       <!-- Row 2 left: Core Files -->
-      <div v-if="graph.god_modules.length" class="arch-section arch-section--col1">
+      <div v-if="activeGraph.god_modules.length" class="arch-section arch-section--col1">
         <h3 class="panel__title">
           Core Files
           <span class="panel__title-note">imported by many others — click to inspect</span>
@@ -450,10 +474,10 @@ const explorerResults = computed(() => {
       </div>
 
       <!-- Row 2 right: Circular Dependencies -->
-      <div v-if="graph.cycles.length" class="arch-section arch-section--col2">
+      <div v-if="activeGraph.cycles.length" class="arch-section arch-section--col2">
         <h3 class="panel__title">Circular Dependencies</h3>
         <p class="panel__subtitle">Files that depend on each other — like two people waiting for each other to go first. Worth cleaning up over time.</p>
-        <div v-for="(cycle, i) in graph.cycles.slice(0, 5)" :key="i" class="cycle-item">
+        <div v-for="(cycle, i) in activeGraph.cycles.slice(0, 5)" :key="i" class="cycle-item">
           <code>{{ cycle.join(' → ') }}</code>
         </div>
       </div>

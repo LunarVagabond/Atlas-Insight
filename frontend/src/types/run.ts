@@ -10,6 +10,24 @@ import type { ContributionOpportunity, ArchTour } from './contributions'
 import type { TodoData } from './todos'
 import type { OwnershipData } from './ownership'
 
+export interface SubProject {
+  name: string
+  path: string
+  languages: string[]
+  tech_stack: string[]
+  dependencies: DepsData
+  graph: GraphData
+  security: SecurityData
+  heuristics: HeuristicSignal[]
+  oss_score?: OssScore
+}
+
+export interface RepoTypeInfo {
+  type: 'single' | 'fullstack' | 'monorepo' | 'microservices'
+  detected_by: string[]
+  sub_projects: SubProject[]
+}
+
 export interface RunResult {
   commits: CommitData
   graph: GraphData
@@ -25,6 +43,7 @@ export interface RunResult {
   todos?: TodoData
   arch_tours?: ArchTour[]
   ownership?: OwnershipData
+  repo_type?: RepoTypeInfo
   error?: string
 }
 

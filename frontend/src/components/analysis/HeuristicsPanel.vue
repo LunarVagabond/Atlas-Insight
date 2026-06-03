@@ -2,9 +2,22 @@
 import { computed, ref } from 'vue'
 import AppCard from '../ui/AppCard.vue'
 import HeuristicDrawer from './HeuristicDrawer.vue'
-import type { HeuristicSignal, HeuristicSignalKey, RunResult } from '../../stores/analysis'
+import SubProjectSelector from './SubProjectSelector.vue'
+import type { HeuristicSignal, HeuristicSignalKey, RunResult, SubProject } from '../../stores/analysis'
 
-const props = defineProps<{ signals: HeuristicSignal[]; result?: RunResult }>()
+const props = defineProps<{
+  signals: HeuristicSignal[]
+  result?: RunResult
+  subProjects?: SubProject[]
+  selectedSubProject?: string | null
+}>()
+
+const emit = defineEmits<{ 'update:selectedSubProject': [name: string | null] }>()
+
+const activeSignals = computed<HeuristicSignal[]>(() => {
+  if (!props.selectedSubProject || !props.subProjects?.length) return props.signals
+  return props.subProjects.find(sp => sp.name === props.selectedSubProject)?.heuristics ?? props.signals
+})
 
 const active = ref<HeuristicSignal | null>(null)
 const activeHint = ref<HeuristicSignalKey | null>(null)
@@ -46,13 +59,13 @@ function riskLabel(score: number): string {
 
 // Weighted score breakdown
 const overallScore = computed(() => {
-  if (!props.signals.length) return null
-  const total = props.signals.reduce((sum, s) => sum + s.score, 0)
-  return Math.round(total / props.signals.length)
+  if (!activeSignals.value.length) return null
+  const total = activeSignals.value.reduce((sum, s) => sum + s.score, 0)
+  return Math.round(total / activeSignals.value.length)
 })
 
 const scoreBreakdown = computed(() =>
-  [...props.signals]
+  [...activeSignals.value]
     .sort((a, b) => b.score - a.score)
     .map(s => ({
       label: s.label,
@@ -82,6 +95,18 @@ const SIGNAL_DESCRIPTIONS: Partial<Record<HeuristicSignalKey, string>> = {
     <h2 class="panel__title">Health Signals</h2>
     <p class="panel__subtitle">Automated signals about this project's activity, health, and contributor patterns — click any card for details.</p>
 
+    <SubProjectSelector
+      v-if="subProjects?.length"
+      :sub-projects="subProjects"
+      :model-value="selectedSubProject ?? null"
+      style="margin-bottom: 1rem"
+      @update:model-value="emit('update:selectedSubProject', $event)"
+    />
+
+    <p v-if="selectedSubProject && activeSignals.length < 11" class="panel__hint">
+      Repo-wide signals (Documentation, CI Health, Community Health, Release Cadence, Bus Factor) are omitted in sub-project view.
+    </p>
+
     <!-- Score Breakdown -->
     <div v-if="overallScore !== null" class="score-breakdown">
       <div class="score-breakdown__body">
@@ -108,7 +133,7 @@ const SIGNAL_DESCRIPTIONS: Partial<Record<HeuristicSignalKey, string>> = {
 
     <div class="heuristics-grid">
       <AppCard
-        v-for="signal in signals"
+        v-for="signal in activeSignals"
         :key="signal.signal"
         elevated
         :class="['heuristic-card', `heuristic-card--${level(signal.score)}`, 'heuristic-card--clickable']"

@@ -121,3 +121,18 @@ class FeatureFlag(models.Model):
 
     def __str__(self):
         return f'{self.name} ({"on" if self.enabled else "off"})'
+
+
+class Constellation(models.Model):
+    """MS1: meta-layer linking multiple repos that reference each other."""
+    id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
+    name = models.CharField(max_length=255)
+    org = models.CharField(max_length=255, blank=True, null=True)
+    repos = models.ManyToManyField(Repository, related_name='constellations', blank=True)
+    edges = models.JSONField(default=list, blank=True)
+    # edges schema: [{from_repo_id, to_repo_id, ref_type: 'hard'|'soft', evidence: str}]
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name

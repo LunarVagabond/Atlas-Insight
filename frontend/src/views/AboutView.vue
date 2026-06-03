@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { RouterLink } from 'vue-router'
 import AppTabs from '../components/ui/AppTabs.vue'
+import LanguageList from '../components/ui/LanguageList.vue'
 
 const TABS = ['About', 'Why Atlas Insight', 'Guide']
 const activeTab = ref('About')
@@ -395,13 +397,34 @@ function clearSearch() {
       </section>
 
       <section class="about-view__section">
+        <h2 class="about-view__section-title">Supported languages</h2>
+        <p>Full import-graph analysis — circular dependencies, god modules, hot files — is available for the following languages. All other languages still get dependency scanning if a supported manifest file is present.</p>
+        <LanguageList mode="list" tier="full" style="margin-top: 0.5rem" />
+        <p class="about-view__note">Language support is community-driven. If your language is missing, <a href="https://github.com/LunarVagabond/Atlas-Insight/issues" target="_blank" rel="noopener noreferrer">open an issue</a> — adding a parser is a great first contribution.</p>
+      </section>
+
+      <section class="about-view__section">
         <h2 class="about-view__section-title">Limitations</h2>
         <ul class="about-view__feature-list">
           <li>Analysis runs on a point-in-time clone — results reflect the repo at fetch time.</li>
-          <li>Import graph analysis covers Python, TypeScript, JavaScript, Go, Ruby, Rust, Java, Kotlin, C#, and PHP. Other languages show dependency reports only.</li>
           <li>Very large repositories (&gt;500 MB) may time out.</li>
           <li>GitHub API rate limits apply; some JIT data (issues, PRs) may be unavailable under load.</li>
         </ul>
+      </section>
+
+      <section class="about-view__section">
+        <h2 class="about-view__section-title">New to open source?</h2>
+        <p>Atlas Insight surfaces contribution opportunities, but if you're new to git or unfamiliar with how to navigate a codebase, check the resources below:</p>
+        <div class="about-view__badge-grid" style="margin-top: 0.5rem">
+          <RouterLink to="/learn" class="about-view__quicklink">
+            <strong>Developer Guide</strong>
+            <span>Git basics, reading a project, making your first PR, and 10 habits worth building.</span>
+          </RouterLink>
+          <RouterLink to="/resources" class="about-view__quicklink">
+            <strong>Resources</strong>
+            <span>Curated learning material — interactive tools, books, docs, and communities.</span>
+          </RouterLink>
+        </div>
       </section>
     </div>
 

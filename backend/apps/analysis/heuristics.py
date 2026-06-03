@@ -196,7 +196,14 @@ def compute_heuristics(
             bf_score = 0
             bf_desc = 'Solo project — all changes by one author by design'
         elif bus_factor == 1:
-            bf_desc = '1 contributor accounts for 80%+ of all file changes'
+            if total_contributors >= 10:
+                bf_score = min(bf_score, 45)
+                bf_desc = f'1 contributor touches 80%+ of files, but {total_contributors} contributors have participated — typical of a founder-led open source project'
+            elif total_contributors >= 5:
+                bf_score = min(bf_score, 60)
+                bf_desc = f'1 contributor accounts for 80%+ of file changes across {total_contributors} contributors — may reflect project founder ownership'
+            else:
+                bf_desc = '1 contributor accounts for 80%+ of all file changes'
         elif bus_factor <= 2:
             bf_desc = f'{bus_factor} contributors account for 80%+ of file changes — low redundancy'
         else:

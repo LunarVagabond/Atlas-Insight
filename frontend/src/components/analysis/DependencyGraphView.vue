@@ -27,6 +27,25 @@ const SUBSYSTEM_PREFIXES: Record<string, string[]> = {
   config:   ['config/', 'scripts/', '.github/', 'ci/', 'infra/', 'deploy/'],
 }
 
+const AREA_COLORS: Record<string, string> = {
+  frontend: '#4A9EFF',
+  api:      '#3DD68C',
+  data:     '#A78BFA',
+  tests:    '#F59E0B',
+  config:   '#94A3B8',
+  other:    '#64748B',
+}
+
+const GOD_COLOR    = '#ef4444'
+const IMPACT_COLOR = '#f97316'
+
+function detectArea(id: string): string {
+  for (const [area, prefixes] of Object.entries(SUBSYSTEM_PREFIXES)) {
+    if (prefixes.some(p => id.includes(p))) return area
+  }
+  return 'other'
+}
+
 const selectedNode = ref<NodeInfo | null>(null)
 const searchQuery = ref('')
 const searchMatches = ref<string[]>([])
@@ -128,16 +147,18 @@ function applySubsystemFilter(filter: string) {
   subsystemFilter.value = filter
   if (!cy) return
   if (filter === 'all') {
-    cy.elements().removeClass('faded')
+    cy.elements().removeClass('area-hidden')
+    cy.fit(undefined, 32)
     return
   }
   const prefixes = SUBSYSTEM_PREFIXES[filter] ?? []
   cy.nodes().forEach(node => {
     const id = node.id()
-    const matches = prefixes.some(p => id.startsWith(p))
-    if (matches) node.removeClass('faded')
-    else node.addClass('faded')
+    const matches = prefixes.some(p => id.includes(p))
+    if (matches) node.removeClass('area-hidden')
+    else node.addClass('area-hidden')
   })
+  cy.fit(cy.elements(':visible'), 32)
 }
 
 function cssVar(name: string): string {
@@ -191,6 +212,7 @@ function initGraph() {
       label: n.id.split('/').pop() ?? n.id,
       isGod: godModuleIds.has(n.id),
       inDegree: n.in_degree,
+      area: detectArea(n.id),
     },
   }))
 
@@ -214,14 +236,19 @@ function initGraph() {
           'text-margin-y': 3,
           width: 16,
           height: 16,
-          'background-color': cssVar('--color-accent'),
+          'background-color': AREA_COLORS.other,
           color: cssVar('--color-text'),
         },
       },
+      // Area colors — order matters; god overrides below
+      ...Object.entries(AREA_COLORS).map(([area, color]) => ({
+        selector: `node[area="${area}"]`,
+        style: { 'background-color': color },
+      })),
       {
         selector: 'node[?isGod]',
         style: {
-          'background-color': cssVar('--color-error'),
+          'background-color': GOD_COLOR,
           width: 26,
           height: 26,
         },
@@ -239,6 +266,10 @@ function initGraph() {
       {
         selector: 'node.faded',
         style: { opacity: 0.2 },
+      },
+      {
+        selector: '.area-hidden',
+        style: { display: 'none' },
       },
       {
         selector: 'edge',
@@ -272,7 +303,7 @@ function initGraph() {
       {
         selector: 'node.impact',
         style: {
-          'background-color': cssVar('--color-warning'),
+          'background-color': IMPACT_COLOR,
           width: 18,
           height: 18,
           'border-width': 1,
@@ -311,7 +342,7 @@ function initGraph() {
     cy!.elements().removeClass('faded selected impact')
 
     const neighborhood = node.closedNeighborhood()
-    cy!.elements().not(neighborhood).addClass('faded')
+    cy!.elements().not(neighborhood).not('.area-hidden').addClass('faded')
     neighborhood.addClass('selected')
     node.removeClass('faded')
 
@@ -386,20 +417,40 @@ watch(() => props.graph, initGraph)
     <div v-if="!graph.nodes.length" class="empty-state">No import data found</div>
     <template v-else>
       <div class="dep-graph__legend">
-        <span class="dep-graph__legend-item dep-graph__legend-item--normal">Source file</span>
-        <span class="dep-graph__legend-item dep-graph__legend-item--god" title="Imported by many other files — changing it could break a lot">Core file (depended on by many)</span>
-        <span class="dep-graph__legend-item dep-graph__legend-item--impact" title="Files that would need updating if you change the selected file">Affected by changes</span>
-        <span class="dep-graph__legend-hint">Click any file to see what it imports and what depends on it</span>
+        <div class="dep-graph__legend-row">
+          <span
+            v-for="[area, color] in Object.entries(AREA_COLORS)"
+            :key="area"
+            class="dep-graph__legend-item"
+            :style="{ '--legend-dot': color }"
+          >{{ area }}</span>
+        </div>
+        <div class="dep-graph__legend-row">
+          <span class="dep-graph__legend-item" :style="{ '--legend-dot': GOD_COLOR }" title="Imported by many other files — changing it could break a lot">Core file</span>
+          <span class="dep-graph__legend-item" :style="{ '--legend-dot': IMPACT_COLOR }" title="Files that would need updating if you change the selected file">Affected by change</span>
+          <span class="dep-graph__legend-hint">Click any file to see what it imports and what depends on it</span>
+        </div>
       </div>
       <div class="dep-graph__filters">
         <span class="dep-graph__filter-label">Filter by area:</span>
         <button
-          v-for="f in ['all', 'frontend', 'api', 'data', 'tests', 'config']"
-          :key="f"
-          :class="['dep-graph__filter-btn', subsystemFilter === f && 'dep-graph__filter-btn--active']"
-          :title="f === 'all' ? 'Show all files' : `Show only files in the ${f} area`"
-          @click="applySubsystemFilter(f)"
-        >{{ f }}</button>
+          class="dep-graph__filter-btn"
+          :class="{ 'dep-graph__filter-btn--active': subsystemFilter === 'all' }"
+          title="Show all files"
+          @click="applySubsystemFilter('all')"
+        >all</button>
+        <button
+          v-for="[area, color] in Object.entries(AREA_COLORS).filter(([a]) => a !== 'other')"
+          :key="area"
+          class="dep-graph__filter-btn"
+          :class="{ 'dep-graph__filter-btn--active': subsystemFilter === area }"
+          :style="subsystemFilter === area ? { background: color, borderColor: color, color: '#fff' } : { '--area-color': color }"
+          :title="`Show only files in the ${area} area`"
+          @click="applySubsystemFilter(area)"
+        >
+          <span class="dep-graph__filter-dot" :style="{ background: color }" />
+          {{ area }}
+        </button>
       </div>
       <div class="dep-graph__stage">
         <div ref="container" class="dep-graph__canvas" />

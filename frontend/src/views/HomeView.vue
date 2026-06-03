@@ -12,6 +12,7 @@ import { useAnalysisStore } from '../stores/analysis'
 import type { RunListItem, FeaturedRepo } from '../stores/analysis'
 import { useAuthStore } from '../stores/auth'
 import logoUrl from '../assets/logo.png'
+import LanguageList from '../components/ui/LanguageList.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -211,6 +212,11 @@ const ghostRows = computed(() => Math.max(0, perPage - items.value.length))
         🧪 Experimental hobby project — results are public and cached. Private repos at your own risk.
       </p>
     </main>
+
+    <div class="hero__lang-section">
+      <p class="hero__lang-heading">Supported Languages &amp; Frameworks</p>
+      <LanguageList mode="marquee" />
+    </div>
 
     <div v-if="spotlight || featured" class="home-discovery">
       <RepoOfWeekCard v-if="spotlight" :spotlight="spotlight" />

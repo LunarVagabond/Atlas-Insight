@@ -51,6 +51,16 @@ const router = createRouter({
       component: () => import('../views/AboutView.vue'),
     },
     {
+      path: '/learn',
+      name: 'learn',
+      component: () => import('../views/LearnView.vue'),
+    },
+    {
+      path: '/resources',
+      name: 'resources',
+      component: () => import('../views/ResourcesView.vue'),
+    },
+    {
       path: '/spotlight',
       name: 'spotlight',
       component: () => import('../views/SpotlightView.vue'),

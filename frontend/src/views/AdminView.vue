@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import axios from 'axios'
 import AppCard from '../components/ui/AppCard.vue'
 import AppButton from '../components/ui/AppButton.vue'
@@ -37,10 +38,11 @@ interface WatchedRepo {
   last_analyzed_at: string | null
 }
 
+const router = useRouter()
+
 const stats = ref<AdminStats | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
-const accessDenied = ref(false)
 
 const rateLimit = ref<RateLimitData | null>(null)
 const rateLimitLoading = ref(false)
@@ -66,7 +68,7 @@ async function fetchStats() {
     fetchRateLimit()
   } catch (err: any) {
     if (err?.response?.status === 403) {
-      accessDenied.value = true
+      router.replace('/')
     } else {
       error.value = 'Failed to load admin stats'
     }
@@ -197,20 +199,15 @@ onMounted(fetchStats)
 
 <template>
   <div class="results-layout">
-    <div class="results-layout__header">
-      <h1 class="panel__title" style="font-size:1.5rem">Ops Dashboard</h1>
-    </div>
-
     <div class="results-layout__content">
-      <div v-if="accessDenied" class="empty-state">
-        Staff access only.
-      </div>
-
-      <LoadingSpinner v-else-if="loading" label="Loading stats…" />
+      <LoadingSpinner v-if="loading" label="Loading stats…" />
 
       <div v-else-if="error" class="empty-state">{{ error }}</div>
 
       <template v-else-if="stats">
+        <div class="results-layout__header">
+          <h1 class="panel__title" style="font-size:1.5rem">Ops Dashboard</h1>
+        </div>
         <!-- System Health -->
         <div class="panel">
           <p class="panel__title">System Health</p>

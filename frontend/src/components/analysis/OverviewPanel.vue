@@ -172,5 +172,35 @@ function formatMonth(ym: string): string {
         </li>
       </ul>
     </div>
+
+    <!-- Sub-project scorecards -->
+    <div v-if="result.repo_type?.sub_projects?.length" class="overview-subprojects">
+      <h3 class="overview-subprojects__title">Sub-projects</h3>
+      <div class="overview-subprojects__grid">
+        <AppCard
+          v-for="sp in result.repo_type.sub_projects"
+          :key="sp.name"
+          class="overview-subprojects__card"
+        >
+          <div class="overview-subprojects__name">{{ sp.name }}</div>
+          <div class="overview-subprojects__langs">
+            <AppBadge v-for="lang in sp.languages.slice(0, 2)" :key="lang" variant="info">{{ lang }}</AppBadge>
+          </div>
+          <div v-if="sp.oss_score" class="overview-subprojects__score">
+            <span
+              class="overview-subprojects__score-val"
+              :class="`overview-subprojects__score-val--${sp.oss_score.score >= 7 ? 'good' : sp.oss_score.score >= 4 ? 'mid' : 'low'}`"
+            >{{ sp.oss_score.score.toFixed(1) }}</span>
+            <span class="overview-subprojects__score-label">{{ sp.oss_score.label }}</span>
+          </div>
+          <div class="overview-subprojects__deps">
+            {{ sp.dependencies.dependency_count }} deps
+            <span v-if="sp.security.issue_count" class="overview-subprojects__issues">
+              · {{ sp.security.issue_count }} issue{{ sp.security.issue_count === 1 ? '' : 's' }}
+            </span>
+          </div>
+        </AppCard>
+      </div>
+    </div>
   </div>
 </template>

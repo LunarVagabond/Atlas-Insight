@@ -82,6 +82,8 @@ function closeMobileNav() { mobileNavOpen.value = false }
         <RouterLink to="/spotlight" class="navbar__nav-link">Spotlight</RouterLink>
         <RouterLink to="/trending" class="navbar__nav-link">Trending</RouterLink>
         <RouterLink v-if="authStore.isAuthenticated" to="/dashboard" class="navbar__nav-link">My Analyses</RouterLink>
+        <RouterLink to="/learn" class="navbar__nav-link">Learn</RouterLink>
+        <RouterLink to="/resources" class="navbar__nav-link">Resources</RouterLink>
         <RouterLink to="/about" class="navbar__nav-link">About</RouterLink>
         <RouterLink v-if="authStore.user?.is_staff || authStore.user?.is_superuser" to="/admin" class="navbar__nav-link navbar__nav-link--admin">Ops</RouterLink>
       </div>
@@ -153,6 +155,8 @@ function closeMobileNav() { mobileNavOpen.value = false }
           <RouterLink to="/spotlight" class="mobile-nav-overlay__link" @click="closeMobileNav">Spotlight</RouterLink>
           <RouterLink to="/trending" class="mobile-nav-overlay__link" @click="closeMobileNav">Trending</RouterLink>
           <RouterLink v-if="authStore.isAuthenticated" to="/dashboard" class="mobile-nav-overlay__link" @click="closeMobileNav">My Analyses</RouterLink>
+          <RouterLink to="/learn" class="mobile-nav-overlay__link" @click="closeMobileNav">Learn</RouterLink>
+          <RouterLink to="/resources" class="mobile-nav-overlay__link" @click="closeMobileNav">Resources</RouterLink>
           <RouterLink to="/about" class="mobile-nav-overlay__link" @click="closeMobileNav">About</RouterLink>
           <RouterLink v-if="authStore.user?.is_staff || authStore.user?.is_superuser" to="/admin" class="mobile-nav-overlay__link mobile-nav-overlay__link--admin" @click="closeMobileNav">Ops</RouterLink>
         </nav>
@@ -166,7 +170,7 @@ function closeMobileNav() { mobileNavOpen.value = false }
       <span class="app-footer__copy">
         <span v-if="isDev" class="app-footer__version-badge app-footer__version-badge--dev">{{ gitSha }}</span>
         <span v-else class="app-footer__version-badge">v{{ appVersion }}</span>
-        © {{ new Date().getFullYear() }} Lunar Vagabond. All rights reserved.
+        © {{ new Date().getFullYear() }} Lunar Vagabond · <a href="https://github.com/LunarVagabond/Atlas-Insight/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" class="app-footer__license-link">MIT License</a>
       </span>
       <span class="app-footer__support">
         <span class="app-footer__support-text">If you enjoy Atlas Insight, consider</span>
