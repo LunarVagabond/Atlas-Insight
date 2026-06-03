@@ -284,7 +284,7 @@ onUnmounted(() => {
             </AppButton>
             <div v-if="result" class="results-header__overflow" @click.stop>
               <AppButton variant="secondary" size="sm" @click="showOverflow = !showOverflow" title="More actions">
-                ⋯
+                Export
               </AppButton>
               <div v-if="showOverflow" class="results-header__overflow-menu">
                 <button class="results-header__overflow-item" @click="exportJson(); showOverflow = false">↓ Export JSON</button>
@@ -329,7 +329,7 @@ onUnmounted(() => {
         </div>
         <div v-else-if="isPolling" class="analysis-progress__track">
           <span
-            v-for="(step, i) in PROGRESS_STEPS"
+            v-for="step in PROGRESS_STEPS"
             :key="step.key"
             class="analysis-progress__dot"
           />
@@ -415,6 +415,11 @@ onUnmounted(() => {
           <div class="overview-split">
             <div class="overview-split__left">
               <OverviewPanel :result="result" />
+              <SimilarReposPanel
+                v-if="store.similarRuns !== null || store.similarLoading"
+                :runs="store.similarRuns ?? []"
+                :loading="store.similarLoading"
+              />
             </div>
             <div class="overview-split__right">
               <AnalysisStatusCard v-if="store.run" :run="store.run" />
@@ -425,11 +430,6 @@ onUnmounted(() => {
               />
             </div>
           </div>
-          <SimilarReposPanel
-            v-if="store.similarRuns !== null || store.similarLoading"
-            :runs="store.similarRuns ?? []"
-            :loading="store.similarLoading"
-          />
         </template>
         <template v-if="activeTab === 'Project'">
           <ProjectPanel :result="result" />
@@ -473,7 +473,7 @@ onUnmounted(() => {
         <DependenciesPanel v-if="activeTab === 'Dependencies'" :deps="result.dependencies" :security="result.security" />
         <SecurityPanel v-if="activeTab === 'Security'" :security="result.security" :heuristics="result.heuristics" :structure="result.structure" />
         <HeuristicsPanel v-if="activeTab === 'Heuristics'" :signals="result.heuristics" :result="result" />
-        <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" :structure="result.structure" :todos="result.todos" :arch-tours="result.arch_tours ?? []" />
+        <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" :structure="result.structure" :todos="result.todos" :arch-tours="result.arch_tours ?? []" :commits="result.commits" />
         <ArchitectureToursPanel v-if="activeTab === 'Tours'" :tours="result.arch_tours ?? []" :repo-url="store.run?.repo_url" :run-id="runId" />
       </div>
       </Transition>

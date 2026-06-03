@@ -5,6 +5,7 @@ import AppBadge from '../ui/AppBadge.vue'
 import ContributionDrawer from './ContributionDrawer.vue'
 import ContributionPathPanel from './ContributionPathPanel.vue'
 import type { ArchTour, ContributionOpportunity, StructureData, TodoData } from '../../stores/analysis'
+import type { CommitData } from '../../types/commits'
 
 const props = defineProps<{
   opportunities: ContributionOpportunity[]
@@ -12,7 +13,19 @@ const props = defineProps<{
   structure?: StructureData
   todos?: TodoData
   archTours?: ArchTour[]
+  commits?: CommitData
 }>()
+
+const STYLE_LABELS: Record<string, string> = {
+  conventional_commits: 'Conventional Commits',
+  ticket_prefix: 'Ticket / Issue Prefix',
+  bracket_prefix: 'Bracket Prefix',
+  emoji_prefix: 'Emoji Prefix',
+  sentence_case: 'Sentence Case',
+  mixed: 'Mixed / No Clear Standard',
+}
+
+const conventions = computed(() => props.commits?.commit_conventions ?? null)
 
 type CategoryFilter = 'all' | ContributionOpportunity['category']
 const activeFilter = ref<CategoryFilter>('all')
@@ -125,6 +138,37 @@ const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
         — {{ heuristicCount }} from code analysis, {{ githubCount }} from open GitHub issues
       </template>
     </p>
+
+    <!-- Commit conventions -->
+    <div v-if="conventions && conventions.style !== 'mixed'" class="contrib-conventions">
+      <h3 class="contrib-conventions__title">Commit Conventions</h3>
+
+      <div v-if="conventions.format_template" class="contrib-conventions__template-block">
+        <span class="contrib-conventions__template-label">Commit format</span>
+        <code class="contrib-conventions__template">{{ conventions.format_template }}</code>
+        <span class="contrib-conventions__template-sub">
+          {{ STYLE_LABELS[conventions.style] ?? conventions.style }} · {{ Math.round(conventions.style_confidence * 100) }}% of commits follow this pattern
+        </span>
+      </div>
+
+      <div v-if="conventions.examples.length" class="contrib-conventions__examples">
+        <span class="contrib-conventions__examples-label">Real examples</span>
+        <code v-for="(ex, i) in conventions.examples" :key="i" class="contrib-conventions__example">{{ ex }}</code>
+      </div>
+
+      <div class="contrib-conventions__grid">
+        <div class="contrib-conventions__stat">
+          <span class="contrib-conventions__stat-label">Avg subject length</span>
+          <span class="contrib-conventions__stat-value">{{ conventions.avg_subject_length }} chars</span>
+          <span class="contrib-conventions__stat-sub">{{ Math.round(conventions.subject_under_72_pct * 100) }}% under 72</span>
+        </div>
+        <div v-if="conventions.issue_ref_rate >= 0.2" class="contrib-conventions__stat">
+          <span class="contrib-conventions__stat-label">Issue references</span>
+          <span class="contrib-conventions__stat-value">{{ Math.round(conventions.issue_ref_rate * 100) }}%</span>
+          <span class="contrib-conventions__stat-sub">of commits link an issue</span>
+        </div>
+      </div>
+    </div>
 
     <!-- Category filter -->
     <div v-if="availableFilters.length > 2" class="table-filter-bar">

@@ -131,6 +131,39 @@ def _token_has_repo_scope(token: str) -> bool:
         return True
 
 
+def _user_can_access_repo(user, owner: str, name: str) -> bool:
+    from django.core.cache import cache
+    cache_key = f'repo_access_{user.pk}_{owner}_{name}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        from allauth.socialaccount.models import SocialToken
+        import requests as _requests
+        social = SocialToken.objects.filter(
+            account__user=user,
+            account__provider='github',
+        ).first()
+        if not social:
+            cache.set(cache_key, False, 900)
+            return False
+        r = _requests.get(
+            f'https://api.github.com/repos/{owner}/{name}',
+            headers={
+                'Authorization': f'Bearer {social.token}',
+                'Accept': 'application/vnd.github+json',
+            },
+            timeout=5,
+        )
+        result = r.status_code == 200
+    except Exception:
+        result = False
+
+    cache.set(cache_key, result, 900)
+    return result
+
+
 class AnalyzeRequest(Schema):
     url: str
     pat: Optional[str] = None
@@ -347,8 +380,11 @@ def get_run(request, run_id: uuid.UUID):
     except AnalysisRun.DoesNotExist:
         raise HttpError(404, 'Run not found')
     if run.repo.is_private:
-        if not request.user.is_authenticated or run.user != request.user:
+        if not request.user.is_authenticated:
             raise HttpError(403, 'Access denied')
+        if run.user != request.user:
+            if not _user_can_access_repo(request.user, run.repo.owner, run.repo.name):
+                raise HttpError(403, 'Access denied')
     if run.status == 'completed':
         Repository.objects.filter(pk=run.repo_id).update(view_count=F('view_count') + 1)
     return RunStatusSchema(

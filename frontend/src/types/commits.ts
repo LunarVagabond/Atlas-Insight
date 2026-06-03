@@ -7,6 +7,16 @@ export interface MonthlyCommit {
   parents?: string[]
 }
 
+export interface CommitConventions {
+  style: 'conventional_commits' | 'ticket_prefix' | 'jira_prefix' | 'bracket_prefix' | 'emoji_prefix' | 'sentence_case' | 'mixed'
+  style_confidence: number
+  avg_subject_length: number
+  subject_under_72_pct: number
+  issue_ref_rate: number
+  examples: string[]
+  format_template?: string
+}
+
 export interface CommitData {
   total_commits: number
   total_contributors: number
@@ -19,6 +29,7 @@ export interface CommitData {
   contributor_churn: { month: string; active: number; new: number; lost: number }[]
   monthly_commits?: Record<string, MonthlyCommit[]>
   reverted_commits?: { sha: string; message: string; date: string; files: string[] }[]
+  commit_conventions?: CommitConventions
 }
 
 export interface FileHistoryCommit {

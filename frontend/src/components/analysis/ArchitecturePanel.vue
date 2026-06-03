@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
-import FileHistoryDrawer from './FileHistoryDrawer.vue'
-import type { GraphData, StructureData } from '../../stores/analysis'
+import type { GraphData, StructureData, FileHistory } from '../../stores/analysis'
+import { useAnalysisStore } from '../../stores/analysis'
 import { useTableFilter } from '../../composables/useTableFilter'
 
 const props = defineProps<{ graph: GraphData; hotFiles?: { file: string; commit_count: number }[]; structure?: StructureData; runId?: string; repoUrl?: string }>()
@@ -62,6 +62,9 @@ function buildFileInfo(id: string): FileInfo {
 }
 
 const drawerFile = ref<FileInfo | null>(null)
+const store = useAnalysisStore()
+const drawerHistory = ref<FileHistory | null>(null)
+const drawerHistoryLoading = ref(false)
 
 function openDrawer(id: string) {
   drawerFile.value = buildFileInfo(id)
@@ -69,10 +72,22 @@ function openDrawer(id: string) {
 
 function closeDrawer() {
   drawerFile.value = null
+  drawerHistory.value = null
 }
 
-const activeFilePath = ref<string | null>(null)
-function openFileHistory(file: string) { activeFilePath.value = file }
+function formatDate(iso: string): string {
+  if (!iso) return ''
+  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+watch(drawerFile, async (f) => {
+  drawerHistory.value = null
+  if (!f || !props.runId) return
+  drawerHistoryLoading.value = true
+  const result = await store.fetchFileHistory(props.runId, f.id)
+  drawerHistory.value = result ?? null
+  drawerHistoryLoading.value = false
+})
 
 // ── File type descriptions ────────────────────────────────────────────────────
 
@@ -385,7 +400,6 @@ const explorerResults = computed(() => {
                 <th>#</th>
                 <th class="runs-table__sortable" @click="hotFilesFilter.setSort('file')">File {{ hotFilesFilter.sortIcon('file') }}</th>
                 <th class="runs-table__sortable" @click="hotFilesFilter.setSort('commit_count')">Changes {{ hotFilesFilter.sortIcon('commit_count') }}</th>
-                <th v-if="runId"></th>
               </tr>
             </thead>
             <tbody>
@@ -398,9 +412,6 @@ const explorerResults = computed(() => {
                 <td>{{ idx + 1 }}</td>
                 <td>{{ hf.file }}</td>
                 <td>{{ hf.commit_count.toLocaleString() }}</td>
-                <td v-if="runId">
-                  <button v-if="!hf.file.endsWith('/')" class="file-history-btn" :title="`View commit history for ${hf.file}`" @click.stop="openFileHistory(hf.file)">📜</button>
-                </td>
               </tr>
             </tbody>
           </table>
@@ -522,17 +533,55 @@ const explorerResults = computed(() => {
                 </div>
                 <p v-else class="arch-file-drawer__empty">Nothing imports this module</p>
               </div>
+
+              <div v-if="runId" class="arch-file-drawer__section">
+                <h4 class="arch-file-drawer__section-title">
+                  Commit History
+                  <span v-if="drawerHistory" class="arch-file-drawer__count">{{ drawerHistory.commits.length }}</span>
+                </h4>
+                <div v-if="drawerHistoryLoading" class="file-history__loading">
+                  <span class="spinner" />
+                  <span>Loading…</span>
+                </div>
+                <template v-else-if="drawerHistory">
+                  <div class="file-history__actions">
+                    <a
+                      v-if="repoUrl && drawerFile"
+                      :href="`${repoUrl}/blob/HEAD/${drawerFile.id}`"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="btn btn--secondary btn--sm"
+                    >View on GitHub ↗</a>
+                  </div>
+                  <p v-if="!drawerHistory.commits.length" class="file-history__empty">No commit history found.</p>
+                  <div v-else class="file-history__timeline">
+                    <div v-for="commit in drawerHistory.commits" :key="commit.full_sha" class="fh-commit">
+                      <div class="fh-commit__header">
+                        <a :href="commit.url" target="_blank" rel="noopener noreferrer" class="fh-commit__sha">{{ commit.sha }}</a>
+                        <span class="fh-commit__date">{{ formatDate(commit.date) }}</span>
+                        <span class="fh-commit__author">{{ commit.author }}</span>
+                      </div>
+                      <p class="fh-commit__message">{{ commit.message }}</p>
+                      <div v-if="commit.issue_refs.length" class="fh-commit__refs">
+                        <span class="fh-commit__refs-label">References:</span>
+                        <a
+                          v-for="ref in commit.issue_refs"
+                          :key="ref"
+                          :href="repoUrl ? `${repoUrl}/issues/${ref}` : '#'"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="fh-commit__ref-link"
+                        >#{{ ref }}</a>
+                      </div>
+                    </div>
+                  </div>
+                  <p class="contrib-drawer__disclaimer">Showing most recent {{ drawerHistory.commits.length }} commits.</p>
+                </template>
+              </div>
             </div>
           </div>
         </div>
       </Transition>
     </Teleport>
-
-    <FileHistoryDrawer
-      :run-id="runId ?? null"
-      :path="activeFilePath"
-      :repo-url="repoUrl"
-      @close="activeFilePath = null"
-    />
   </div>
 </template>

@@ -1,0 +1,120 @@
+{% load i18n %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign-in Error — Atlas Insight</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-secondary: #8b949e;
+      --accent: #58a6ff;
+      --error-bg: #2a1219;
+      --error-border: #6e1c26;
+      --error-text: #f85149;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f6f8fa;
+        --surface: #ffffff;
+        --border: #d0d7de;
+        --text: #1f2328;
+        --text-secondary: #656d76;
+        --accent: #0969da;
+        --error-bg: #fff0ee;
+        --error-border: #ffc1ba;
+        --error-text: #cf222e;
+      }
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .wordmark {
+      margin-bottom: 28px;
+      text-decoration: none;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 32px;
+      width: 100%;
+      max-width: 360px;
+      text-align: center;
+    }
+
+    .error-icon {
+      font-size: 32px;
+      margin-bottom: 16px;
+    }
+
+    .card__title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .card__subtitle {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 9px 18px;
+      background: var(--accent);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+
+    .btn:hover { opacity: 0.85; }
+  </style>
+</head>
+<body>
+
+  <a href="/" class="wordmark">Atlas Insight</a>
+
+  <div class="card">
+    <div class="error-icon">⚠️</div>
+    <h1 class="card__title">Sign-in failed</h1>
+    <p class="card__subtitle">An error occurred while signing in with GitHub. This can happen if you denied access or if there was a temporary issue.</p>
+    <a href="/accounts/github/login/" class="btn">Try again</a>
+  </div>
+
+</body>
+</html>
