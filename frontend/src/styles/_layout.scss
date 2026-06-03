@@ -161,6 +161,32 @@
     &:hover { background: var(--color-surface-hover); }
   }
 
+  &__more {
+    position: relative;
+  }
+
+  &__more-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+
+    &--open {
+      color: var(--color-text);
+      background: var(--color-surface-hover);
+    }
+  }
+
+  &__more-dropdown {
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 130px;
+  }
+
   // Mobile nav-links placeholder — actual overlay is handled by .mobile-nav-overlay
   &__mobile-drawer { display: none; }
 

@@ -393,7 +393,7 @@ def get_run_vulnerabilities(request, run_id: uuid.UUID):
 @router.get('/runs/{run_id}/ai-summary')
 @ratelimit(key='user_or_ip', rate='60/h', method='GET', block=False)
 def get_ai_summary(request, run_id: uuid.UUID):
-    """Compact plain-text repo summary optimised for pasting into AI prompts."""
+    """AI onboarding brief — paste this at the start of a chat to orient the AI to the project."""
     _assert_not_limited(request)
     try:
         run = AnalysisRun.objects.select_related('repo').get(id=run_id, status='completed')
@@ -407,74 +407,150 @@ def get_ai_summary(request, run_id: uuid.UUID):
     owner, name = run.repo.owner, run.repo.name
     meta = r.get('github_meta') or {}
     commits = r.get('commits') or {}
-    heuristics = r.get('heuristics') or []
-    oss = r.get('oss_score') or {}
     structure = r.get('structure') or {}
     deps = r.get('dependencies') or {}
     graph = r.get('graph') or {}
-    classification = r.get('classification') or {}
     security = r.get('security') or {}
+    repo_type = r.get('repo_type') or {}
+    arch_tours = r.get('arch_tours') or []
+    opportunities = r.get('contribution_opportunities') or []
+    commit_conventions = (r.get('commits') or {}).get('commit_conventions') or {}
 
-    overall_risk = (
-        round(sum(h['score'] for h in heuristics) / len(heuristics))
-        if heuristics else None
-    )
-    top_langs = [
-        f"{l['name']} {round(l['pct'] * 100)}%"
-        for l in (structure.get('languages') or [])[:3]
+    # Languages — pct already 0-100
+    all_langs = [
+        f"{l['name']} ({round(l['pct'])}%)"
+        for l in (structure.get('languages') or [])
+        if l.get('pct', 0) >= 1
     ]
-    top_deps = [
-        d['name'] for d in (deps.get('dependencies') or [])
-        if not d.get('dev')
-    ][:8]
-    hot = [f.get('file', '') for f in (structure.get('hot_files') or [])[:5]]
-    top_contributors = [
-        c['author'] for c in (commits.get('top_contributors') or [])[:5]
-    ]
-    tags = (classification.get('tags') or [])[:6]
-    sec_issues = len(security.get('issues') or [])
+
+    prod_deps = [d for d in (deps.get('dependencies') or []) if not d.get('dev')]
+    dev_deps  = [d for d in (deps.get('dependencies') or []) if d.get('dev')]
+    key_deps  = [d['name'] for d in prod_deps[:10]]
+
+    hot_files    = [f.get('file', '') for f in (structure.get('hot_files') or [])[:8] if f.get('file')]
+    god_modules  = [m.get('module', '') for m in (graph.get('god_modules') or [])[:8] if m.get('module')]
+    top_contribs = [c['author'] for c in (commits.get('top_contributors') or [])[:5]]
+
+    sec_issues = security.get('issues') or []
     vuln_count = len(security.get('vulnerabilities') or [])
+    cycle_count = graph.get('cycle_count', 0)
+    active_90d  = commits.get('active_contributor_count_90d')
 
-    lines = [
-        f"# {owner}/{name}",
-        f"URL: {run.repo.url}",
-        "",
-        f"Primary language: {meta.get('primary_language') or '—'}",
-    ]
-    if top_langs:
-        lines.append(f"Language breakdown: {', '.join(top_langs)}")
-    if meta.get('stars') is not None:
-        lines.append(f"Stars: {meta['stars']} | Forks: {meta.get('forks', '—')} | Open issues: {meta.get('open_issues', '—')}")
-    if oss:
-        lines.append(f"OSS Score: {oss.get('label', '—')} ({oss.get('score', '—')}/10)")
-    if overall_risk is not None:
-        risk_label = 'Low' if overall_risk < 30 else 'Medium' if overall_risk < 60 else 'High'
-        lines.append(f"Overall Risk: {risk_label} ({overall_risk}/100)")
-    if tags:
-        lines.append(f"Tech stack: {', '.join(tags)}")
-    if commits.get('commit_count'):
-        lines.append(f"Total commits: {commits['commit_count']}")
-    if commits.get('active_contributor_count_90d') is not None:
-        lines.append(f"Active contributors (90d): {commits['active_contributor_count_90d']}")
-    if top_contributors:
-        lines.append(f"Top contributors: {', '.join(top_contributors)}")
-    prod_dep_count = len([d for d in (deps.get('dependencies') or []) if not d.get('dev')])
-    dev_dep_count = len([d for d in (deps.get('dependencies') or []) if d.get('dev')])
-    if prod_dep_count or dev_dep_count:
-        lines.append(f"Dependencies: {prod_dep_count} prod, {dev_dep_count} dev")
-    if top_deps:
-        lines.append(f"Key prod deps: {', '.join(top_deps)}")
+    sub_projects = repo_type.get('sub_projects') or []
+    repo_kind    = repo_type.get('type', 'single')
+
+    lines: list[str] = []
+
+    description = (meta.get('description') or '').strip()
+    primary_lang = meta.get('primary_language') or (all_langs[0].split(' ')[0] if all_langs else '')
+
+    # ── Opening sentence ─────────────────────────────────────────────────────
+    # "<name> is a <description>. It uses:"
+    if description:
+        opener = f"{name} is a project at {run.repo.url}\n{description}\n\nIt uses:"
+    else:
+        opener = f"{name} is a {primary_lang} project at {run.repo.url}\n\nIt uses:"
+    lines += [opener]
+    for lang in all_langs:
+        lines.append(f"  - {lang}")
+    lines.append("")
+
+    # ── Size + structure ─────────────────────────────────────────────────────
+    size_parts = []
+    if structure.get('total_files'):
+        size_parts.append(f"{structure['total_files']:,} files")
+    if structure.get('total_loc'):
+        size_parts.append(f"{structure['total_loc']:,} lines of code")
+    if size_parts:
+        lines.append(f"The codebase is {' and '.join(size_parts)}.")
+
     if graph.get('node_count'):
-        lines.append(f"Architecture: {graph['node_count']} modules, {graph.get('edge_count', 0)} edges, {graph.get('cycle_count', 0)} cycles")
-    if hot:
-        lines.append(f"Most-changed files: {', '.join(hot)}")
-    if sec_issues or vuln_count:
-        lines.append(f"Security: {sec_issues} flagged patterns, {vuln_count} CVEs")
-    lines += [
-        "",
-        f"Analysis date: {run.completed_at.strftime('%Y-%m-%d') if run.completed_at else '—'}",
-        f"Atlas Insight run: {run.id}",
-    ]
+        arch_sentence = f"There are {graph['node_count']} modules in the architecture with {graph.get('edge_count', 0)} import edges"
+        if cycle_count:
+            arch_sentence += f" and {cycle_count} circular dependencies that should be resolved before large refactors"
+        arch_sentence += "."
+        lines.append(arch_sentence)
+    lines.append("")
 
-    summary = '\n'.join(lines)
+    # ── Sub-projects (monorepo) ───────────────────────────────────────────────
+    if sub_projects:
+        lines.append(f"This is a {repo_kind} with the following sub-projects:")
+        for sp in sub_projects:
+            sp_langs = ', '.join(sp.get('languages') or []) or '—'
+            sp_stack = ', '.join(sp.get('tech_stack') or [])
+            sp_line = f"  - {sp['name']}/ ({sp_langs}"
+            if sp_stack:
+                sp_line += f", {sp_stack}"
+            sp_line += ")"
+            lines.append(sp_line)
+        lines.append("")
+
+    # ── Key files — core + hot ────────────────────────────────────────────────
+    if god_modules or hot_files:
+        lines.append("Key files to understand this codebase:")
+        if god_modules:
+            lines.append("  Core files (imported widely — read these first):")
+            for f in god_modules:
+                lines.append(f"    - {f}")
+        if hot_files:
+            lines.append("  Most actively changed files:")
+            for f in hot_files:
+                lines.append(f"    - {f}")
+        lines.append("")
+
+    # ── Architecture tours ────────────────────────────────────────────────────
+    if arch_tours:
+        lines.append("Suggested entry points by subsystem:")
+        for tour in arch_tours[:5]:
+            entry = (tour.get('entry_files') or [])[:3]
+            if entry:
+                lines.append(f"  {tour['name']}: {', '.join(entry)}")
+        lines.append("")
+
+    # ── Dependencies ─────────────────────────────────────────────────────────
+    if key_deps:
+        dep_line = f"Key dependencies: {', '.join(key_deps)}"
+        remaining = len(prod_deps) - len(key_deps)
+        if remaining > 0:
+            dep_line += f" (plus {remaining} more production deps and {len(dev_deps)} dev deps)"
+        lines.append(dep_line + ".")
+        lines.append("")
+
+    # ── Contributors ─────────────────────────────────────────────────────────
+    if top_contribs:
+        c_line = f"Main contributors: {', '.join(top_contribs)}"
+        if active_90d is not None:
+            c_line += f" — {active_90d} active in the last 90 days"
+        lines.append(c_line + ".")
+        lines.append("")
+
+    # ── Commit convention ─────────────────────────────────────────────────────
+    style = commit_conventions.get('style', '')
+    template = commit_conventions.get('format_template', '')
+    if style and style != 'mixed' and template:
+        lines.append(f"Commit convention: {style} — format: {template}")
+        lines.append("")
+
+    # ── Open tasks ────────────────────────────────────────────────────────────
+    open_opps = [o for o in opportunities if not o.get('has_open_pr')]
+    if open_opps:
+        lines.append("Open tasks and known issues:")
+        for opp in open_opps[:6]:
+            diff = opp.get('difficulty', 'unknown')
+            title = opp.get('title', '')
+            issue = f" (#{opp['issue_number']})" if opp.get('issue_number') else ''
+            lines.append(f"  - [{diff}] {title}{issue}")
+        if len(open_opps) > 6:
+            lines.append(f"  … and {len(open_opps) - 6} more")
+        lines.append("")
+
+    # ── Security ─────────────────────────────────────────────────────────────
+    if vuln_count or sec_issues:
+        if vuln_count:
+            lines.append(f"⚠ Dependency security: {vuln_count} CVEs detected — check before adding or upgrading packages.")
+        if sec_issues:
+            lines.append(f"⚠ {len(sec_issues)} security patterns flagged (possible accidental secrets or gitignore gaps).")
+        lines.append("")
+
+    summary = '\n'.join(lines).rstrip()
     return {'summary': summary}

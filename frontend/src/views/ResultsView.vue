@@ -238,19 +238,29 @@ function copyCard() {
   setTimeout(() => { cardCopied.value = false }, 2000)
 }
 
+const showAiSummaryModal = ref(false)
+const aiSummaryText = ref('')
 const aiSummaryCopied = ref(false)
 const aiSummaryLoading = ref(false)
-async function copyAiSummary() {
+
+async function openAiSummary() {
   if (!store.run || aiSummaryLoading.value) return
+  showAiSummaryModal.value = true
+  if (aiSummaryText.value) return  // already loaded
   aiSummaryLoading.value = true
   try {
     const { data } = await axios.get(`/api/v1/repositories/runs/${store.run.id}/ai-summary`)
-    await navigator.clipboard.writeText(data.summary)
-    aiSummaryCopied.value = true
-    setTimeout(() => { aiSummaryCopied.value = false }, 2500)
+    aiSummaryText.value = data.summary
   } finally {
     aiSummaryLoading.value = false
   }
+}
+
+async function copyAiSummary() {
+  if (!aiSummaryText.value) return
+  await navigator.clipboard.writeText(aiSummaryText.value)
+  aiSummaryCopied.value = true
+  setTimeout(() => { aiSummaryCopied.value = false }, 2500)
 }
 
 const isArchived = computed(() => result.value?.github_meta?.archived === true)
@@ -316,8 +326,8 @@ onUnmounted(() => {
               <div v-if="showOverflow" class="results-header__overflow-menu">
                 <button class="results-header__overflow-item" @click="exportJson(); showOverflow = false">↓ Export JSON</button>
                 <button class="results-header__overflow-item" @click="printPage(); showOverflow = false">⎙ Print / PDF</button>
-                <button class="results-header__overflow-item" :disabled="aiSummaryLoading" @click="copyAiSummary(); showOverflow = false">
-                  {{ aiSummaryCopied ? '✓ Copied!' : aiSummaryLoading ? 'Loading…' : '🤖 Copy AI Summary' }}
+                <button class="results-header__overflow-item" @click="openAiSummary(); showOverflow = false">
+                  🤖 AI Summary
                 </button>
               </div>
             </div>
@@ -552,4 +562,25 @@ onUnmounted(() => {
   </div>
 
   <CompareModal v-if="showCompareModal" @close="showCompareModal = false" />
+
+  <!-- AI Summary modal -->
+  <Teleport to="body">
+    <div v-if="showAiSummaryModal" class="ai-summary-overlay" @click.self="showAiSummaryModal = false">
+      <div class="ai-summary-modal">
+        <div class="ai-summary-modal__header">
+          <span class="ai-summary-modal__title">AI Context Block</span>
+          <div class="ai-summary-modal__actions">
+            <button
+              class="ai-summary-modal__copy"
+              :disabled="!aiSummaryText"
+              @click="copyAiSummary"
+            >{{ aiSummaryCopied ? '✓ Copied' : 'Copy' }}</button>
+            <button class="ai-summary-modal__close" @click="showAiSummaryModal = false">✕</button>
+          </div>
+        </div>
+        <div v-if="aiSummaryLoading" class="ai-summary-modal__loading">Loading…</div>
+        <pre v-else class="ai-summary-modal__body">{{ aiSummaryText }}</pre>
+      </div>
+    </div>
+  </Teleport>
 </template>

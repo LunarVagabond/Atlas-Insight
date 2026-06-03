@@ -55,16 +55,24 @@ onMounted(async () => {
     router.replace({ query: {} })
   }
   window.addEventListener('keydown', onGlobalKey)
+  document.addEventListener('click', onDocClick)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onGlobalKey)
+  document.removeEventListener('click', onDocClick)
 })
 
 const menuOpen = ref(false)
+const moreOpen = ref(false)
 const mobileNavOpen = ref(false)
 
 function closeMobileNav() { mobileNavOpen.value = false }
+
+function onDocClick() {
+  menuOpen.value = false
+  moreOpen.value = false
+}
 </script>
 
 <template>
@@ -82,9 +90,16 @@ function closeMobileNav() { mobileNavOpen.value = false }
         <RouterLink to="/spotlight" class="navbar__nav-link">Spotlight</RouterLink>
         <RouterLink to="/trending" class="navbar__nav-link">Trending</RouterLink>
         <RouterLink v-if="authStore.isAuthenticated" to="/dashboard" class="navbar__nav-link">My Analyses</RouterLink>
-        <RouterLink to="/learn" class="navbar__nav-link">Learn</RouterLink>
-        <RouterLink to="/resources" class="navbar__nav-link">Resources</RouterLink>
-        <RouterLink to="/about" class="navbar__nav-link">About</RouterLink>
+        <div class="navbar__more" @click.stop="moreOpen = !moreOpen">
+          <button class="navbar__nav-link navbar__more-btn" :class="{ 'navbar__more-btn--open': moreOpen }">
+            Reference <span class="navbar__chevron">▾</span>
+          </button>
+          <div v-if="moreOpen" class="navbar__dropdown navbar__more-dropdown">
+            <RouterLink to="/learn" class="navbar__dropdown-item" @click="moreOpen = false">Learn</RouterLink>
+            <RouterLink to="/resources" class="navbar__dropdown-item" @click="moreOpen = false">Resources</RouterLink>
+            <RouterLink to="/about" class="navbar__dropdown-item" @click="moreOpen = false">About</RouterLink>
+          </div>
+        </div>
         <RouterLink v-if="authStore.user?.is_staff || authStore.user?.is_superuser" to="/admin" class="navbar__nav-link navbar__nav-link--admin">Ops</RouterLink>
       </div>
 
@@ -114,7 +129,7 @@ function closeMobileNav() { mobileNavOpen.value = false }
         </button>
 
         <!-- Authenticated -->
-        <div v-else-if="authStore.isAuthenticated" class="navbar__user" @click="menuOpen = !menuOpen">
+        <div v-else-if="authStore.isAuthenticated" class="navbar__user" @click.stop="menuOpen = !menuOpen">
           <img
             v-if="authStore.user?.avatar_url"
             :src="authStore.user.avatar_url"

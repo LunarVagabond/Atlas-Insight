@@ -4233,6 +4233,98 @@
 }
 
 // ===== COMPARE MODAL =====
+.ai-summary-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-overlay);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: $space-4;
+}
+
+.ai-summary-modal {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: $radius-lg;
+  width: 100%;
+  max-width: 680px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px var(--color-shadow);
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: $space-4 $space-5;
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+  }
+
+  &__title {
+    font-weight: 600;
+    font-size: 0.9375rem;
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+  }
+
+  &__copy {
+    font-size: 0.8125rem;
+    padding: 4px 12px;
+    border: 1px solid var(--color-accent);
+    border-radius: $radius-md;
+    background: none;
+    color: var(--color-accent);
+    cursor: pointer;
+    transition: background $transition-fast;
+
+    &:hover:not(:disabled) { background: var(--color-accent); color: #fff; }
+    &:disabled { opacity: 0.5; cursor: default; }
+  }
+
+  &__close {
+    font-size: 1rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-text-muted);
+    padding: 4px 8px;
+    line-height: 1;
+
+    &:hover { color: var(--color-text); }
+  }
+
+  &__loading {
+    padding: $space-8;
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+  }
+
+  &__body {
+    flex: 1;
+    overflow-y: auto;
+    padding: $space-5;
+    margin: 0;
+    font-family: $font-mono;
+    font-size: 0.8125rem;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--color-text);
+    background: var(--color-bg);
+    border-bottom-left-radius: $radius-lg;
+    border-bottom-right-radius: $radius-lg;
+  }
+}
+
 .compare-modal-overlay {
   position: fixed;
   inset: 0;

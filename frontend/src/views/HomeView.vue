@@ -221,7 +221,7 @@ function langIconUrl(name: string | null): string | null {
               <th style="width:2rem"></th>
               <th>Author</th>
               <th>Repository</th>
-              <th>Language</th>
+              <th>Primary Language</th>
               <th class="runs-table__sortable" @click="setSort('status')">
                 Status {{ sortIcon('status') }}
               </th>
