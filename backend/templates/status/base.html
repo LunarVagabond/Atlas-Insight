@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}{{ site_name }}{% endblock %}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0b1016;
+      --bg-accent: #121a24;
+      --surface: #141d28;
+      --surface-2: #0f1620;
+      --border: #2a3a4b;
+      --text: #ebf2f8;
+      --text-muted: #a8bbcd;
+      --accent: #2f9bff;
+      --accent-hover: #56adff;
+      --danger: #ef5350;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f4f7fb;
+        --bg-accent: #e9f1fb;
+        --surface: #ffffff;
+        --surface-2: #f6f9fc;
+        --border: #d7e2ee;
+        --text: #1b2838;
+        --text-muted: #556678;
+        --accent: #0a6cd7;
+        --accent-hover: #0958af;
+        --danger: #c62828;
+      }
+    }
+
+    body {
+      min-height: 100dvh;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1000px 500px at 10% -20%, var(--bg-accent), transparent 70%),
+        radial-gradient(900px 400px at 90% 120%, var(--bg-accent), transparent 70%),
+        var(--bg);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .card {
+      width: min(540px, 100%);
+      background: linear-gradient(180deg, var(--surface), var(--surface-2));
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+      text-decoration: none;
+      margin-bottom: 16px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .brand__dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 45%, transparent);
+    }
+
+    h1 {
+      font-size: clamp(24px, 4.5vw, 34px);
+      line-height: 1.15;
+      margin-bottom: 10px;
+      letter-spacing: -0.02em;
+    }
+
+    .muted {
+      color: var(--text-muted);
+      margin-bottom: 18px;
+      font-size: 14px;
+    }
+
+    .note {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 12px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .btn {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: var(--text);
+      background: transparent;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color .15s ease, color .15s ease, transform .15s ease;
+    }
+
+    .btn:hover {
+      border-color: var(--accent-hover);
+      color: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn--primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .btn--primary:hover {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+      color: #fff;
+    }
+
+    .danger {
+      color: var(--danger);
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <a href="{{ frontend_url }}" class="brand">
+      <span class="brand__dot" aria-hidden="true"></span>
+      {{ site_name }}
+    </a>
+
+    {% block content %}{% endblock %}
+
+    <div class="actions">
+      <a href="{{ frontend_url }}" class="btn btn--primary">Go to Home</a>
+      <button type="button" class="btn" onclick="if (window.history.length > 1) { window.history.back(); } else { window.location.href='{{ frontend_url }}'; }">Go Back</button>
+      {% block actions %}{% endblock %}
+    </div>
+  </main>
+</body>
+</html>

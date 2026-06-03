@@ -6,6 +6,12 @@ from ninja import NinjaAPI
 from apps.api.router import router as api_router
 from apps.repositories.router import router as repositories_router
 from apps.users.router import router as auth_router
+from config.error_views import (
+    frontend_home_redirect,
+    handler403 as custom_handler403,
+    handler404 as custom_handler404,
+    handler500 as custom_handler500,
+)
 
 api = NinjaAPI(
     title='Atlas Insight API',
@@ -23,4 +29,9 @@ urlpatterns = [
     path('accounts/', include('allauth.urls')),
     path('', include('django_prometheus.urls')),
     path('api/', api.urls),
+    path('', frontend_home_redirect),
 ]
+
+handler403 = custom_handler403
+handler404 = custom_handler404
+handler500 = custom_handler500

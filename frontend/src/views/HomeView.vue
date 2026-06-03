@@ -208,15 +208,15 @@ const ghostRows = computed(() => Math.max(0, perPage - items.value.length))
         :initial-url="initialUrl"
         @submitted="handleSubmit"
       />
+      <div class="hero__lang-section">
+        <p class="hero__lang-heading">Supported Languages &amp; Frameworks</p>
+        <LanguageList mode="marquee" />
+      </div>
       <p class="hero__disclaimer">
         🧪 Experimental hobby project — results are public and cached. Private repos at your own risk.
       </p>
     </main>
 
-    <div class="hero__lang-section">
-      <p class="hero__lang-heading">Supported Languages &amp; Frameworks</p>
-      <LanguageList mode="marquee" />
-    </div>
 
     <div v-if="spotlight || featured" class="home-discovery">
       <RepoOfWeekCard v-if="spotlight" :spotlight="spotlight" />

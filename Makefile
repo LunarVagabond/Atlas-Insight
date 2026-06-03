@@ -27,6 +27,7 @@ COMPOSE_BARE := docker compose -f $(ROOT_DIR)/docker-compose.yml
         test lint format build type-check \
 		logs-django logs-celery logs-beat logs-flower logs-vite \
         docker-up docker-down docker-build release \
+        submit-repos \
         _ensure_running_dirs
 
 # ── Help ───────────────────────────────────────────────────────────────────────
@@ -76,6 +77,10 @@ help:
 	@echo "    format             Black format"
 	@echo "    type-check         vue-tsc"
 	@echo "    build              Vite production build"
+	@echo ""
+	@echo "  ── Batch submission ─────────────────────────────────────────────────"
+	@echo "    submit-repos       POST each URL in FILE to the analyze API"
+	@echo "                       FILE=repos.txt (default)  HOST=http://localhost:4500"
 	@echo ""
 	@echo "  ── Logs ─────────────────────────────────────────────────────────────"
 	@echo "    logs               Tail all logs"
@@ -456,6 +461,38 @@ docker-down:
 
 release:
 	@bash $(ROOT_DIR)/scripts/release.sh
+
+# ── Batch submission ──────────────────────────────────────────────────────────
+
+SUBMIT_FILE ?= $(ROOT_DIR)/repos.txt
+SUBMIT_HOST ?= http://localhost:4500
+
+submit-repos:
+	@if [ ! -f "$(SUBMIT_FILE)" ]; then \
+	  echo "File not found: $(SUBMIT_FILE)"; \
+	  echo "Create it with one GitHub URL per line, then re-run."; \
+	  echo "Override path with: make submit-repos FILE=/path/to/urls.txt"; \
+	  exit 1; \
+	fi
+	@echo "Submitting repos from $(SUBMIT_FILE) → $(SUBMIT_HOST)/api/v1/repositories/analyze"
+	@echo ""
+	@while IFS= read -r url || [ -n "$$url" ]; do \
+	  url=$$(echo "$$url" | tr -d '[:space:]'); \
+	  [ -z "$$url" ] && continue; \
+	  [[ "$$url" == \#* ]] && continue; \
+	  printf "  %-60s " "$$url"; \
+	  response=$$(curl -s -o /dev/null -w "%{http_code}" \
+	    -X POST "$(SUBMIT_HOST)/api/v1/repositories/analyze" \
+	    -H "Content-Type: application/json" \
+	    -d "{\"url\": \"$$url\"}"); \
+	  if [ "$$response" = "200" ]; then \
+	    echo "queued"; \
+	  else \
+	    echo "HTTP $$response"; \
+	  fi; \
+	done < "$(SUBMIT_FILE)"
+	@echo ""
+	@echo "Done."
 
 # ── Internal ───────────────────────────────────────────────────────────────────
 

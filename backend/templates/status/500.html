@@ -1,0 +1,8 @@
+{% extends "status/base.html" %}
+
+{% block title %}Server Error | {{ site_name }}{% endblock %}
+
+{% block content %}
+  <h1 class="danger">Something Broke</h1>
+  <p class="muted">The backend hit an unexpected error. Please go back and try again from the app home.</p>
+{% endblock %}
