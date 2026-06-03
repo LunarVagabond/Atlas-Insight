@@ -535,19 +535,31 @@ def get_ai_summary(request, run_id: uuid.UUID):
     open_opps = [o for o in opportunities if not o.get('has_open_pr')]
     if open_opps:
         lines.append("Open tasks and known issues:")
-        for opp in open_opps[:6]:
+        for opp in open_opps:
             diff = opp.get('difficulty', 'unknown')
             title = opp.get('title', '')
             issue = f" (#{opp['issue_number']})" if opp.get('issue_number') else ''
             lines.append(f"  - [{diff}] {title}{issue}")
-        if len(open_opps) > 6:
-            lines.append(f"  … and {len(open_opps) - 6} more")
         lines.append("")
 
     # ── Security ─────────────────────────────────────────────────────────────
-    if vuln_count or sec_issues:
-        if vuln_count:
-            lines.append(f"⚠ Dependency security: {vuln_count} CVEs detected — check before adding or upgrading packages.")
+    vulns = security.get('vulnerabilities') or []
+    if vulns or sec_issues:
+        if vulns:
+            lines.append(f"⚠ Dependency CVEs ({len(vulns)} total) — check before adding or upgrading packages:")
+            for v in vulns:
+                pkg = v.get('name', '?')
+                ver = v.get('version', '')
+                vid = v.get('vuln_id', '')
+                sev = v.get('severity', '')
+                parts = [f"  - {pkg}"]
+                if ver:
+                    parts[0] += f"@{ver}"
+                if vid:
+                    parts[0] += f" — {vid}"
+                if sev:
+                    parts[0] += f" ({sev})"
+                lines.append(parts[0])
         if sec_issues:
             lines.append(f"⚠ {len(sec_issues)} security patterns flagged (possible accidental secrets or gitignore gaps).")
         lines.append("")
