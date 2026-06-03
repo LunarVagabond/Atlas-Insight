@@ -65,7 +65,3 @@ Key endpoints:
 - `GET /api/v1/repositories/runs/{id}/issues` — live GitHub issues (JIT, 15min cache)
 - `GET /api/v1/repositories/runs/{id}/prs` — live open PRs (JIT, 15min cache)
 - `GET /api/v1/repositories/runs/{id}/diff` — delta vs previous run
-
-## License
-
-TBD

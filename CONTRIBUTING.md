@@ -13,9 +13,8 @@ make start
 ## Branch naming
 
 ```
-feat/<short-description>
-fix/<short-description>
-chore/<short-description>
+<issue_number>-<short-description> (i.e. 1-update-website )
+noissue-<short-description> (i.e. noissue-update-website)
 ```
 
 ## Making changes
@@ -51,4 +50,4 @@ Open a GitHub issue using the bug report template.
 
 ## Questions
 
-Open a GitHub discussion or email chris.conlon1993@gmail.com.
+Open a GitHub discussion or email lvagabond@dsyndicate.dev.
