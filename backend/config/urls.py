@@ -5,6 +5,7 @@ from ninja import NinjaAPI
 
 from apps.api.router import router as api_router
 from apps.repositories.router import router as repositories_router
+from apps.repositories.router_contributors import router as contributors_router
 from apps.users.router import router as auth_router
 from config.error_views import (
     frontend_home_redirect,
@@ -21,6 +22,7 @@ api = NinjaAPI(
 )
 api.add_router('/v1/', api_router)
 api.add_router('/v1/repositories/', repositories_router)
+api.add_router('/v1/', contributors_router)
 api.add_router('/v1/auth/', auth_router)
 
 urlpatterns = [

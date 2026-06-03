@@ -388,3 +388,93 @@ def get_run_vulnerabilities(request, run_id: uuid.UUID):
     result = {'checked': len(queries), 'vulnerable': vulnerable}
     cache.set(cache_key, result, 900)
     return result
+
+
+@router.get('/runs/{run_id}/ai-summary')
+@ratelimit(key='user_or_ip', rate='60/h', method='GET', block=False)
+def get_ai_summary(request, run_id: uuid.UUID):
+    """Compact plain-text repo summary optimised for pasting into AI prompts."""
+    _assert_not_limited(request)
+    try:
+        run = AnalysisRun.objects.select_related('repo').get(id=run_id, status='completed')
+    except AnalysisRun.DoesNotExist:
+        raise HttpError(404, 'Run not found or not completed')
+    if run.repo.is_private:
+        if not request.user.is_authenticated or run.user != request.user:
+            raise HttpError(403, 'Access denied')
+
+    r = run.result or {}
+    owner, name = run.repo.owner, run.repo.name
+    meta = r.get('github_meta') or {}
+    commits = r.get('commits') or {}
+    heuristics = r.get('heuristics') or []
+    oss = r.get('oss_score') or {}
+    structure = r.get('structure') or {}
+    deps = r.get('dependencies') or {}
+    graph = r.get('graph') or {}
+    classification = r.get('classification') or {}
+    security = r.get('security') or {}
+
+    overall_risk = (
+        round(sum(h['score'] for h in heuristics) / len(heuristics))
+        if heuristics else None
+    )
+    top_langs = [
+        f"{l['name']} {round(l['pct'] * 100)}%"
+        for l in (structure.get('languages') or [])[:3]
+    ]
+    top_deps = [
+        d['name'] for d in (deps.get('dependencies') or [])
+        if not d.get('dev')
+    ][:8]
+    hot = [f.get('file', '') for f in (structure.get('hot_files') or [])[:5]]
+    top_contributors = [
+        c['author'] for c in (commits.get('top_contributors') or [])[:5]
+    ]
+    tags = (classification.get('tags') or [])[:6]
+    sec_issues = len(security.get('issues') or [])
+    vuln_count = len(security.get('vulnerabilities') or [])
+
+    lines = [
+        f"# {owner}/{name}",
+        f"URL: {run.repo.url}",
+        "",
+        f"Primary language: {meta.get('primary_language') or '—'}",
+    ]
+    if top_langs:
+        lines.append(f"Language breakdown: {', '.join(top_langs)}")
+    if meta.get('stars') is not None:
+        lines.append(f"Stars: {meta['stars']} | Forks: {meta.get('forks', '—')} | Open issues: {meta.get('open_issues', '—')}")
+    if oss:
+        lines.append(f"OSS Score: {oss.get('label', '—')} ({oss.get('score', '—')}/10)")
+    if overall_risk is not None:
+        risk_label = 'Low' if overall_risk < 30 else 'Medium' if overall_risk < 60 else 'High'
+        lines.append(f"Overall Risk: {risk_label} ({overall_risk}/100)")
+    if tags:
+        lines.append(f"Tech stack: {', '.join(tags)}")
+    if commits.get('commit_count'):
+        lines.append(f"Total commits: {commits['commit_count']}")
+    if commits.get('active_contributor_count_90d') is not None:
+        lines.append(f"Active contributors (90d): {commits['active_contributor_count_90d']}")
+    if top_contributors:
+        lines.append(f"Top contributors: {', '.join(top_contributors)}")
+    prod_dep_count = len([d for d in (deps.get('dependencies') or []) if not d.get('dev')])
+    dev_dep_count = len([d for d in (deps.get('dependencies') or []) if d.get('dev')])
+    if prod_dep_count or dev_dep_count:
+        lines.append(f"Dependencies: {prod_dep_count} prod, {dev_dep_count} dev")
+    if top_deps:
+        lines.append(f"Key prod deps: {', '.join(top_deps)}")
+    if graph.get('node_count'):
+        lines.append(f"Architecture: {graph['node_count']} modules, {graph.get('edge_count', 0)} edges, {graph.get('cycle_count', 0)} cycles")
+    if hot:
+        lines.append(f"Most-changed files: {', '.join(hot)}")
+    if sec_issues or vuln_count:
+        lines.append(f"Security: {sec_issues} flagged patterns, {vuln_count} CVEs")
+    lines += [
+        "",
+        f"Analysis date: {run.completed_at.strftime('%Y-%m-%d') if run.completed_at else '—'}",
+        f"Atlas Insight run: {run.id}",
+    ]
+
+    summary = '\n'.join(lines)
+    return {'summary': summary}

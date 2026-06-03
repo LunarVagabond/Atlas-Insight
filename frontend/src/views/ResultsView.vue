@@ -24,6 +24,7 @@ import ContributorGraph from '../components/analysis/ContributorGraph.vue'
 import StaleBranchesPanel from '../components/analysis/StaleBranchesPanel.vue'
 import SimilarReposPanel from '../components/analysis/SimilarReposPanel.vue'
 import CompareModal from '../components/ui/CompareModal.vue'
+import axios from 'axios'
 
 const route = useRoute()
 const router = useRouter()
@@ -237,6 +238,21 @@ function copyCard() {
   setTimeout(() => { cardCopied.value = false }, 2000)
 }
 
+const aiSummaryCopied = ref(false)
+const aiSummaryLoading = ref(false)
+async function copyAiSummary() {
+  if (!store.run || aiSummaryLoading.value) return
+  aiSummaryLoading.value = true
+  try {
+    const { data } = await axios.get(`/api/v1/repositories/runs/${store.run.id}/ai-summary`)
+    await navigator.clipboard.writeText(data.summary)
+    aiSummaryCopied.value = true
+    setTimeout(() => { aiSummaryCopied.value = false }, 2500)
+  } finally {
+    aiSummaryLoading.value = false
+  }
+}
+
 const isArchived = computed(() => result.value?.github_meta?.archived === true)
 
 const showCompareModal = ref(false)
@@ -300,6 +316,9 @@ onUnmounted(() => {
               <div v-if="showOverflow" class="results-header__overflow-menu">
                 <button class="results-header__overflow-item" @click="exportJson(); showOverflow = false">↓ Export JSON</button>
                 <button class="results-header__overflow-item" @click="printPage(); showOverflow = false">⎙ Print / PDF</button>
+                <button class="results-header__overflow-item" :disabled="aiSummaryLoading" @click="copyAiSummary(); showOverflow = false">
+                  {{ aiSummaryCopied ? '✓ Copied!' : aiSummaryLoading ? 'Loading…' : '🤖 Copy AI Summary' }}
+                </button>
               </div>
             </div>
           </div>

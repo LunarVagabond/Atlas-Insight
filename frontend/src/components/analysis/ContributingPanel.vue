@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
 import ContributionDrawer from './ContributionDrawer.vue'
@@ -98,6 +100,11 @@ const availableFilters = computed(() =>
 
 const activeOpp = ref<ContributionOpportunity | null>(null)
 
+function renderMarkdown(text: string): string {
+  const raw = marked.parse(text, { async: false }) as string
+  return DOMPurify.sanitize(raw)
+}
+
 const githubCount = computed(() => props.opportunities.filter(o => o.category === 'github-issue' || o.category === 'feature').length)
 const heuristicCount = computed(() => props.opportunities.filter(o => o.category !== 'github-issue' && o.category !== 'feature').length)
 
@@ -152,21 +159,8 @@ const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
       </div>
 
       <div v-if="conventions.examples.length" class="contrib-conventions__examples">
-        <span class="contrib-conventions__examples-label">Real examples</span>
-        <code v-for="(ex, i) in conventions.examples" :key="i" class="contrib-conventions__example">{{ ex }}</code>
-      </div>
-
-      <div class="contrib-conventions__grid">
-        <div class="contrib-conventions__stat">
-          <span class="contrib-conventions__stat-label">Avg subject length</span>
-          <span class="contrib-conventions__stat-value">{{ conventions.avg_subject_length }} chars</span>
-          <span class="contrib-conventions__stat-sub">{{ Math.round(conventions.subject_under_72_pct * 100) }}% under 72</span>
-        </div>
-        <div v-if="conventions.issue_ref_rate >= 0.2" class="contrib-conventions__stat">
-          <span class="contrib-conventions__stat-label">Issue references</span>
-          <span class="contrib-conventions__stat-value">{{ Math.round(conventions.issue_ref_rate * 100) }}%</span>
-          <span class="contrib-conventions__stat-sub">of commits link an issue</span>
-        </div>
+        <span class="contrib-conventions__examples-label">Example</span>
+        <code class="contrib-conventions__example">{{ conventions.examples[0] }}</code>
       </div>
     </div>
 
@@ -203,7 +197,7 @@ const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
               <span class="contrib-card__icon">{{ CATEGORY_ICONS[opp.category] }}</span>
               <span class="contrib-card__title">{{ opp.title }}</span>
             </div>
-            <p class="contrib-card__desc">{{ opp.description }}</p>
+            <p class="contrib-card__desc" v-html="renderMarkdown(opp.description)"></p>
 
             <!-- GitHub issue / feature extras -->
             <div v-if="opp.issue_url" class="contrib-card__issue-meta">
@@ -258,7 +252,7 @@ const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
               <span class="contrib-card__icon">{{ CATEGORY_ICONS[opp.category] }}</span>
               <span class="contrib-card__title">{{ opp.title }}</span>
             </div>
-            <p class="contrib-card__desc">{{ opp.description }}</p>
+            <p class="contrib-card__desc" v-html="renderMarkdown(opp.description)"></p>
             <div v-if="opp.category === 'github-issue'" class="contrib-card__issue-meta">
               <a
                 v-if="opp.issue_url"
@@ -309,7 +303,7 @@ const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
               <span class="contrib-card__icon">{{ CATEGORY_ICONS[opp.category] }}</span>
               <span class="contrib-card__title">{{ opp.title }}</span>
             </div>
-            <p class="contrib-card__desc">{{ opp.description }}</p>
+            <p class="contrib-card__desc" v-html="renderMarkdown(opp.description)"></p>
           </div>
           <div class="contrib-card__footer">
             <AppBadge :variant="diffVariant(opp.difficulty)">{{ opp.difficulty }}</AppBadge>

@@ -45,3 +45,5 @@ Thumbs.db
 *.key
 id_rsa
 *.log
+# Build-time generated
+backend/contributors_stats.json

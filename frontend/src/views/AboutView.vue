@@ -1,10 +1,15 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+import axios from 'axios'
 import AppTabs from '../components/ui/AppTabs.vue'
+import AppButton from '../components/ui/AppButton.vue'
+import AppCard from '../components/ui/AppCard.vue'
 import LanguageList from '../components/ui/LanguageList.vue'
 
-const TABS = ['About', 'Why Atlas Insight', 'Guide']
+const TABS = ['About', 'Why Atlas Insight', 'Guide', 'Contributors']
 const activeTab = ref('About')
 
 const _rawPublicBase = (import.meta.env.VITE_PUBLIC_BASE_URL as string | undefined) || window.location.origin
@@ -266,6 +271,34 @@ const GUIDE_ENTRIES: GuideEntry[] = [
     method: 'We cross-reference open issues against open PRs using JIT data fetched from GitHub after analysis completes. A PR mentioning an issue number (via "Fixes #123" or "Closes #123") marks that issue as claimed.',
     searchText: 'readiness ready claimed stale open pr issue cross reference fixes closes blocked available',
   },
+  {
+    id: 'arch-tours',
+    term: 'Architecture Tours',
+    section: 'Contributing & Opportunities',
+    defHtml: `Guided reading paths through a codebase subsystem — <span class="guide-kw">entry files to start from</span>, the most-changed files to understand, and a suggested reading order. Tours help a newcomer build a mental model without randomly browsing files.`,
+    methodLabel: 'How we compute them',
+    method: 'We group files by subsystem type (frontend, API, data, tests, config, docs) using path patterns. Within each group we identify entry points (top-level index/router/main files), the most-changed files by commit count, and generate a suggested reading order starting from the entry points outward.',
+    searchText: 'architecture tours guided reading path subsystem entry files reading order newcomer mental model frontend api data tests config docs',
+  },
+  // ── OSS Score Tiers ─────────────────────────────────────────────────────
+  {
+    id: 'oss-tiers',
+    term: 'OSS Score Tiers',
+    section: 'Scores & Risk',
+    defHtml: `The six labels applied to an OSS Score: <span class="guide-kw">Champion</span> (9.0–10), <span class="guide-kw">Thriving</span> (7.5–8.9), <span class="guide-kw">Growing</span> (6.0–7.4), <span class="guide-kw">Seedling</span> (4.0–5.9), <span class="guide-kw">Struggling</span> (2.0–3.9), <span class="guide-kw">Dormant</span> (0–1.9). These appear on analysis cards, sub-project summaries, and status badges.`,
+    methodLabel: 'How tiers are assigned',
+    method: 'Purely score-based cutoffs. Champion = 9.0+, Thriving = 7.5+, Growing = 6.0+, Seedling = 4.0+, Struggling = 2.0+, Dormant = below 2.0. The same tier labels appear for both the top-level repo and for individual sub-projects detected inside a monorepo.',
+    searchText: 'champion thriving growing seedling struggling dormant oss score tier label badge 9 7.5 6 4 2 monorepo subproject sub-project',
+  },
+  {
+    id: 'sub-projects',
+    term: 'Sub-projects',
+    section: 'Architecture',
+    defHtml: `When Atlas Insight detects a <span class="guide-kw">monorepo</span> — a single repository containing multiple independent projects — it splits the analysis into per-sub-project slices. Each sub-project gets its own stack detection, dependency summary, security scan, and OSS Score. This avoids mixing Python backend deps with JavaScript frontend deps in a single report.`,
+    methodLabel: 'How we detect them',
+    method: 'We look for monorepo signals: presence of packages/, apps/, services/, or frontend/+backend/ directories; root-level package.json with workspaces; pnpm-workspace.yaml; Cargo.toml workspaces; go.work files. When found, each top-level sub-directory with its own manifest is treated as a sub-project.',
+    searchText: 'sub-projects subprojects monorepo packages apps services frontend backend workspaces split analysis per-project independent stack champion oss score',
+  },
 ]
 
 const SECTION_ORDER = ['Scores & Risk', 'Activity & Momentum', 'Architecture', 'Project Health', 'Contributing & Opportunities']
@@ -290,6 +323,47 @@ function entriesForSection(section: string) {
 
 function clearSearch() {
   searchQuery.value = ''
+}
+
+// ── Contributors tab ─────────────────────────────────────────────────────────
+interface Contributor {
+  username: string
+  bio_md: string
+  lines_added: number
+  lines_removed: number
+  commit_count: number
+}
+
+const contribs = ref<Contributor[]>([])
+const contribTotal = ref(0)
+const contribPage = ref(1)
+const contribPerPage = 20
+const contribQ = ref('')
+const contribLoading = ref(false)
+
+async function fetchContribs() {
+  contribLoading.value = true
+  try {
+    const { data } = await axios.get('/api/v1/contributors/', {
+      params: { page: contribPage.value, per_page: contribPerPage, q: contribQ.value },
+    })
+    contribs.value = data.items
+    contribTotal.value = data.total
+  } catch {
+    contribs.value = []
+  } finally {
+    contribLoading.value = false
+  }
+}
+
+watch(activeTab, tab => { if (tab === 'Contributors') fetchContribs() })
+watch([contribQ], () => { contribPage.value = 1; fetchContribs() })
+watch(contribPage, fetchContribs)
+
+const contribTotalPages = computed(() => Math.ceil(contribTotal.value / contribPerPage))
+
+function renderMd(text: string): string {
+  return DOMPurify.sanitize(marked.parse(text, { async: false }) as string)
 }
 </script>
 
@@ -504,6 +578,53 @@ function clearSearch() {
         <p class="about-view__note">All scores reset on each re-analysis. Push changes and re-analyze to see updated scores.</p>
       </section>
 
+    </div>
+
+    <!-- ── Contributors tab ─────────────────────────────────────────────── -->
+    <div v-if="activeTab === 'Contributors'" class="about-view__body" style="margin-top: 2rem">
+      <div class="contrib-tab__controls">
+        <input
+          v-model="contribQ"
+          class="url-form__input"
+          placeholder="Search contributors…"
+          style="max-width: 280px"
+        />
+        <span class="contrib-tab__count">{{ contribTotal }} contributor{{ contribTotal !== 1 ? 's' : '' }}</span>
+      </div>
+
+      <div v-if="contribLoading" style="padding: 2rem 0; color: var(--color-text-muted)">Loading…</div>
+
+      <div v-else-if="!contribs.length" style="padding: 2rem 0; color: var(--color-text-muted)">
+        {{ contribQ ? `No contributors matching "${contribQ}".` : 'No contributors found.' }}
+      </div>
+
+      <div v-else class="contrib-tab__list">
+        <AppCard v-for="c in contribs" :key="c.username" class="contrib-tab__card">
+          <div class="contrib-tab__avatar-col">
+            <img
+              :src="`https://github.com/${c.username}.png?size=80`"
+              :alt="c.username"
+              class="contrib-tab__avatar"
+              width="80"
+              height="80"
+            />
+          </div>
+          <div class="contrib-tab__content-col">
+            <div class="contrib-tab__bio" v-html="renderMd(c.bio_md)"></div>
+            <div class="contrib-tab__meta">
+              <span class="contrib-tab__stat">{{ c.commit_count }} commits</span>
+              <span class="contrib-tab__stat contrib-tab__stat--add">+{{ c.lines_added.toLocaleString() }}</span>
+              <span class="contrib-tab__stat contrib-tab__stat--del">-{{ c.lines_removed.toLocaleString() }}</span>
+            </div>
+          </div>
+        </AppCard>
+      </div>
+
+      <div v-if="contribTotalPages > 1" class="runs-pagination" style="margin-top: 1.5rem">
+        <AppButton variant="secondary" :disabled="contribPage <= 1" @click="contribPage--">← Prev</AppButton>
+        <span class="runs-pagination__info">Page {{ contribPage }} of {{ contribTotalPages }}</span>
+        <AppButton variant="secondary" :disabled="contribPage >= contribTotalPages" @click="contribPage++">Next →</AppButton>
+      </div>
     </div>
   </div>
 </template>

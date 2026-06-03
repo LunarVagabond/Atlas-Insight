@@ -209,6 +209,7 @@ class RunListItemSchema(Schema):
     last_fetched_at: Optional[str]
     tags: list[str] = []
     has_previous_run: bool = False
+    primary_language: Optional[str] = None
 
 
 class RunListSchema(Schema):
@@ -361,6 +362,7 @@ def list_runs(
                 last_fetched_at=r.repo.last_fetched_at.isoformat() if r.repo.last_fetched_at else None,
                 tags=r.result.get('classification', {}).get('tags', []) if r.result else [],
                 has_previous_run=getattr(r, 'has_previous_run', False),
+                primary_language=r.result.get('github_meta', {}).get('primary_language') if r.result else None,
             )
             for r in runs
         ],

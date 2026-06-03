@@ -1,5 +1,10 @@
 # Atlas Insight
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
+[![Vue](https://img.shields.io/badge/Vue-3-42b883.svg)](https://vuejs.org/)
+[![Django](https://img.shields.io/badge/Django-5-092e20.svg)](https://www.djangoproject.com/)
+
 Repository archaeology and static analysis platform. Paste a GitHub URL and get architecture insights, commit history analysis, dependency reports, and heuristic health scores — no AI, just data.
 
 ## What it does

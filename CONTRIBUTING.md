@@ -13,8 +13,8 @@ make start
 ## Branch naming
 
 ```
-<issue_number>-<short-description> (i.e. 1-update-website )
-noissue-<short-description> (i.e. noissue-update-website)
+<issue_number>-<short-description>   e.g. 42-fix-auth-token
+noissue-<short-description>          e.g. noissue-update-readme
 ```
 
 ## Making changes
@@ -38,6 +38,33 @@ npm test
 
 4. Add an entry under `## Unreleased` in `CHANGELOG.md`
 5. Open a pull request against `main`
+
+## Pull requests
+
+**Title format:** `<type>(<scope>): <short description>` — mirrors the commit convention used in this repo.
+
+| Type | When to use |
+|------|-------------|
+| `feat` | New user-facing feature |
+| `fix` | Bug fix |
+| `refactor` | Internal restructure with no behavior change |
+| `test` | Tests only |
+| `docs` | Documentation only |
+| `chore` | Build, config, dependency bumps |
+
+Examples:
+```
+feat(analysis): add submodule champion detection
+fix(frontend): correct pagination offset on home page
+docs(contributing): add PR conventions section
+```
+
+**PR description should answer:**
+- **What** — one-line summary of the change
+- **Why** — motivation or linked issue (`Closes #123`)
+- **Test plan** — what you ran to verify it works
+
+Keep PRs focused. A PR that adds a feature and refactors an unrelated module is harder to review. Split when in doubt.
 
 ## Code style
 

@@ -123,6 +123,7 @@ const devDeps = computed(() =>
 const godModules = computed(() => result.value?.graph?.god_modules?.slice(0, 15) ?? [])
 const hotFiles = computed(() => result.value?.structure?.hot_files?.slice(0, 15) ?? [])
 const opportunities = computed(() => (result.value?.contribution_opportunities ?? []).slice(0, 20))
+const subProjects = computed(() => result.value?.repo_type?.sub_projects ?? [])
 
 const difficultyColor: Record<string, string> = {
   beginner: '#2da44e',
@@ -142,6 +143,7 @@ const sectionNums = computed(() => {
     project: String(n++).padStart(2, '0'),
     deps: String(n++).padStart(2, '0'),
     arch: String(n++).padStart(2, '0'),
+    subprojects: subProjects.value.length ? String(n++).padStart(2, '0') : null,
     contributing: opportunities.value.length ? String(n++).padStart(2, '0') : null,
   }
 })
@@ -806,6 +808,43 @@ function exportCvesCsv() {
               </tr>
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <!-- ══ §SUB-PROJECTS (conditional) ══ -->
+      <section v-if="subProjects.length" class="print-section">
+        <div class="print-section__header">
+          <span class="print-section__num">{{ sectionNums.subprojects }}</span>
+          <h2 class="print-section__title">Sub-projects</h2>
+        </div>
+
+        <div v-for="sp in subProjects" :key="sp.name" style="margin-bottom:1.5rem">
+          <div class="print-subsection">{{ sp.name }} <span style="font-weight:400;color:#666">— {{ sp.path }}</span></div>
+
+          <div class="print-stat-grid print-stat-grid--sm" style="margin-bottom:0.75rem">
+            <div v-if="sp.oss_score" class="print-stat">
+              <div class="print-stat__value">{{ sp.oss_score.score }}</div>
+              <div class="print-stat__label">OSS Score ({{ sp.oss_score.label }})</div>
+            </div>
+            <div class="print-stat">
+              <div class="print-stat__value">{{ sp.languages.join(', ') || '—' }}</div>
+              <div class="print-stat__label">Languages</div>
+            </div>
+            <div class="print-stat">
+              <div class="print-stat__value">{{ (sp.dependencies?.dependencies ?? []).filter(d => !d.dev).length }}</div>
+              <div class="print-stat__label">Prod Deps</div>
+            </div>
+            <div v-if="sp.security?.issue_count != null" class="print-stat">
+              <div :class="['print-stat__value', sp.security.issue_count > 0 ? 'print-risk--high' : '']">
+                {{ sp.security.issue_count }}
+              </div>
+              <div class="print-stat__label">Security Issues</div>
+            </div>
+          </div>
+
+          <div v-if="sp.tech_stack?.length" style="font-size:0.8125rem;color:#555;margin-bottom:0.25rem">
+            Stack: {{ sp.tech_stack.join(', ') }}
+          </div>
         </div>
       </section>
 

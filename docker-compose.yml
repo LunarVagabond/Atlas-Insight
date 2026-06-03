@@ -96,7 +96,9 @@ services:
   # All services share the backend image; only CMD differs for celery/flower.
 
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "4500:4500"
     env_file: ./backend/.env
@@ -119,7 +121,9 @@ services:
       - app
 
   celery:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     command: celery -A config worker --loglevel=info
     env_file: ./backend/.env
     environment:
@@ -138,7 +142,9 @@ services:
       - app
 
   celery-beat:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     command: celery -A config beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     env_file: ./backend/.env
     environment:
@@ -155,7 +161,9 @@ services:
       - app
 
   flower:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     command: celery -A config flower --port=4504
     ports:
       - "4504:4504"

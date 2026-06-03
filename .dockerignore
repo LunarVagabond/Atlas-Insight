@@ -1,0 +1,8 @@
+# Keep build context small — only backend + .git needed for the backend image
+frontend/node_modules
+frontend/dist
+_running/
+docs/
+*.md
+!backend/**
+.claude/

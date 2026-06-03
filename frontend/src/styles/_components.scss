@@ -3631,6 +3631,42 @@
   &:hover td { background: transparent; }
 }
 
+.runs-table__lang-cell {
+  white-space: nowrap;
+  display: table-cell;
+}
+
+.runs-table__lang-icon {
+  vertical-align: middle;
+  margin-right: 0.375rem;
+}
+
+.runs-table__lang-name {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  vertical-align: middle;
+}
+
+.runs-table__lang-unknown {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.65rem;
+  font-weight: 700;
+  margin-right: 0.375rem;
+  vertical-align: middle;
+}
+
+.runs-table__lang-empty {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
 .runs-table__divider td {
   padding: 4px 1rem;
   font-size: 0.7rem;
