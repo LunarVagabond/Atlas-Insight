@@ -124,6 +124,16 @@ const godModules = computed(() => result.value?.graph?.god_modules?.slice(0, 15)
 const hotFiles = computed(() => result.value?.structure?.hot_files?.slice(0, 15) ?? [])
 const opportunities = computed(() => (result.value?.contribution_opportunities ?? []).slice(0, 20))
 const subProjects = computed(() => result.value?.repo_type?.sub_projects ?? [])
+const codeQuality = computed(() => ({
+  complexity: result.value?.complexity,
+  deadCode: result.value?.dead_code,
+  testCoverage: result.value?.test_coverage,
+}))
+const devOps = computed(() => ({
+  cicd: result.value?.cicd,
+  containers: result.value?.containers,
+  changelog: result.value?.changelog,
+}))
 
 const difficultyColor: Record<string, string> = {
   beginner: '#2da44e',
@@ -143,6 +153,8 @@ const sectionNums = computed(() => {
     project: String(n++).padStart(2, '0'),
     deps: String(n++).padStart(2, '0'),
     arch: String(n++).padStart(2, '0'),
+    codeQuality: String(n++).padStart(2, '0'),
+    devops: String(n++).padStart(2, '0'),
     subprojects: subProjects.value.length ? String(n++).padStart(2, '0') : null,
     contributing: opportunities.value.length ? String(n++).padStart(2, '0') : null,
   }
@@ -809,6 +821,119 @@ function exportCvesCsv() {
             </tbody>
           </table>
         </div>
+      </section>
+
+      <!-- ══ §CODE QUALITY ══ -->
+      <section class="print-section">
+        <div class="print-section__header">
+          <span class="print-section__num">{{ sectionNums.codeQuality }}</span>
+          <h2 class="print-section__title">Code Quality</h2>
+        </div>
+
+        <div class="print-stat-grid print-stat-grid--sm">
+          <div class="print-stat">
+            <div class="print-stat__value">{{ codeQuality.complexity?.files_over_threshold ?? 0 }}</div>
+            <div class="print-stat__label">Complexity Hotspots</div>
+          </div>
+          <div class="print-stat">
+            <div class="print-stat__value">{{ codeQuality.deadCode?.count ?? 0 }}</div>
+            <div class="print-stat__label">Unreferenced Files</div>
+          </div>
+          <div class="print-stat">
+            <div class="print-stat__value">{{ formatPct(codeQuality.testCoverage?.test_ratio ?? null) }}</div>
+            <div class="print-stat__label">Test Ratio</div>
+          </div>
+          <div class="print-stat">
+            <div class="print-stat__value">{{ codeQuality.testCoverage?.framework_detected ?? '—' }}</div>
+            <div class="print-stat__label">Test Framework</div>
+          </div>
+        </div>
+
+        <template v-if="(codeQuality.complexity?.hotspots?.length ?? 0) > 0">
+          <div class="print-subsection">Top Complexity Hotspots</div>
+          <table class="print-table print-table--bordered">
+            <thead><tr><th>File</th><th>LOC</th><th>Adjacent Test</th></tr></thead>
+            <tbody>
+              <tr v-for="f in (codeQuality.complexity?.hotspots ?? []).slice(0, 12)" :key="f.file">
+                <td class="print-table__mono">{{ f.file }}</td>
+                <td>{{ f.loc }}</td>
+                <td>{{ f.has_adjacent_test ? 'Yes' : 'No' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </template>
+
+        <template v-if="(codeQuality.testCoverage?.untested_dirs?.length ?? 0) > 0">
+          <div class="print-subsection">Directories Missing Tests</div>
+          <table class="print-table print-table--bordered">
+            <thead><tr><th>Directory</th><th>Source Files</th></tr></thead>
+            <tbody>
+              <tr v-for="d in (codeQuality.testCoverage?.untested_dirs ?? []).slice(0, 12)" :key="d.path">
+                <td class="print-table__mono">{{ d.path }}</td>
+                <td>{{ d.source_files }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </template>
+
+        <div
+          v-if="(codeQuality.complexity?.hotspots?.length ?? 0) === 0 && (codeQuality.testCoverage?.untested_dirs?.length ?? 0) === 0"
+          class="print-clear"
+        >
+          No major code quality hotspots detected by current static checks.
+        </div>
+      </section>
+
+      <!-- ══ §DEVOPS ══ -->
+      <section class="print-section">
+        <div class="print-section__header">
+          <span class="print-section__num">{{ sectionNums.devops }}</span>
+          <h2 class="print-section__title">DevOps</h2>
+        </div>
+
+        <div class="print-stat-grid print-stat-grid--sm">
+          <div class="print-stat">
+            <div class="print-stat__value">{{ devOps.cicd?.workflow_count ?? 0 }}</div>
+            <div class="print-stat__label">CI Workflows</div>
+          </div>
+          <div class="print-stat">
+            <div class="print-stat__value">{{ devOps.containers?.dockerfile_count ?? 0 }}</div>
+            <div class="print-stat__label">Dockerfiles</div>
+          </div>
+          <div class="print-stat">
+            <div :class="['print-stat__value', (devOps.containers?.total_issues ?? 0) > 0 ? 'print-risk--medium' : '']">
+              {{ devOps.containers?.total_issues ?? 0 }}
+            </div>
+            <div class="print-stat__label">Container Issues</div>
+          </div>
+          <div class="print-stat">
+            <div class="print-stat__value">{{ devOps.changelog?.found ? 'Present' : 'Missing' }}</div>
+            <div class="print-stat__label">Changelog</div>
+          </div>
+        </div>
+
+        <table class="print-table print-table--bordered print-table--compact">
+          <tbody>
+            <tr>
+              <td class="print-table__key">CI System</td>
+              <td>{{ devOps.cicd?.system ?? 'Not detected' }}</td>
+              <td class="print-table__key">Runs Tests</td>
+              <td>{{ devOps.cicd?.summary?.has_tests ? 'Yes' : 'No' }}</td>
+            </tr>
+            <tr>
+              <td class="print-table__key">Runs Lint</td>
+              <td>{{ devOps.cicd?.summary?.has_lint ? 'Yes' : 'No' }}</td>
+              <td class="print-table__key">Deploy Job</td>
+              <td>{{ devOps.cicd?.summary?.has_deploy ? 'Yes' : 'No' }}</td>
+            </tr>
+            <tr>
+              <td class="print-table__key">Changelog Format</td>
+              <td>{{ devOps.changelog?.format ?? 'none' }}</td>
+              <td class="print-table__key">Days Since Changelog Update</td>
+              <td>{{ devOps.changelog?.days_stale ?? '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
       </section>
 
       <!-- ══ §SUB-PROJECTS (conditional) ══ -->

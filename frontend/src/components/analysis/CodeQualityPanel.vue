@@ -41,7 +41,7 @@ function distPct(key: keyof NonNullable<ComplexityData['distribution']>): number
     <!-- ── Test coverage ──────────────────────────────────────── -->
     <section class="cq-section">
       <h3 class="cq-section__title">Test Coverage</h3>
-      <div class="panel__grid panel__grid--2col" style="margin-bottom: var(--space-4)">
+      <div class="panel__grid panel__grid--2col" style="margin-bottom: 1rem">
         <AppCard elevated>
           <div class="stat">
             <div class="stat__value">{{ testRatioPercent }}%</div>
@@ -60,7 +60,7 @@ function distPct(key: keyof NonNullable<ComplexityData['distribution']>): number
         Framework detected: <AppBadge variant="info">{{ testCoverage.framework_detected }}</AppBadge>
       </div>
 
-      <div v-if="(testCoverage?.untested_dirs?.length ?? 0) > 0" style="margin-top: var(--space-4)">
+      <div v-if="(testCoverage?.untested_dirs?.length ?? 0) > 0" style="margin-top: 1rem">
         <p class="cq-section__subtitle">Directories with source files but no tests:</p>
         <table class="data-table">
           <thead>
@@ -74,7 +74,7 @@ function distPct(key: keyof NonNullable<ComplexityData['distribution']>): number
           </tbody>
         </table>
       </div>
-      <div v-else-if="testCoverage" class="panel__hint" style="margin-top: var(--space-3)">
+      <div v-else-if="testCoverage" class="panel__hint" style="margin-top: 0.75rem">
         No untested directories detected with more than 3 source files.
       </div>
     </section>
@@ -82,7 +82,7 @@ function distPct(key: keyof NonNullable<ComplexityData['distribution']>): number
     <!-- ── Complexity hotspots ────────────────────────────────── -->
     <section class="cq-section">
       <h3 class="cq-section__title">Complexity Hotspots</h3>
-      <div class="panel__grid panel__grid--2col" style="margin-bottom: var(--space-4)">
+      <div class="panel__grid panel__grid--2col" style="margin-bottom: 1rem">
         <AppCard elevated>
           <div class="stat">
             <div class="stat__value">{{ complexity?.files_over_threshold ?? 0 }}</div>
@@ -114,7 +114,7 @@ function distPct(key: keyof NonNullable<ComplexityData['distribution']>): number
         </div>
       </div>
 
-      <div v-if="(complexity?.hotspots?.length ?? 0) > 0" style="margin-top: var(--space-4)">
+      <div v-if="(complexity?.hotspots?.length ?? 0) > 0" style="margin-top: 1rem">
         <table class="data-table">
           <thead>
             <tr><th>File</th><th>LOC</th><th>Has Test</th></tr>
@@ -132,7 +132,7 @@ function distPct(key: keyof NonNullable<ComplexityData['distribution']>): number
           </tbody>
         </table>
       </div>
-      <div v-else-if="complexity" class="panel__hint" style="margin-top: var(--space-3)">
+      <div v-else-if="complexity" class="panel__hint" style="margin-top: 0.75rem">
         No files exceed the {{ complexity.threshold }}-line threshold.
       </div>
     </section>
@@ -145,7 +145,7 @@ function distPct(key: keyof NonNullable<ComplexityData['distribution']>): number
       <div v-if="deadCode?.note" class="panel__hint">{{ deadCode.note }}</div>
 
       <template v-else-if="(deadCode?.count ?? 0) > 0">
-        <div class="panel__grid" style="margin-bottom: var(--space-4)">
+        <div class="panel__grid" style="margin-bottom: 1rem">
           <AppCard elevated>
             <div class="stat">
               <div class="stat__value" :class="`stat__value--${riskLevel(Math.min(100, (deadCode?.count ?? 0) * 2))}`">
@@ -173,7 +173,7 @@ function distPct(key: keyof NonNullable<ComplexityData['distribution']>): number
             </tr>
           </tbody>
         </table>
-        <p v-if="(deadCode?.count ?? 0) > 30" class="panel__hint" style="margin-top: var(--space-3)">
+        <p v-if="(deadCode?.count ?? 0) > 30" class="panel__hint" style="margin-top: 0.75rem">
           Showing 30 of {{ deadCode?.count }} unreferenced files.
         </p>
       </template>

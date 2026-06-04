@@ -48,8 +48,8 @@ const GUIDE_ENTRIES: GuideEntry[] = [
     section: 'Scores & Risk',
     defHtml: `A single number summarizing how ready a project is for open-source collaboration and long-term sustainability. <span class="guide-kw">10 is best</span>. This is not a code quality score — it measures community scaffolding: docs, CI, licensing, and regular releases.`,
     methodLabel: 'How we compute it',
-    method: 'Weighted combination of all 11 heuristics: community health (17%), documentation (15%), CI/testing (15%), security hygiene (12%), release cadence (10%), abandonment risk (9%), dependency health (8%), bus factor (7%), monolith growth (3%), commit velocity (2%), burnout (2%). Each is inverted (100 − risk score) so lower risk = higher contribution to the OSS score, then normalized to 0–10. Only signals that were computable for that repo contribute; weights are renormalized if some are missing.',
-    searchText: 'oss score open source sustainability champion thriving growing seedling struggling dormant 10 weighted community docs ci release bus factor security dependency monolith velocity burnout',
+    method: 'Weighted combination of 16 heuristics: community health (13%), documentation (11%), CI/testing (11%), security hygiene (9%), release cadence (8%), abandonment risk (8%), license risk (7%), test coverage (7%), dependency health (6%), CI/CD maturity (5%), bus factor (5%), complexity debt (4%), container hygiene (3%), monolith growth (2%), commit velocity (1%), burnout (1%). Each is inverted (100 − risk score) so lower risk = higher contribution to the OSS score, then normalized to 0–10. Only signals computable for that repo contribute; weights are renormalized if some are missing.',
+    searchText: 'oss score open source sustainability champion thriving growing seedling struggling dormant 10 weighted community docs ci release bus factor security dependency monolith velocity burnout license test coverage cicd container complexity',
   },
   {
     id: 'confidence',
@@ -308,6 +308,72 @@ const GUIDE_ENTRIES: GuideEntry[] = [
     method: 'We look for monorepo signals: presence of packages/, apps/, services/, or frontend/+backend/ directories; root-level package.json with workspaces; pnpm-workspace.yaml; Cargo.toml workspaces; go.work files. When found, each top-level sub-directory with its own manifest is treated as a sub-project.',
     searchText: 'sub-projects subprojects monorepo packages apps services frontend backend workspaces split analysis per-project independent stack champion oss score',
   },
+  // ── License ────────────────────────────────────────────────────────────────
+  {
+    id: 'license-risk',
+    term: 'License Risk',
+    section: 'Project Health',
+    defHtml: `Whether the project has a <span class="guide-kw">recognized open-source license</span> and whether any dependency licenses are <span class="guide-kw">incompatible</span> with it. A missing license means all rights are reserved by default — contributors and users cannot legally use, modify, or distribute the code. Copyleft licenses (GPL, AGPL) require derivative works to use the same license.`,
+    methodLabel: 'How we detect it',
+    method: 'We scan the file tree for standard license filenames (LICENSE, LICENSE.md, COPYING, etc.) and match the file content against regex patterns for 14 SPDX identifiers. If no file is found, we fall back to the GitHub API\'s license_spdx field. For the top 100 dependencies we cross-reference a static lookup table of known package licenses across PyPI, npm, crates.io, RubyGems, and Go to flag incompatible combinations. No external API calls for license data — this is a static lookup.',
+    searchText: 'license risk spdx mit apache gpl agpl lgpl mpl bsd isc copyleft permissive osi approved derivative compatibility dependency',
+  },
+  // ── Code Quality ───────────────────────────────────────────────────────────
+  {
+    id: 'complexity-debt',
+    term: 'Complexity Debt',
+    section: 'Architecture',
+    defHtml: `A measure of how many <span class="guide-kw">large, hard-to-navigate files</span> exist in the codebase. Files over 500 non-blank, non-comment lines are flagged as hotspots. Hotspots without an adjacent test file are weighted more heavily — large untested files are both complex and fragile to change.`,
+    methodLabel: 'How we compute it',
+    method: 'We count non-blank, non-comment lines in every source file across 12 languages (same set as TODO scanning). Files over 500 LOC are classified as hotspots and checked for an adjacent test file (e.g. test_foo.py next to foo.py, or foo.test.ts next to foo.ts). Score = (over_threshold_ratio × 50) + (untested_hotspot_ratio × 50), capped at 100.',
+    searchText: 'complexity debt loc lines of code hotspot large file 500 threshold untested adjacent test fragile hard to change',
+  },
+  {
+    id: 'unreferenced-files',
+    term: 'Unreferenced Files',
+    section: 'Architecture',
+    defHtml: `Source files that are <span class="guide-kw">never imported</span> by any other file in the repository — potential dead code. Known entry points (main.py, index.js, etc.) and files in scripts/, bin/, tests/ directories are excluded automatically. Requires a dense enough import graph to be reliable.`,
+    methodLabel: 'How we detect them',
+    method: 'We reuse the import graph edges already computed for the Architecture tab and compute the in-degree of every node. Nodes with in-degree 0 that are not entry points, test files, config files, or migration files are flagged. When the graph has fewer than 20 edges, we suppress the result entirely and note that the graph is too sparse for a reliable signal.',
+    searchText: 'unreferenced files dead code import graph in-degree entry point sparse never imported orphan module',
+  },
+  {
+    id: 'test-coverage',
+    term: 'Test Coverage Proxy',
+    section: 'Project Health',
+    defHtml: `A structural proxy for test coverage — not a runtime measurement. We map which <span class="guide-kw">directories have at least one test file</span> nearby, which framework is in use, and what the overall test-file ratio is. Useful for spotting large swaths of untested code even without instrumentation.`,
+    methodLabel: 'How we compute it',
+    method: 'We walk the file tree and classify files as tests if they live in a test/ or spec/ directory, contain "test" or "spec" in the filename, or match common test framework patterns. For each non-test directory with 3+ source files we check whether a sibling test file or tests/ subdirectory exists. The risk score penalizes low test ratios: below 5% → 80 risk, 5–15% → 55, 15–25% → 30, 25–40% → 10, above 40% → 0. Additional penalty for directories with no test coverage.',
+    searchText: 'test coverage proxy directory ratio framework pytest jest rspec vitest mocha go test untested source files structural',
+  },
+  // ── DevOps ─────────────────────────────────────────────────────────────────
+  {
+    id: 'container-hygiene',
+    term: 'Container Hygiene',
+    section: 'Project Health',
+    defHtml: `Static analysis of <span class="guide-kw">Dockerfile</span> and <span class="guide-kw">docker-compose</span> files for common security and reproducibility issues: running as root, unpinned base images, credentials baked into environment variables, using ADD instead of COPY, and missing apt cache cleanup.`,
+    methodLabel: 'How we detect issues',
+    method: 'We scan every Dockerfile* file in the repo line by line. High-severity: no USER directive (runs as root by default), USER root explicitly set, ENV variable with a name matching *SECRET*, *KEY*, *TOKEN*, or *PASSWORD*. Medium: FROM *:latest (unpinned base image). Low: ADD for local files (use COPY instead), apt-get install without --no-install-recommends, apt-get install without clearing /var/lib/apt afterwards. Docker Compose files are checked for :latest service images and exposed ports without healthchecks. Score: high issues × 25 + medium issues × 10 + low issues × 3, capped at 100.',
+    searchText: 'container hygiene dockerfile docker compose root user latest unpinned base image secret env key token password add copy apt cache',
+  },
+  {
+    id: 'cicd-maturity',
+    term: 'CI/CD Maturity',
+    section: 'Project Health',
+    defHtml: `How complete the <span class="guide-kw">automated pipeline</span> is — not just whether CI exists, but whether it actually runs tests, applies a linter, has a deployment step, and tests across multiple runtime versions (matrix strategy). A basic CI that only builds the project without running tests scores much lower than one with a full quality gate.`,
+    methodLabel: 'How we compute it',
+    method: 'For GitHub Actions we parse every .yml and .yaml file under .github/workflows/ and scan the run: commands across all jobs. Test presence: keyword match against pytest, jest, vitest, mocha, rspec, cargo test, go test, etc. Lint presence: ruff, eslint, pylint, rubocop, golangci, mypy, tsc, etc. Deploy presence: deploy, publish, helm upgrade, kubectl apply, etc. For other CI systems (Travis, CircleCI, Jenkinsfile, GitLab CI) we fall back to text matching the entire config file. Maturity score: base 40 if any CI exists, +30 for tests, +15 for lint, +10 for deploy, +5 for matrix. Risk score = 100 − maturity score.',
+    searchText: 'ci cd maturity pipeline github actions travis circleci jenkins tests lint deploy matrix strategy quality gate automated',
+  },
+  {
+    id: 'changelog-discipline',
+    term: 'Changelog Discipline',
+    section: 'Project Health',
+    defHtml: `Whether the project maintains a structured <span class="guide-kw">CHANGELOG</span> file, what format it uses, and whether it is kept up to date with the actual commit history. A changelog lets downstream users understand what changed between versions without reading raw commits.`,
+    methodLabel: 'How we detect it',
+    method: 'We check for the changelog file detected by the project structure analyzer (CHANGELOG.md, CHANGELOG, HISTORY.md, etc.) and read the first 20 KB. Format detection: Keep a Changelog format (## [Unreleased] or ## [x.y.z] headings) → "keep-a-changelog"; any ## vX.Y or ## X.Y versioned heading → "versioned"; everything else → "prose". We extract the first ISO date (YYYY-MM-DD) found in the file and compare it to the last commit date. If the changelog has not been updated within 90 days of the last commit and the repo is still active, we flag it as stale.',
+    searchText: 'changelog discipline keep a changelog versioned format stale date last updated prose history versions',
+  },
 ]
 
 const SECTION_ORDER = ['Scores & Risk', 'Activity & Momentum', 'Architecture', 'Project Health', 'Contributing & Opportunities']
@@ -407,15 +473,18 @@ function renderMd(text: string): string {
         <h2 class="about-view__section-title">What the tabs show</h2>
         <ul class="about-view__feature-list">
           <li><strong>Overview</strong> — high-level stats: stars, language, age, top contributors, tech stack.</li>
-          <li><strong>Project</strong> — README content, community files, links, and release history.</li>
-          <li><strong>Architecture</strong> — import graph, god modules, circular dependencies, hot files.</li>
-          <li><strong>Tours</strong> — guided reading paths through major subsystems.</li>
-          <li><strong>Ownership</strong> — file ownership map, bus factor, subsystem breakdown, and <strong>PR Impact Preview</strong> (enter any PR number to get a complexity score and reviewer suggestions).</li>
+          <li><strong>Heuristics</strong> — 16 scored risk signals: burnout, abandonment, license risk, complexity debt, and more.</li>
+          <li><strong>Security</strong> — hardcoded secrets scan, gitignore gaps, known CVEs in dependencies.</li>
+          <li><strong>Licenses</strong> — SPDX license detection, OSI approval status, dependency license compatibility check.</li>
           <li><strong>Dependencies</strong> — all declared dependencies, Docker base image warnings, missing lockfiles.</li>
-          <li><strong>Security</strong> — hardcoded secrets scan, gitignore gaps, common patterns.</li>
+          <li><strong>Architecture</strong> — import graph, god modules, circular dependencies, hot files.</li>
+          <li><strong>Code Quality</strong> — file complexity hotspots (LOC distribution), unreferenced files, per-directory test coverage mapping.</li>
+          <li><strong>Project</strong> — README content, community files, links, and release history.</li>
           <li><strong>History</strong> — commit timeline, contributor churn, monthly breakdown, roadmap milestones.</li>
-          <li><strong>Heuristics</strong> — scored risk signals: burnout, abandonment, monolith growth, and more.</li>
+          <li><strong>Ownership</strong> — file ownership map, bus factor, subsystem breakdown, and <strong>PR Impact Preview</strong>.</li>
           <li><strong>Contributing</strong> — actionable contribution opportunities with difficulty ratings.</li>
+          <li><strong>DevOps</strong> — CI/CD pipeline depth, Dockerfile hygiene, changelog discipline.</li>
+          <li><strong>Tours</strong> — guided reading paths through major subsystems.</li>
         </ul>
       </section>
 
@@ -448,7 +517,7 @@ function renderMd(text: string): string {
             <div><strong>Dormant (0–2)</strong><span>Abandoned or severely under-maintained.</span></div>
           </div>
         </div>
-        <p class="about-view__note">Score weights: Community health 17% · Documentation 15% · CI/testing 15% · Security 12% · Release cadence 10% · Abandonment 9% · Dependency health 8% · Bus factor 7% · Monolith growth 3% · Commit velocity 2% · Burnout 2%.</p>
+        <p class="about-view__note">Score weights (16 signals): Community health 13% · Documentation 11% · CI/testing 11% · Security hygiene 9% · Release cadence 8% · Abandonment risk 8% · License risk 7% · Test coverage 7% · Dependency health 6% · CI/CD maturity 5% · Bus factor 5% · Complexity debt 4% · Container hygiene 3% · Monolith growth 2% · Commit velocity 1% · Burnout 1%.</p>
       </section>
 
       <section class="about-view__section">

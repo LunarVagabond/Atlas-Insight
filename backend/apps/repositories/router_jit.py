@@ -411,6 +411,12 @@ def get_ai_summary(request, run_id: uuid.UUID):
     deps = r.get('dependencies') or {}
     graph = r.get('graph') or {}
     security = r.get('security') or {}
+    complexity = r.get('complexity') or {}
+    dead_code = r.get('dead_code') or {}
+    test_coverage = r.get('test_coverage') or {}
+    cicd = r.get('cicd') or {}
+    containers = r.get('containers') or {}
+    changelog = r.get('changelog') or {}
     repo_type = r.get('repo_type') or {}
     arch_tours = r.get('arch_tours') or []
     opportunities = r.get('contribution_opportunities') or []
@@ -514,6 +520,54 @@ def get_ai_summary(request, run_id: uuid.UUID):
         if remaining > 0:
             dep_line += f" (plus {remaining} more production deps and {len(dev_deps)} dev deps)"
         lines.append(dep_line + ".")
+        lines.append("")
+
+    # ── Code quality ────────────────────────────────────────────────────────
+    cq_parts: list[str] = []
+    if complexity:
+                cq_parts.append(f"{complexity.get('files_over_threshold', 0)} complexity hotspots")
+    if dead_code:
+                cq_parts.append(f"{dead_code.get('count', 0)} unreferenced files")
+    if test_coverage:
+                ratio = test_coverage.get('test_ratio')
+                if isinstance(ratio, (int, float)):
+                        cq_parts.append(f"test ratio {round(ratio * 100)}%")
+                framework = test_coverage.get('framework_detected')
+                if framework:
+                        cq_parts.append(f"framework {framework}")
+    if cq_parts:
+                lines.append(f"Code Quality: {', '.join(cq_parts)}.")
+                untested = test_coverage.get('untested_dirs') or []
+                if untested:
+                        sample = ', '.join(d.get('path', '') for d in untested[:5] if d.get('path'))
+                        if sample:
+                                lines.append(f"  Likely under-tested areas: {sample}.")
+                lines.append("")
+
+    # ── DevOps ──────────────────────────────────────────────────────────────
+    devops_parts: list[str] = []
+    if cicd:
+        devops_parts.append(f"{cicd.get('workflow_count', 0)} CI workflow(s)")
+        summary = cicd.get('summary') or {}
+        checks = []
+        if summary.get('has_tests'):
+            checks.append('tests')
+        if summary.get('has_lint'):
+            checks.append('lint')
+        if summary.get('has_deploy'):
+            checks.append('deploy')
+        if checks:
+            devops_parts.append(f"checks: {', '.join(checks)}")
+    if containers:
+        devops_parts.append(
+            f"{containers.get('dockerfile_count', 0)} Dockerfile(s), {containers.get('total_issues', 0)} container issue(s)"
+        )
+    if changelog:
+        status = 'present' if changelog.get('found') else 'missing'
+        fmt = changelog.get('format') or 'none'
+        devops_parts.append(f"changelog {status} ({fmt})")
+    if devops_parts:
+        lines.append(f"DevOps: {', '.join(devops_parts)}.")
         lines.append("")
 
     # ── Contributors ─────────────────────────────────────────────────────────

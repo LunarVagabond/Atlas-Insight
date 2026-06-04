@@ -30,7 +30,7 @@ const unknownDeps = computed(() => (props.license?.dep_licenses ?? []).filter(d 
 
     <template v-else>
       <!-- Project license summary -->
-      <div class="panel__grid panel__grid--2col" style="margin-bottom: var(--space-6)">
+      <div class="panel__grid panel__grid--2col" style="margin-bottom: 1.5rem">
         <AppCard elevated>
           <div class="stat">
             <div class="stat__value" style="font-size: 1.4rem">
@@ -41,7 +41,7 @@ const unknownDeps = computed(() => (props.license?.dep_licenses ?? []).filter(d 
         </AppCard>
         <AppCard elevated>
           <div class="license-panel__badges">
-            <div class="stat__label" style="margin-bottom: var(--space-2)">Properties</div>
+            <div class="stat__label" style="margin-bottom: 0.5rem">Properties</div>
             <AppBadge v-if="license?.osi_approved" variant="info">OSI Approved</AppBadge>
             <AppBadge v-if="license?.copyleft" variant="warning">Copyleft</AppBadge>
             <AppBadge v-if="!license?.osi_approved && license?.source !== 'none'" variant="info">Non-OSI</AppBadge>
@@ -53,7 +53,7 @@ const unknownDeps = computed(() => (props.license?.dep_licenses ?? []).filter(d 
       </div>
 
       <!-- Issues -->
-      <div v-if="(license?.issues?.length ?? 0) > 0" style="margin-bottom: var(--space-6)">
+      <div v-if="(license?.issues?.length ?? 0) > 0" style="margin-bottom: 1.5rem">
         <h3 class="license-panel__section-title">Issues</h3>
         <table class="data-table">
           <thead>
@@ -78,7 +78,7 @@ const unknownDeps = computed(() => (props.license?.dep_licenses ?? []).filter(d 
           <span class="license-panel__sub">({{ license?.dep_licenses?.length }} deps checked)</span>
         </h3>
 
-        <div class="panel__grid" style="margin-bottom: var(--space-4)">
+        <div class="panel__grid" style="margin-bottom: 1rem">
           <AppCard>
             <div class="stat">
               <div class="stat__value stat__value--ok">{{ compatibleDeps.length }}</div>

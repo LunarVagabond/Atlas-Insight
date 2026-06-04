@@ -28,9 +28,18 @@ def _is_test_file(name: str) -> bool:
     return any(p in name_lower for p in _TEST_FILE_PATTERNS)
 
 
-def _detect_framework(repo_dir: str, tech_stack: list) -> str | None:
+def _detect_framework(repo_dir: str, tech_stack: list | None) -> str | None:
     root = Path(repo_dir)
-    stack_names = {t.get('name', '').lower() for t in tech_stack} if tech_stack else set()
+    stack_names = set()
+    for item in tech_stack or []:
+        if isinstance(item, str):
+            name = item
+        elif isinstance(item, dict):
+            name = str(item.get('name', ''))
+        else:
+            name = ''
+        if name:
+            stack_names.add(name.lower())
 
     for framework, signatures in _FRAMEWORK_SIGNATURES.items():
         for sig in signatures:

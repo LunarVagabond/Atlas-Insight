@@ -204,7 +204,22 @@ async function forceReanalyze() {
 // Export JSON
 function exportJson() {
   if (!result.value || !store.run) return
-  const blob = new Blob([JSON.stringify(result.value, null, 2)], { type: 'application/json' })
+  const payload = {
+    ...result.value,
+    tab_exports: {
+      code_quality: {
+        complexity: result.value.complexity ?? null,
+        dead_code: result.value.dead_code ?? null,
+        test_coverage: result.value.test_coverage ?? null,
+      },
+      devops: {
+        cicd: result.value.cicd ?? null,
+        containers: result.value.containers ?? null,
+        changelog: result.value.changelog ?? null,
+      },
+    },
+  }
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -582,6 +597,7 @@ onUnmounted(() => {
           :complexity="result.complexity"
           :dead-code="result.dead_code"
           :test-coverage="result.test_coverage"
+          :structure="result.structure"
         />
         <DevOpsPanel
           v-if="activeTab === 'DevOps'"

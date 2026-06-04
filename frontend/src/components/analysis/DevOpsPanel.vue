@@ -31,7 +31,7 @@ function ciScoreBadge(score: number): 'info' | 'warning' | 'failed' {
 }
 
 const changelogFormatLabel: Record<string, string> = {
-  'keep-a-changelog': 'Keep a Changelog',
+  'keep-a-changelog': 'Keep a Changelog (standard format)',
   versioned: 'Versioned',
   prose: 'Prose',
   none: 'None',
@@ -54,7 +54,7 @@ const allContainerIssues = computed(() => {
     <section class="devops-section">
       <h3 class="devops-section__title">CI/CD Pipeline</h3>
 
-      <div class="panel__grid panel__grid--2col" style="margin-bottom: var(--space-4)">
+      <div class="panel__grid panel__grid--2col" style="margin-bottom: 1rem">
         <AppCard elevated>
           <div class="stat">
             <div class="stat__value">
@@ -62,7 +62,7 @@ const allContainerIssues = computed(() => {
                 {{ ciScoreLabel(cicd?.score ?? 0) }}
               </AppBadge>
             </div>
-            <div class="stat__label" style="margin-top: var(--space-2)">
+            <div class="stat__label" style="margin-top: 0.5rem">
               Maturity · {{ cicd?.score ?? 0 }}/100
               <span v-if="cicd?.system" class="devops-system-tag"> via {{ cicd.system.replace(/_/g, ' ') }}</span>
             </div>
@@ -122,7 +122,7 @@ const allContainerIssues = computed(() => {
       </div>
 
       <template v-else>
-        <div class="panel__grid" style="margin-bottom: var(--space-4)">
+        <div class="panel__grid" style="margin-bottom: 1rem">
           <AppCard elevated>
             <div class="stat">
               <div class="stat__value">{{ containers?.dockerfile_count }}</div>
@@ -172,8 +172,11 @@ const allContainerIssues = computed(() => {
     <!-- ── Changelog discipline ───────────────────────────────── -->
     <section class="devops-section">
       <h3 class="devops-section__title">Changelog Discipline</h3>
+      <p class="panel__hint" style="margin: 0 0 0.75rem 0">
+        Checks whether a changelog exists, what style it uses, and whether it appears stale. “Keep a Changelog” is a detected format label, not a hard requirement.
+      </p>
 
-      <div class="panel__grid panel__grid--2col" style="margin-bottom: var(--space-4)">
+      <div class="panel__grid panel__grid--2col" style="margin-bottom: 1rem">
         <AppCard elevated>
           <div class="stat">
             <div class="stat__value">
@@ -181,7 +184,7 @@ const allContainerIssues = computed(() => {
                 {{ changelog?.found ? 'Present' : 'Missing' }}
               </AppBadge>
             </div>
-            <div class="stat__label" style="margin-top: var(--space-2)">Changelog</div>
+            <div class="stat__label" style="margin-top: 0.5rem">Changelog</div>
           </div>
         </AppCard>
         <AppCard elevated>
@@ -192,7 +195,7 @@ const allContainerIssues = computed(() => {
         </AppCard>
       </div>
 
-      <div v-if="changelog?.found" class="panel__grid" style="margin-bottom: var(--space-4)">
+      <div v-if="changelog?.found" class="panel__grid" style="margin-bottom: 1rem">
         <AppCard>
           <div class="stat">
             <div class="stat__value">{{ changelog?.entry_count ?? 0 }}</div>
@@ -213,7 +216,7 @@ const allContainerIssues = computed(() => {
         </AppCard>
       </div>
 
-      <div v-if="(changelog?.issues?.length ?? 0) > 0" style="margin-top: var(--space-3)">
+      <div v-if="(changelog?.issues?.length ?? 0) > 0" style="margin-top: 0.75rem">
         <table class="data-table">
           <thead>
             <tr><th>Severity</th><th>Issue</th></tr>
