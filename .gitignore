@@ -1,7 +1,12 @@
 Overview.md
 TASKS.md
 TASK.md
+# Coverage
 .coverage
+.coverage.*
+coverage.xml
+backend/htmlcov/
+frontend/coverage/
 
 # Python
 backend/.venv/

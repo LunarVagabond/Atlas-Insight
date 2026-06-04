@@ -13,3 +13,20 @@ select = ["E", "F", "I", "N", "W"]
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings.development"
 python_files = ["tests.py", "test_*.py"]
+addopts = "--cov=apps --cov-report=term-missing --cov-report=html:htmlcov --cov-report=xml:coverage.xml"
+
+[tool.coverage.run]
+source = ["apps"]
+omit = ["*/migrations/*", "*/tests/*", "*/test_*.py"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+precision = 1
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

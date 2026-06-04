@@ -1,7 +1,7 @@
 import { execSync } from 'child_process'
 import { resolve } from 'path'
 import vue from '@vitejs/plugin-vue'
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import { version } from './package.json'
 
 const gitSha = (() => {
@@ -41,6 +41,29 @@ export default defineConfig({
       '/accounts': {
         target: 'http://localhost:4500',
         changeOrigin: true,
+      },
+    },
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'lcov'],
+      reportsDirectory: 'coverage',
+      include: ['src/**/*.{ts,vue}'],
+      exclude: [
+        'src/main.ts',
+        'src/vite-env.d.ts',
+        'src/**/*.d.ts',
+        'src/router/index.ts',
+      ],
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 70,
+        statements: 80,
       },
     },
   },
