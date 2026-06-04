@@ -26,9 +26,9 @@ def analyze_changelog(repo_dir: str, structure: dict, commits: dict) -> dict:
 
     if not found or not changelog_file:
         issues.append({
-            'severity': 'medium',
+            'severity': 'low',
             'message': (
-                'No CHANGELOG file found — contributors cannot track'
+                'No CHANGELOG file found — contributors might have trouble tracking'
                 ' what changed between versions'
             ),
         })
@@ -94,7 +94,7 @@ def analyze_changelog(repo_dir: str, structure: dict, commits: dict) -> dict:
 
     if entry_count == 0:
         issues.append({
-            'severity': 'medium',
+            'severity': 'low',
             'message': 'CHANGELOG has no version entries',
         })
 
