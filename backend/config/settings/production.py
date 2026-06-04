@@ -11,6 +11,9 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 # False by default — nginx/Cloudflare terminates TLS; Django must not redirect or it loops.
 # Set SECURE_SSL_REDIRECT=True only when Django is directly internet-facing without a proxy.
 SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
+# Tell Django it's behind an HTTPS proxy (Cloudflare → nginx → Django).
+# Nginx forwards X-Forwarded-Proto so request.is_secure() returns True.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
