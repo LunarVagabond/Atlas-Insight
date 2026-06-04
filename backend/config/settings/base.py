@@ -1,3 +1,4 @@
+import sys as _sys_logging
 from pathlib import Path
 
 from decouple import Csv, config
@@ -227,14 +228,11 @@ MAX_CACHE_GB = config('MAX_CACHE_GB', default=10, cast=float)
 LOG_RETENTION_DAYS = config('LOG_RETENTION_DAYS', default=30, cast=int)
 
 # Logging
-import sys as _sys_logging
-
 
 def _detect_service_name() -> str:
     explicit = config('ATLAS_SERVICE', default='').strip()
     if explicit:
         return explicit
-
     argv = ' '.join(_sys_logging.argv).lower()
     if 'flower' in argv:
         return 'celery-flower'
@@ -245,70 +243,13 @@ def _detect_service_name() -> str:
     return 'django'
 
 
-_sentry_service = _detect_service_name()
+_service_name = _detect_service_name()
 
-# Add new Django app-level service buckets here.
-_DJANGO_APP_SERVICE_MAP = {
-    'analysis': 'django-analysis',
-    'api': 'django-api',
-    'repositories': 'django-repositories',
-    'users': 'django-users',
-    'utils': 'django-utils',
-}
-
-
-def _service_from_logger_name(logger_name: str) -> str:
-    logger_name = (logger_name or '').strip()
-    if logger_name:
-        if logger_name.startswith('apps.'):
-            parts = logger_name.split('.')
-            app = parts[1] if len(parts) > 1 else ''
-            if app in _DJANGO_APP_SERVICE_MAP:
-                return _DJANGO_APP_SERVICE_MAP[app]
-            return 'django'
-
-        root = logger_name.split('.')[0]
-        if root == 'config':
-            return 'django-config'
-        if root == 'django':
-            return 'django'
-        if root in {'flower'}:
-            return 'celery-flower'
-        if root in {'celery', 'kombu'}:
-            return 'celery-workers'
-    return _sentry_service
-
-class _SentryServiceFilter:
-    def filter(self, record):
-        service_name = _service_from_logger_name(getattr(record, 'name', ''))
-        setattr(record, 'service', service_name)
-        # Forward to Sentry/GlitchTip if DSN is configured
-        if SENTRY_DSN:
-            try:
-                import sentry_sdk
-                message = record.getMessage()
-                # Attach service context and send as explicit log capture
-                sentry_sdk.set_tag('service', service_name)
-                sentry_sdk.set_context('service', {'name': service_name})
-                # Capture at appropriate level
-                if record.levelno >= 40:
-                    sentry_sdk.capture_message(message, level='error')
-                elif record.levelno >= 30:
-                    sentry_sdk.capture_message(message, level='warning')
-                else:
-                    sentry_sdk.capture_message(message, level='info')
-            except Exception:
-                pass
-        return True
+_LOG_HANDLERS = ['console']
 
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
-    'filters': {
-        'sentry_service': {
-            '()': _SentryServiceFilter,
-        },
-    },
     'formatters': {
         'verbose': {
             'format': '{asctime} {levelname:<8} {name} — {message}',
@@ -320,119 +261,30 @@ LOGGING = {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
-            'filters': ['sentry_service'],
         },
     },
     'loggers': {
-        'django': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'django.request': {
-            'handlers': ['console'],
-            'level': 'ERROR',
-            'propagate': False,
-        },
-        'django.server': {
-            'handlers': ['console'],
-            'level': 'ERROR',
-            'propagate': False,
-        },
-        'django.template': {
-            'handlers': ['console'],
-            'level': 'ERROR',
-            'propagate': False,
-        },
-        'django.db.backends': {
-            'handlers': ['console'],
-            'level': 'WARNING',
-            'propagate': False,
-        },
-        'celery': {
-            'handlers': ['console'],
-            'level': LOG_LEVEL,
-            'propagate': False,
-        },
-        'apps': {
-            'handlers': ['console'],
-            'level': LOG_LEVEL,
-            'propagate': False,
-        },
+        'django': {'handlers': _LOG_HANDLERS, 'level': 'INFO', 'propagate': False},
+        'django.request': {'handlers': _LOG_HANDLERS, 'level': 'ERROR', 'propagate': False},
+        'django.server': {'handlers': _LOG_HANDLERS, 'level': 'ERROR', 'propagate': False},
+        'django.template': {'handlers': _LOG_HANDLERS, 'level': 'ERROR', 'propagate': False},
+        'django.db.backends': {'handlers': _LOG_HANDLERS, 'level': 'WARNING', 'propagate': False},
+        'celery': {'handlers': _LOG_HANDLERS, 'level': LOG_LEVEL, 'propagate': False},
+        'apps': {'handlers': _LOG_HANDLERS, 'level': LOG_LEVEL, 'propagate': False},
     },
-    'root': {
-        'handlers': ['console'],
-        'level': LOG_LEVEL,
-    },
+    'root': {'handlers': _LOG_HANDLERS, 'level': LOG_LEVEL},
 }
 
-# ── Sentry / GlitchTip ───────────────────────────────────────────────────────
-SENTRY_DSN = config('SENTRY_DSN', default='')
-if SENTRY_DSN:
-    import logging as _logging
-    import sentry_sdk
-    from sentry_sdk.integrations.celery import CeleryIntegration
-    from sentry_sdk.integrations.django import DjangoIntegration
-    from sentry_sdk.integrations.logging import LoggingIntegration
-
-    def _derive_sentry_service(event: dict) -> str:
-        logger_name = (event.get('logger') or '').strip()
-        if logger_name:
-            return _service_from_logger_name(logger_name)
-
-        tx_name = (event.get('transaction') or '').strip()
-        if tx_name.startswith('apps.'):
-            parts = tx_name.split('.')
-            app = parts[1] if len(parts) > 1 else ''
-            if app in _DJANGO_APP_SERVICE_MAP:
-                return _DJANGO_APP_SERVICE_MAP[app]
-            return 'django'
-        if tx_name.startswith('config.'):
-            return 'django-config'
-
-        return _sentry_service
-
-    def _attach_service_fields(event: dict) -> dict:
-        service_name = _derive_sentry_service(event)
-
-        tags = dict(event.get('tags') or {})
-        tags['service'] = service_name
-        event['tags'] = tags
-
-        contexts = dict(event.get('contexts') or {})
-        service_ctx = dict(contexts.get('service') or {})
-        service_ctx['name'] = service_name
-        contexts['service'] = service_ctx
-        event['contexts'] = contexts
-
-        return event
-
-    def _before_send(event, hint):
-        return _attach_service_fields(event)
-
-    def _before_send_transaction(event, hint):
-        return _attach_service_fields(event)
-
-    sentry_sdk.init(
-        dsn=SENTRY_DSN,
-        environment=config('DJANGO_SETTINGS_MODULE', default='development').split('.')[-1],
-        server_name=_sentry_service,
-        traces_sample_rate=0.1,
-        send_default_pii=False,
-        before_send=_before_send,
-        before_send_transaction=_before_send_transaction,
-        integrations=[
-            DjangoIntegration(),
-            CeleryIntegration(),
-            # Disabled: LoggingIntegration may interfere with handler filters
-            # LoggingIntegration(
-            #     sentry_logs_level=_logging.INFO,
-            #     event_level=None,
-            #     level=_logging.INFO,
-            # ),
-        ],
-        enable_logs=True,
-    )
-
-    sentry_sdk.set_tag('service', _sentry_service)
-    sentry_sdk.set_context('service', {'name': _sentry_service})
+# Write to _running/logs/<service>.log when LOG_TO_FILE=True (truncate on each start).
+# Independent of DEBUG — set True locally even with production settings.
+LOG_TO_FILE = config('LOG_TO_FILE', default=False, cast=bool)
+if LOG_TO_FILE:
+    _log_dir = REPO_ROOT / '_running' / 'logs'
+    _log_dir.mkdir(parents=True, exist_ok=True)
+    LOGGING['handlers']['file'] = {
+        'class': 'logging.FileHandler',
+        'filename': str(_log_dir / f'{_service_name}.log'),
+        'mode': 'w',
+        'formatter': 'verbose',
+    }
+    _LOG_HANDLERS.append('file')

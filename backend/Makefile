@@ -18,7 +18,7 @@ DJANGO_ENV := DJANGO_SETTINGS_MODULE=$(or $(DJANGO_SETTINGS_MODULE),config.setti
         start-celery stop-celery \
 	start-beat stop-beat \
         start-flower stop-flower \
-	sentry-test-services promote-user \
+	promote-user \
         migrate makemigrations createsuperuser shell dbshell collectstatic \
         test lint format logs \
         _ensure_running_dirs _start_svc _stop_svc
@@ -211,22 +211,19 @@ status:
 	done
 
 logs:
-	@echo "Local backend log files are disabled. Use GlitchTip Logs and make logs-glitchtip."
+	@tail -f $(MAKEFILE_DIR)/../_running/logs/django.log 2>/dev/null || echo "No django.log yet — start the server first"
 
 logs-django:
-	@echo "Local django log files are disabled. Use GlitchTip Logs service filter: django-*"
+	@tail -f $(MAKEFILE_DIR)/../_running/logs/django.log 2>/dev/null || echo "No log yet"
 
 logs-celery:
-	@echo "Local celery log files are disabled. Use GlitchTip Logs service filter: celery-workers"
+	@tail -f $(MAKEFILE_DIR)/../_running/logs/celery-workers.log 2>/dev/null || echo "No log yet"
 
 logs-beat:
-	@echo "Local beat log files are disabled. Use GlitchTip Logs service filter: celery-workers"
-
-sentry-test-services:
-	@cd $(MAKEFILE_DIR) && $(DJANGO_ENV) $(PYTHON) -c "import os, sys; sys.path.insert(0, '.'); from scripts.sentry_service_test import load_env_and_run; load_env_and_run()"
+	@tail -f $(MAKEFILE_DIR)/../_running/logs/celery-beat.log 2>/dev/null || echo "No log yet"
 
 logs-flower:
-	@echo "Local flower log files are disabled. Use GlitchTip Logs service filter: celery-flower"
+	@tail -f $(MAKEFILE_DIR)/../_running/logs/celery-flower.log 2>/dev/null || echo "No log yet"
 
 promote-user:
 	@cd $(MAKEFILE_DIR) && PROMOTE_EMAIL="$(EMAIL)" PROMOTE_USERNAME="$(USERNAME)" $(DJANGO_ENV) $(PYTHON) scripts/promote_user.py

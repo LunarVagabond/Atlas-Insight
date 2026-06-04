@@ -1,5 +1,6 @@
 """Admin + webhook endpoints: stats, rate-limit, pick-spotlight, watched, github-webhook."""
 import logging
+import os
 import uuid
 from typing import Optional
 
@@ -8,7 +9,8 @@ from ninja import Router, Schema
 from ninja.errors import HttpError
 
 from apps.analysis.tasks import analyze_repository
-from .models import AnalysisRun, Repository, RepoOfTheWeek, WebhookDelivery
+
+from .models import AnalysisRun, RepoOfTheWeek, Repository, WebhookDelivery
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -27,6 +29,7 @@ class WatchedRepoSchema(Schema):
 @ratelimit(key='user', rate='30/h', method='GET', block=True)
 def admin_stats(request):
     import os
+
     from django.conf import settings as django_settings
     if not request.user.is_staff:
         raise HttpError(403, 'Staff only')
@@ -82,9 +85,15 @@ def admin_rate_limit(request):
         raise HttpError(502, 'Failed to fetch rate limit from GitHub')
 
     def fmt(r: dict) -> dict:
-        from datetime import datetime, timezone as _tz
-        reset_at = datetime.fromtimestamp(r.get('reset', 0), tz=_tz.utc).isoformat() if r.get('reset') else None
-        return {'limit': r.get('limit', 0), 'remaining': r.get('remaining', 0), 'reset_at': reset_at}
+        from datetime import datetime
+        from datetime import timezone as _tz
+        ts = r.get('reset', 0)
+        reset_at = datetime.fromtimestamp(ts, tz=_tz.utc).isoformat() if ts else None
+        return {
+            'limit': r.get('limit', 0),
+            'remaining': r.get('remaining', 0),
+            'reset_at': reset_at,
+        }
 
     return {
         'core': fmt(data.get('core', {})),
@@ -98,6 +107,7 @@ def admin_rate_limit(request):
 def admin_pick_spotlight(request):
     import random
     from datetime import date, timedelta
+
     from django.db.models import Count
 
     if not request.user.is_superuser:
@@ -183,6 +193,57 @@ def unwatch_repo(request, repo_id: uuid.UUID):
     repo.is_watched = False
     repo.save(update_fields=['is_watched'])
     return 204, None
+
+
+@router.post('/admin/purge-cache', response={200: dict})
+@ratelimit(key='user', rate='10/h', method='POST', block=True)
+def admin_purge_cache(request):
+    import shutil
+
+    from django.conf import settings as django_settings
+
+    if not request.user.is_staff:
+        raise HttpError(403, 'Staff only')
+
+    cache_dir = django_settings.REPO_CACHE_DIR
+    if not os.path.isdir(cache_dir):
+        return {'deleted': 0, 'skipped_active': 0, 'freed_gb': 0}
+
+    active_dir_names = set(
+        AnalysisRun.objects.filter(status__in=['pending', 'running'])
+        .values_list('repo__owner', 'repo__name')
+        .values_list('repo__owner', flat=False)
+    )
+    active_dirs = {f"{o}_{n}" for o, n in active_dir_names}
+
+    deleted = 0
+    skipped = 0
+    freed_bytes = 0
+
+    for entry in os.scandir(cache_dir):
+        if not entry.is_dir():
+            continue
+        if entry.name in active_dirs:
+            skipped += 1
+            continue
+        size = 0
+        for root, dirs, files in os.walk(entry.path):
+            for f in files:
+                try:
+                    size += os.path.getsize(os.path.join(root, f))
+                except OSError:
+                    pass
+        shutil.rmtree(entry.path, ignore_errors=True)
+        freed_bytes += size
+        deleted += 1
+
+    freed_gb = freed_bytes / (1024 ** 3)
+    logger.info('Purged cache: deleted=%d skipped=%d freed_gb=%.2f', deleted, skipped, freed_gb)
+    return {
+        'deleted': deleted,
+        'skipped_active': skipped,
+        'freed_gb': round(freed_gb, 3),
+    }
 
 
 @router.post('/webhooks/github', response={200: None})

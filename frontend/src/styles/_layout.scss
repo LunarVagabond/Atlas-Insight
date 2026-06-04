@@ -326,18 +326,28 @@
     background: var(--color-bg);
   }
 
+  &__tab-frame {
+    border: 1.5px solid color-mix(in srgb, var(--tab-color, var(--color-border)) 40%, var(--color-border));
+    border-radius: 8px;
+    padding: $space-5 $space-5 $space-6;
+    margin-top: $space-4;
+    transition: border-color 0.2s ease;
+  }
+
   @media (max-width: $bp-md) {
     height: calc(100vh - 56px - 48px);
 
     &__sticky { padding: $space-3 $space-4 0; }
     &__scroll { padding: $space-4; }
     &__chapter-nav { padding: $space-2 $space-4; }
+    &__tab-frame { padding: $space-3 $space-4; }
   }
 
   @media (max-width: $bp-sm) {
     &__sticky { padding: $space-3 $space-3 0; }
     &__scroll { padding: $space-3; }
     &__chapter-nav { padding: $space-2 $space-3; }
+    &__tab-frame { padding: $space-3; }
   }
 }
 

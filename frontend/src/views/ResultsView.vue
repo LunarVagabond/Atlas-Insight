@@ -104,6 +104,10 @@ const tabBadges = computed<Record<string, number | string>>(() => {
 
 const activeTab = ref((route.query.tab as string) || 'Overview')
 
+const activeGroupColor = computed(() =>
+  GROUPS.value.find(g => g.tabs.includes(activeTab.value))?.color ?? 'var(--color-border)'
+)
+
 const activeChapterIndex = computed(() => TABS.value.indexOf(activeTab.value))
 const prevChapter = computed(() => activeChapterIndex.value > 0 ? TABS.value[activeChapterIndex.value - 1] : null)
 const nextChapter = computed(() => activeChapterIndex.value < TABS.value.length - 1 ? TABS.value[activeChapterIndex.value + 1] : null)
@@ -410,8 +414,9 @@ onUnmounted(() => {
       </div>
 
       <!-- Result content -->
+      <div v-if="result" class="results-layout__tab-frame" :style="{ '--tab-color': activeGroupColor }">
       <Transition name="fade">
-      <div v-if="result">
+      <div>
         <div v-if="store.status === 'error'" class="analysis-inline-error">
           <span class="analysis-inline-error__icon">✕</span>
           {{ store.error || 'Re-analysis failed.' }}
@@ -563,6 +568,7 @@ onUnmounted(() => {
         <ArchitectureToursPanel v-if="activeTab === 'Tours'" :tours="result.arch_tours ?? []" :repo-url="store.run?.repo_url" :run-id="runId" />
       </div>
       </Transition>
+      </div><!-- /.results-layout__tab-frame -->
     </div>
 
     <!-- ── Pinned chapter nav ───────────────────────────────────────── -->

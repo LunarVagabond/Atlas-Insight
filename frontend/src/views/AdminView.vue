@@ -156,6 +156,33 @@ function resetAt(iso: string | null): string {
   return d.toLocaleTimeString()
 }
 
+interface PurgeCacheResult {
+  deleted: number
+  skipped_active: number
+  freed_gb: number
+}
+
+const purgeCacheConfirm = ref(false)
+const purgeCacheLoading = ref(false)
+const purgeCacheResult = ref<PurgeCacheResult | null>(null)
+const purgeCacheError = ref<string | null>(null)
+
+async function purgeCache() {
+  purgeCacheLoading.value = true
+  purgeCacheError.value = null
+  purgeCacheResult.value = null
+  purgeCacheConfirm.value = false
+  try {
+    const { data } = await axios.post<PurgeCacheResult>('/api/v1/repositories/admin/purge-cache')
+    purgeCacheResult.value = data
+    await fetchStats()
+  } catch (err: any) {
+    purgeCacheError.value = err?.response?.data?.detail ?? 'Failed to purge cache'
+  } finally {
+    purgeCacheLoading.value = false
+  }
+}
+
 interface SpotlightResult {
   owner: string
   name: string
@@ -240,6 +267,37 @@ onMounted(fetchStats)
               <div class="stat__value">{{ stats.cache_size_gb }} GB</div>
               <div class="stat__label">Cache Size</div>
             </AppCard>
+          </div>
+        </div>
+
+        <!-- Cache Purge -->
+        <div class="panel" style="margin-top:1.5rem">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+            <div>
+              <p class="panel__title" style="margin:0">Repo Cache</p>
+              <p class="panel__subtitle" style="margin:0.25rem 0 0">
+                {{ stats.repo_clone_count }} clones · {{ stats.cache_size_gb }} GB on disk.
+                Purging deletes stale clones; active analyses are skipped.
+              </p>
+            </div>
+            <template v-if="!purgeCacheConfirm">
+              <AppButton variant="secondary" :disabled="purgeCacheLoading || stats.repo_clone_count === 0" @click="purgeCacheConfirm = true">
+                {{ purgeCacheLoading ? 'Purging…' : 'Purge Cache' }}
+              </AppButton>
+            </template>
+            <template v-else>
+              <div style="display:flex;align-items:center;gap:0.5rem">
+                <span style="font-size:0.8125rem;color:var(--color-text-muted)">Delete all stale clones?</span>
+                <AppButton variant="primary" :disabled="purgeCacheLoading" @click="purgeCache">Confirm</AppButton>
+                <AppButton variant="secondary" @click="purgeCacheConfirm = false">Cancel</AppButton>
+              </div>
+            </template>
+          </div>
+          <div v-if="purgeCacheError" class="empty-state" style="color:var(--color-error)">{{ purgeCacheError }}</div>
+          <div v-if="purgeCacheResult" style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0.75rem;background:var(--color-surface);border:1px solid var(--color-border);border-radius:6px;font-size:0.875rem">
+            <AppBadge variant="completed">Done</AppBadge>
+            <span>Deleted <strong>{{ purgeCacheResult.deleted }}</strong> clone{{ purgeCacheResult.deleted !== 1 ? 's' : '' }}, freed <strong>{{ purgeCacheResult.freed_gb }} GB</strong></span>
+            <span v-if="purgeCacheResult.skipped_active > 0" style="color:var(--color-text-muted)">· {{ purgeCacheResult.skipped_active }} active skipped</span>
           </div>
         </div>
 
