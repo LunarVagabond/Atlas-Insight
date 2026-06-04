@@ -138,13 +138,15 @@ banner "Step 4 — Build Docker images"
 
 info "Building backend image..."
 docker build \
+    --file "$REPO_ROOT/backend/Dockerfile" \
     --tag "atlas-insight-backend:${GIT_TAG}" \
     --tag "${BACKEND_IMAGE}:${GIT_TAG}" \
-    "$REPO_ROOT/backend"
+    "$REPO_ROOT"
 ok "Backend image built: ${BACKEND_IMAGE}:${GIT_TAG}"
 
 info "Building frontend image..."
 docker build \
+    --file "$REPO_ROOT/frontend/Dockerfile" \
     --tag "atlas-insight-frontend:${GIT_TAG}" \
     --tag "${FRONTEND_IMAGE}:${GIT_TAG}" \
     "$REPO_ROOT/frontend"

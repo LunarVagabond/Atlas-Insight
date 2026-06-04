@@ -1,0 +1,139 @@
+# Production compose — uses pre-built images from ghcr.io, not local builds.
+#
+# Usage on the prod server:
+#   1. Copy this file + backend/.env.prod to the server
+#   2. Set ATLAS_IMAGE_TAG in the environment or a .env file alongside this compose file
+#   3. docker compose -f docker-compose.prod.yml --profile app pull
+#   4. docker compose -f docker-compose.prod.yml --profile app up -d
+#   5. docker compose -f docker-compose.prod.yml exec backend python manage.py migrate
+#
+# Required env vars (set in shell or a .env file next to this file):
+#   ATLAS_IMAGE_TAG      e.g. v1.2.0  (the ghcr.io tag built by make release)
+#   GITHUB_OWNER         your GitHub username/org (lowercase) — used to form the image path
+#
+# The backend .env is mounted read-only from ./backend.env (rename .env.example → backend.env,
+# fill in real secrets). Do NOT commit that file.
+
+x-backend-image: &backend-image ghcr.io/${GITHUB_OWNER}/atlas-insight-backend:${ATLAS_IMAGE_TAG}
+x-frontend-image: &frontend-image ghcr.io/${GITHUB_OWNER}/atlas-insight-frontend:${ATLAS_IMAGE_TAG}
+
+x-backend-env: &backend-env
+  DJANGO_SETTINGS_MODULE: config.settings.production
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  REDIS_URL: redis://redis:6379/1
+  CELERY_BROKER_URL: redis://redis:6379/0
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-atlas_insight}
+      POSTGRES_USER: ${POSTGRES_USER:-atlas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-atlas}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    image: *backend-image
+    ports:
+      - "4500:4500"
+    env_file: ./backend.env
+    environment:
+      <<: *backend-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - repo_cache:/app/_running/repo_cache
+      - static_files:/app/staticfiles
+    restart: unless-stopped
+    profiles:
+      - app
+
+  celery:
+    image: *backend-image
+    command: celery -A config worker --loglevel=info --concurrency=4
+    env_file: ./backend.env
+    environment:
+      <<: *backend-env
+      ATLAS_SERVICE: celery-workers
+    depends_on:
+      - backend
+    volumes:
+      - repo_cache:/app/_running/repo_cache
+    restart: unless-stopped
+    profiles:
+      - app
+
+  celery-beat:
+    image: *backend-image
+    command: celery -A config beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    env_file: ./backend.env
+    environment:
+      <<: *backend-env
+      ATLAS_SERVICE: celery-beat
+    depends_on:
+      - backend
+    restart: unless-stopped
+    profiles:
+      - app
+
+  flower:
+    image: *backend-image
+    command: celery -A config flower --port=4504
+    ports:
+      - "127.0.0.1:4504:4504"
+    env_file: ./backend.env
+    environment:
+      <<: *backend-env
+      ATLAS_SERVICE: celery-flower
+    depends_on:
+      - backend
+    restart: unless-stopped
+    profiles:
+      - app
+
+  frontend:
+    image: *frontend-image
+    ports:
+      - "4501:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    profiles:
+      - app
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    network_mode: host
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN required}
+    profiles:
+      - tunnel
+
+volumes:
+  postgres_data:
+  redis_data:
+  repo_cache:
+  static_files:
