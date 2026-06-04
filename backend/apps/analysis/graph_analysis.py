@@ -4,7 +4,7 @@ import networkx as nx
 
 from .project_structure import FRAMEWORK_PACKAGES
 
-GOD_MODULE_THRESHOLD = 10
+GOD_MODULE_THRESHOLD = 10  # absolute minimum; actual threshold scales with graph size
 
 
 def _is_framework_node(node: str) -> bool:
@@ -31,10 +31,13 @@ def analyze_graph(edges: list[dict]) -> dict:
         all_cycles = []
 
     in_degrees = dict(graph.in_degree())
+    node_count = graph.number_of_nodes()
+    # Scale threshold: top ~5% of in-degree, floor at 5, never below GOD_MODULE_THRESHOLD for tiny graphs
+    god_threshold = max(GOD_MODULE_THRESHOLD, int(node_count * 0.05)) if node_count > 20 else GOD_MODULE_THRESHOLD
     god_modules = [
         {'module': node, 'in_degree': deg}
         for node, deg in sorted(in_degrees.items(), key=lambda x: -x[1])
-        if deg >= GOD_MODULE_THRESHOLD and not _is_framework_node(node)
+        if deg >= god_threshold and not _is_framework_node(node)
     ][:20]
 
     # Hotspots: top 20 by combined in+out degree, excluding god modules

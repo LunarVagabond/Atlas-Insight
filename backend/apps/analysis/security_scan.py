@@ -25,6 +25,26 @@ GITIGNORE_RECOMMENDED = [
 ]
 
 
+def _gitignore_covers(pattern: str, gi_lines_lower: list[str]) -> bool:
+    """Return True if any non-comment gitignore line covers this pattern."""
+    for line in gi_lines_lower:
+        if line == pattern:
+            return True
+        if line == f'/{pattern}':
+            return True
+        # *.ext pattern: a line like "*.log" covers "*.log"; also "**/*.log" covers it
+        if pattern.startswith('*.') and line.endswith(pattern[1:]):
+            return True
+        # plain name (no glob, no dot prefix): exact word match only, not substring
+        if '*' not in pattern and not pattern.startswith('.'):
+            if line == pattern or line == f'/{pattern}' or line == f'{pattern}/':
+                return True
+        # dot-prefix pattern like ".env": covered by ".env" or ".env*" lines
+        if pattern.startswith('.') and (line == pattern or line.startswith(f'{pattern}.')):
+            return True
+    return False
+
+
 def scan_security(repo_obj: Repo, repo_dir: str, path_prefix: str | None = None) -> dict:
     base = Path(repo_dir)
     issues = []
@@ -72,9 +92,16 @@ def scan_security(repo_obj: Repo, repo_dir: str, path_prefix: str | None = None)
 
     if gitignore_path.exists():
         try:
-            gi_content = gitignore_path.read_text(errors='ignore').lower()
+            gi_raw = gitignore_path.read_text(errors='ignore')
+            gi_lines = [
+                line.strip().rstrip('/')
+                for line in gi_raw.splitlines()
+                if line.strip() and not line.strip().startswith('#')
+            ]
+            gi_lines_lower = [l.lower() for l in gi_lines]
             for pattern in GITIGNORE_RECOMMENDED:
-                if pattern.lower() not in gi_content:
+                pat = pattern.lower().rstrip('/')
+                if not _gitignore_covers(pat, gi_lines_lower):
                     gitignore_gaps.append(pattern)
         except Exception:
             pass

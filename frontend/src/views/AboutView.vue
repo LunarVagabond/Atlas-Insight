@@ -48,8 +48,8 @@ const GUIDE_ENTRIES: GuideEntry[] = [
     section: 'Scores & Risk',
     defHtml: `A single number summarizing how ready a project is for open-source collaboration and long-term sustainability. <span class="guide-kw">10 is best</span>. This is not a code quality score — it measures community scaffolding: docs, CI, licensing, and regular releases.`,
     methodLabel: 'How we compute it',
-    method: 'Weighted combination of six heuristics: community health (25%), documentation (20%), CI/testing (20%), release cadence (15%), abandonment risk (10%), bus factor (10%). Each is inverted (100 − risk score) so lower risk = higher contribution to the OSS score, then normalized to 0–10.',
-    searchText: 'oss score open source sustainability champion thriving growing seedling struggling dormant 10 weighted community docs ci release bus factor',
+    method: 'Weighted combination of all 11 heuristics: community health (17%), documentation (15%), CI/testing (15%), security hygiene (12%), release cadence (10%), abandonment risk (9%), dependency health (8%), bus factor (7%), monolith growth (3%), commit velocity (2%), burnout (2%). Each is inverted (100 − risk score) so lower risk = higher contribution to the OSS score, then normalized to 0–10. Only signals that were computable for that repo contribute; weights are renormalized if some are missing.',
+    searchText: 'oss score open source sustainability champion thriving growing seedling struggling dormant 10 weighted community docs ci release bus factor security dependency monolith velocity burnout',
   },
   {
     id: 'confidence',
@@ -67,8 +67,8 @@ const GUIDE_ENTRIES: GuideEntry[] = [
     section: 'Activity & Momentum',
     defHtml: `Whether the pace of commits is <span class="guide-kw">speeding up or slowing down</span> over the last 6 months. A declining velocity can signal reduced interest, shifting priorities, or a project approaching completion. Rising velocity is a strong health indicator.`,
     methodLabel: 'How we compute it',
-    method: 'We split the last 6 months of commit history into two 3-month windows and compare their averages. If the recent window is below 70% of the prior window it is a "slight slowdown"; below 40% it is a "sharp decline". Needs at least 6 months of history to run.',
-    searchText: 'commit velocity pace slowing speeding up 6 months trend decline rise momentum activity',
+    method: 'We split the last 6 months of commit history into two 3-month windows and compare their averages. The score uses a smooth power curve: score = 75 × (1 − ratio)^0.65. Approximate landmarks: ratio 1.0→0, 0.8→15, 0.7→22, 0.5→48, 0.4→55, 0.0→75. No hard buckets — every change in ratio moves the score. Needs at least 6 months of history to run.',
+    searchText: 'commit velocity pace slowing speeding up 6 months trend decline rise momentum activity smooth power curve',
   },
   {
     id: 'activity-decay',
@@ -85,8 +85,8 @@ const GUIDE_ENTRIES: GuideEntry[] = [
     section: 'Activity & Momentum',
     defHtml: `How likely it is that this repo is <span class="guide-kw">no longer actively maintained</span>, based on the time since the last commit. Unmaintained repos don't get security patches, bug fixes, or compatibility updates with newer tooling.`,
     methodLabel: 'How we compute it',
-    method: 'Days since last commit maps directly to a risk score: under 30d = 0, 30–90d = 5, 90–180d = 20, 180–365d = 45, 365–730d = 70, 730d+ = 90.',
-    searchText: 'abandonment risk maintained last commit days silent dormant inactive unmaintained deprecated',
+    method: 'Smooth logarithmic curve based on days since last commit. Under 30d = 0. Beyond 30d: score = min(90, 5 + 22 × log(1 + (days − 30) / 20)). Approximate landmarks: 30d→5, 90d→35, 180d→52, 365d→68, 730d→84, 1095d+→90. No hard cliffs — each additional day of silence adds a continuously increasing penalty.',
+    searchText: 'abandonment risk maintained last commit days silent dormant inactive unmaintained deprecated smooth log curve',
   },
   {
     id: 'contributor-churn',
@@ -103,8 +103,8 @@ const GUIDE_ENTRIES: GuideEntry[] = [
     section: 'Activity & Momentum',
     defHtml: `A composite signal combining <span class="guide-kw">contributor drop from peak</span> and <span class="guide-kw">activity decay</span>. High scores mean fewer people are doing less work than they historically did — a classic early warning sign of a project running out of steam.`,
     methodLabel: 'How we compute it',
-    method: 'Score = (contributor_drop × 50) + ((1 − activity_decay_ratio) × 50), capped at 100. If the most recent month has 25% of the peak contributor count and commits are at 40% of peak pace, that is (0.75 × 50) + (0.6 × 50) = 67 risk.',
-    searchText: 'burnout risk team contributors drop peak activity decay steam momentum warning formula',
+    method: 'Score = (normalized_contributor_drop × 50) + ((1 − activity_decay_ratio) × 50), capped at 100. Contributor drop is normalized by team size: larger teams absorb proportionally more attrition. Dampener = √(2 / peak_contributor_count) — so a 50-person team losing half its contributors is penalized much less than a 2-person team losing one. Solo projects score 0 on this component by design.',
+    searchText: 'burnout risk team contributors drop peak activity decay steam momentum warning formula team size normalization',
   },
   // ── Architecture ─────────────────────────────────────────────────────────
   {
@@ -122,8 +122,8 @@ const GUIDE_ENTRIES: GuideEntry[] = [
     section: 'Architecture',
     defHtml: `A file that <span class="guide-kw">many other files import from</span> — it has a high "in-degree" in the import graph. God modules are not always bad (a well-designed utility module is fine), but they create architectural risk: changing one affects everything that depends on it, making refactoring expensive and risky.`,
     methodLabel: 'How we compute it',
-    method: 'We count how many other files import each file (in-degree). Files with unusually high in-degree relative to the graph size are flagged as god modules. The threshold scales with repository size. Each god module adds 4 points to the Monolith Growth score.',
-    searchText: 'god module in-degree import many files coupling refactor utility shared centralized hub',
+    method: 'We count how many other files import each file (in-degree). The god module threshold scales with repo size: max(10, int(node_count × 0.05)) — so a 200-node repo uses threshold 10 and a 400-node repo uses 20. This prevents large repos from generating dozens of flags while keeping small repos sensitive. Each god module adds 4 points to the Monolith Growth score.',
+    searchText: 'god module in-degree import many files coupling refactor utility shared centralized hub threshold scales size',
   },
   {
     id: 'circular-dependency',
@@ -140,7 +140,7 @@ const GUIDE_ENTRIES: GuideEntry[] = [
     section: 'Architecture',
     defHtml: `A combined measure of <span class="guide-kw">architectural complexity</span> — how much the codebase has structural patterns that make it harder to work in. It combines god modules and circular dependencies into one number.`,
     methodLabel: 'How we compute it',
-    method: 'Score = (god_module_count × 4) + (cycle_count × 3), capped at 100. A repo with 5 god modules and 3 cycles scores (5 × 4) + (3 × 3) = 29.',
+    method: 'Score = (god_module_count × 4) + (cycle_count × 3), capped at 100. A repo with 5 god modules and 3 cycles scores (5 × 4) + (3 × 3) = 29. The god module threshold scales with repo size — see the God Module entry for how "unusually high in-degree" is determined.',
     searchText: 'monolith growth score architectural complexity god modules cycles formula calculation',
   },
   {
@@ -195,8 +195,8 @@ const GUIDE_ENTRIES: GuideEntry[] = [
     section: 'Project Health',
     defHtml: `How complete and useful the project documentation is for a newcomer. Scores low when there is no README, when the README is <span class="guide-kw">too short to be useful</span> (under 100 words), or when key sections are missing — how to install it, how to use it, how to contribute.`,
     methodLabel: 'How we compute it',
-    method: 'We parse the README and scan for section headings matching installation, usage, contributing, and changelog patterns. Each missing section adds 15 points. A missing README entirely scores 90. Max capped at 100.',
-    searchText: 'documentation quality readme short word count installation usage contributing changelog sections missing newcomer',
+    method: 'We parse the README and scan for section headings matching installation, usage, contributing, and changelog patterns. Each missing section adds 15 points. A missing README entirely scores 90. A short README (under 100 words) with no code examples adds the full 15 pts; one that is short but has ≥2 code blocks adds only 8 pts. Sections with under 20 words are considered shallow — three or more shallow sections add an additional 15 pts. Score capped at 100.',
+    searchText: 'documentation quality readme short word count installation usage contributing changelog sections missing newcomer code blocks shallow sections',
   },
   {
     id: 'ci-health',
@@ -204,8 +204,8 @@ const GUIDE_ENTRIES: GuideEntry[] = [
     section: 'Project Health',
     defHtml: `Whether the project has <span class="guide-kw">automated quality checks</span> wired up: a CI pipeline (GitHub Actions, CircleCI, Travis, etc.), a linting configuration, and a meaningful amount of test files. These catch bugs before they ship.`,
     methodLabel: 'How we compute it',
-    method: 'No CI detected = +40 risk. No lint config = +20 risk. Test file ratio below 5% = +30 risk, below 15% = +15 risk, below 25% = +5 risk.',
-    searchText: 'ci health continuous integration github actions circleci travis pipeline linting automated testing checks',
+    method: 'No CI detected = +40 risk. No lint config = +20 risk. Test file ratio below 5% = +30 risk (×0.65 if CI is configured), below 15% = +15 risk (×0.65 if CI), below 25% = +5 risk (×0.65 if CI). The discount when CI exists reflects that integration and end-to-end tests often run in CI pipelines without appearing as test files in the source tree.',
+    searchText: 'ci health continuous integration github actions circleci travis pipeline linting automated testing checks file ratio discount',
   },
   {
     id: 'test-ratio',
@@ -222,8 +222,8 @@ const GUIDE_ENTRIES: GuideEntry[] = [
     section: 'Project Health',
     defHtml: `Risk from external dependencies — <span class="guide-kw">deprecated Docker base images</span>, missing <span class="guide-kw">lockfiles</span>, and very large dependency trees. Each represents a different class of supply-chain or reproducibility risk.`,
     methodLabel: 'How we compute it',
-    method: 'Deprecated Docker base image = +15 per image. Missing lockfile = +20 per package manager. Over 200 total dependencies adds a small scaling penalty (max +20). Score capped at 100.',
-    searchText: 'dependency health docker base image deprecated lockfile supply chain reproducibility package count',
+    method: 'Deprecated Docker base image = +15 per image. Missing lockfile = +20 per package manager. Over 200 total dependencies adds a small scaling penalty (max +20). Unpinned dependencies (no version spec) above 30% of total = up to +15 penalty for reproducibility risk. Score capped at 100.',
+    searchText: 'dependency health docker base image deprecated lockfile supply chain reproducibility package count unpinned version spec',
   },
   {
     id: 'lockfile',
@@ -240,8 +240,8 @@ const GUIDE_ENTRIES: GuideEntry[] = [
     section: 'Project Health',
     defHtml: `How regularly the project <span class="guide-kw">cuts formal releases</span> (git tags / GitHub releases) and how recently the last one was. Regular releases give downstream users a stable update path and signal active maintenance.`,
     methodLabel: 'How we compute it',
-    method: 'No releases = 35 risk. Days since last release: under 90d = 0, 90–365d = 15, 365–730d = 50, 730d+ = 75. Projects that ship continuously from main without tagging will score worse than they deserve.',
-    searchText: 'release cadence tags versions github releases stable update maintenance semver changelog last release',
+    method: 'No releases = 35 risk. Under 90d = 0. Beyond 90d: smooth log curve — score = min(75, 5 + 25 × log(1 + (days − 90) / 100)). Approximate landmarks: 90d→5, 180d→21, 365d→39, 730d→56, 1095d→65, 1460d+→75. No hard cliffs — staleness grows continuously. Projects that ship from main without tagging will score worse than they deserve here.',
+    searchText: 'release cadence tags versions github releases stable update maintenance semver changelog last release smooth log curve',
   },
   {
     id: 'security-hygiene',
@@ -448,7 +448,7 @@ function renderMd(text: string): string {
             <div><strong>Dormant (0–2)</strong><span>Abandoned or severely under-maintained.</span></div>
           </div>
         </div>
-        <p class="about-view__note">Score weights: Community health 25% · Documentation 20% · CI/testing 20% · Release cadence 15% · Activity 10% · Bus factor 10%.</p>
+        <p class="about-view__note">Score weights: Community health 17% · Documentation 15% · CI/testing 15% · Security 12% · Release cadence 10% · Abandonment 9% · Dependency health 8% · Bus factor 7% · Monolith growth 3% · Commit velocity 2% · Burnout 2%.</p>
       </section>
 
       <section class="about-view__section">

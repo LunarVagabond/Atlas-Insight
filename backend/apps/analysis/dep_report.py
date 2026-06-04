@@ -235,9 +235,20 @@ def analyze_dependencies(repo_dir: str) -> dict:
         if not any((base / f).exists() for f in ('package-lock.json', 'yarn.lock', 'pnpm-lock.yaml')):
             missing_lockfile.append('Node lockfile missing (package-lock.json, yarn.lock, or pnpm-lock.yaml)')
 
+    unpinned_count = sum(
+        1 for d in all_deps
+        if not d.get('version_spec', '').strip() or d.get('version_spec', '').strip() == '*'
+    )
+    exact_pinned_count = sum(
+        1 for d in all_deps
+        if re.match(r'^[=~^v]?\d+\.\d+', d.get('version_spec', '').strip())
+    )
+
     return {
         'dependencies': all_deps,
         'dependency_count': len(all_deps),
         'docker_issues': docker_issues,
         'missing_lockfile_warnings': missing_lockfile,
+        'unpinned_count': unpinned_count,
+        'exact_pinned_count': exact_pinned_count,
     }

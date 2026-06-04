@@ -73,6 +73,16 @@ def parse_readme(repo_dir: str) -> dict:
     lower = content.lower()
     links = _extract_links(content)
 
+    code_block_count = len(re.findall(r'```', content)) // 2
+    has_external_links = any(
+        link for link in links
+        if not re.search(r'github\.com|shields\.io|badge|img\.shields', link, re.IGNORECASE)
+    )
+    section_word_counts = _compute_section_word_counts(content)
+    shallow_sections = [
+        s for s, wc in section_word_counts.items() if wc < 20
+    ]
+
     return {
         'found': True,
         'filename': readme_path.name,
@@ -81,6 +91,9 @@ def parse_readme(repo_dir: str) -> dict:
         'sections': sections[:30],
         'badge_count': badge_count,
         'word_count': len(content.split()),
+        'code_block_count': code_block_count,
+        'has_external_links': has_external_links,
+        'shallow_sections': shallow_sections[:10],
         'has_installation': bool(re.search(r'\binstall', lower)),
         'has_usage': bool(re.search(r'\busage\b|\bgetting.started\b', lower)),
         'has_contributing': bool(re.search(r'\bcontribut', lower)),
@@ -181,6 +194,28 @@ def _detect_social_links(links: list[str]) -> list[dict]:
                 })
                 break
     return _dedupe_link_dicts(results)
+
+
+def _compute_section_word_counts(content: str) -> dict[str, int]:
+    """Return word count per top-level section heading."""
+    result: dict[str, int] = {}
+    current_section: str | None = None
+    current_words: list[str] = []
+
+    for line in content.splitlines():
+        m = re.match(r'^#{1,3}\s+(.+)$', line)
+        if m:
+            if current_section is not None:
+                result[current_section] = len(current_words)
+            current_section = m.group(1).strip()
+            current_words = []
+        elif current_section is not None:
+            current_words.extend(line.split())
+
+    if current_section is not None:
+        result[current_section] = len(current_words)
+
+    return result
 
 
 def _dedupe_link_dicts(items: list[dict]) -> list[dict]:

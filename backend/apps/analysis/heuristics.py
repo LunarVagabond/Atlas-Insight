@@ -1,3 +1,4 @@
+import math
 from datetime import datetime, timezone
 
 
@@ -18,9 +19,18 @@ def compute_heuristics(
         recent = churn[-1].get('active', 0)
         peak = max((c.get('active', 0) for c in churn), default=1)
         contributor_drop = 1 - (recent / max(peak, 1))
+        # Larger teams absorb proportionally more attrition before risk rises.
+        # sqrt(2/peak) dampener: at peak=2 → 1.0x, peak=10 → 0.45x, peak=50 → 0.2x.
+        if peak <= 1:
+            normalized_drop = 0.0
+        else:
+            size_dampener = math.sqrt(2.0 / max(2, peak))
+            normalized_drop = min(1.0, contributor_drop * size_dampener)
     else:
         contributor_drop = 0
-    burnout_score = int(min(100, (contributor_drop * 50) + (max(0, 1 - decay) * 50)))
+        normalized_drop = 0.0
+        peak = 1
+    burnout_score = int(min(100, (normalized_drop * 50) + (max(0, 1 - decay) * 50)))
     if burnout_score < 20:
         burnout_desc = 'Contributor activity is stable'
     elif contributor_drop > 0.5:
@@ -44,20 +54,11 @@ def compute_heuristics(
     # ── Abandonment ───────────────────────────────────────────────────────────
     days_silent = commits.get('days_since_last_commit') or 0
     abandoned = commits.get('abandoned', False)
-    if days_silent == 0:
+    if days_silent == 0 or days_silent < 30:
         abandon_score = 0
-    elif days_silent < 30:
-        abandon_score = 0
-    elif days_silent < 90:
-        abandon_score = 5
-    elif days_silent < 180:
-        abandon_score = 20
-    elif days_silent < 365:
-        abandon_score = 45
-    elif days_silent < 730:
-        abandon_score = 70
     else:
-        abandon_score = 90
+        # Smooth log curve: 30d→5, 90d→35, 180d→52, 365d→68, 730d→84, 1095d+→90
+        abandon_score = min(90, 5 + int(22 * math.log1p((days_silent - 30) / 20)))
 
     if days_silent < 30:
         abandon_desc = 'Actively maintained — committed within the last month'
@@ -83,7 +84,6 @@ def compute_heuristics(
     node_count = graph.get('node_count', 0)
     god_count = len(graph.get('god_modules', []))
     cycle_count = graph.get('cycle_count', 0)
-    # Gentler scaling: 20 god modules = 80, 20 cycles = 60 (additive, capped at 100)
     monolith_score = min(100, (god_count * 4) + (cycle_count * 3))
     if monolith_score < 15:
         mono_desc = 'Healthy module boundaries with few architectural concerns'
@@ -107,12 +107,18 @@ def compute_heuristics(
     lockfile_warnings = len(deps.get('missing_lockfile_warnings', []))
     dep_count = deps.get('dependency_count', 0)
     dep_bloat = max(0, (dep_count - 50) // 50) if dep_count > 50 else 0
-    dep_score = min(100, (docker_issues * 15) + (lockfile_warnings * 20) + min(20, dep_bloat * 4))
+    unpinned = deps.get('unpinned_count', 0)
+    unpinned_ratio = unpinned / max(dep_count, 1)
+    # Unpinned deps above 30% of total signal reproducibility risk
+    unpinned_penalty = min(15, int(unpinned_ratio * 30)) if unpinned_ratio > 0.3 else 0
+    dep_score = min(100, (docker_issues * 15) + (lockfile_warnings * 20) + min(20, dep_bloat * 4) + unpinned_penalty)
     dep_parts = []
     if docker_issues:
         dep_parts.append(f'{docker_issues} deprecated Docker base image{"s" if docker_issues > 1 else ""}')
     if lockfile_warnings:
         dep_parts.append(f'{lockfile_warnings} missing lockfile{"s" if lockfile_warnings > 1 else ""}')
+    if unpinned > 0 and unpinned_ratio > 0.3:
+        dep_parts.append(f'{unpinned} unpinned dependencies ({unpinned_ratio:.0%}) — reproducibility risk')
     if dep_count > 200:
         dep_parts.append(f'{dep_count} total dependencies (large surface area)')
     signals.append({
@@ -131,8 +137,15 @@ def compute_heuristics(
             doc_score = 90
         else:
             wc = readme.get('word_count', 0)
+            code_blocks = readme.get('code_block_count', 0)
+            shallow = readme.get('shallow_sections', [])
             if wc < 100:
-                doc_issues.append('README too short')
+                if code_blocks >= 2:
+                    doc_issues.append('README short but has code examples')
+                else:
+                    doc_issues.append('README too short (under 100 words, no code examples)')
+            elif wc < 300 and not readme.get('has_external_links'):
+                doc_issues.append('README brief with no external links or docs site')
             if not readme.get('has_installation'):
                 doc_issues.append('no installation instructions')
             if not readme.get('has_usage'):
@@ -143,7 +156,12 @@ def compute_heuristics(
                 doc_issues.append('no contributing guide')
             if structure and not structure.get('has_contributing'):
                 doc_issues.append('no CONTRIBUTING file')
-            doc_score = min(100, len(doc_issues) * 15)
+            # Shallow sections carry half weight of a full missing section
+            if len(shallow) >= 3:
+                doc_issues.append(f'{len(shallow)} sections too brief to be useful')
+            # "README short but has code examples" is a lighter issue — weight 8 instead of 15
+            weighted = sum(8 if 'short but has code' in i else 15 for i in doc_issues)
+            doc_score = min(100, weighted)
 
         signals.append({
             'signal': 'documentation_quality',
@@ -157,21 +175,25 @@ def compute_heuristics(
     if structure is not None:
         ci_parts: list[str] = []
         ci_score = 0
-        if not structure.get('has_ci'):
+        has_ci = structure.get('has_ci', False)
+        if not has_ci:
             ci_score += 40
             ci_parts.append('no CI configuration')
         if not structure.get('has_lint_config'):
             ci_score += 20
             ci_parts.append('no linting config')
         test_ratio = structure.get('test_ratio', 0)
+        # If CI exists, integration/e2e tests may live outside the file ratio —
+        # reduce the file-ratio penalty to avoid double-penalizing well-tested repos.
+        test_penalty_scale = 0.65 if has_ci else 1.0
         if test_ratio < 0.05:
-            ci_score += 30
+            ci_score += int(30 * test_penalty_scale)
             ci_parts.append(f'very few test files ({test_ratio:.0%} ratio)')
         elif test_ratio < 0.15:
-            ci_score += 15
+            ci_score += int(15 * test_penalty_scale)
             ci_parts.append(f'low test file ratio ({test_ratio:.0%})')
         elif test_ratio < 0.25:
-            ci_score += 5
+            ci_score += int(5 * test_penalty_scale)
 
         ci_systems = structure.get('ci_systems', [])
         signals.append({
@@ -233,12 +255,11 @@ def compute_heuristics(
         vulns = security.get('vulnerabilities', [])
         vuln_count = len(vulns)
 
-        # Weight CVEs by CVSS severity; cap contribution at 60 points
         cve_score = 0
         for v in vulns:
             cvss = v.get('severity_score')
             if cvss is None:
-                cvss = 5.0  # default medium when no score available
+                cvss = 5.0
             if cvss >= 9.0:
                 cve_score += 25
             elif cvss >= 7.0:
@@ -296,16 +317,17 @@ def compute_heuristics(
         elif days_since_release < 90:
             rel_score = 0
             rel_desc = f'{release_count} releases, last {days_since_release} days ago — active cadence'
-        elif days_since_release < 365:
-            rel_score = 15
-            rel_desc = f'{release_count} releases, last {days_since_release} days ago'
-        elif days_since_release < 730:
-            rel_score = 50
-            rel_desc = f'Last release {days_since_release} days ago — release pace slowing'
         else:
-            years = days_since_release // 365
-            rel_score = 75
-            rel_desc = f'Last release {years}+ year{"s" if years > 1 else ""} ago — stale release cadence'
+            # Smooth log curve: 90d→5, 180d→21, 365d→39, 730d→56, 1095d→65, 1460d+→75
+            rel_score = min(75, 5 + int(25 * math.log1p((days_since_release - 90) / 100)))
+            if days_since_release < 365:
+                rel_desc = f'{release_count} releases, last {days_since_release} days ago — pace slowing'
+            elif days_since_release < 730:
+                years_f = days_since_release / 365
+                rel_desc = f'Last release {years_f:.1f} years ago — release cadence stale'
+            else:
+                years = days_since_release // 365
+                rel_desc = f'Last release {years}+ year{"s" if years > 1 else ""} ago — significantly stale'
 
         signals.append({
             'signal': 'release_cadence',
@@ -362,15 +384,15 @@ def compute_heuristics(
         if velocity_ratio >= 1.0:
             vel_score = 0
             vel_desc = f'Commit pace stable or growing ({recent_avg:.0f} commits/month recently)'
-        elif velocity_ratio >= 0.7:
-            vel_score = 20
-            vel_desc = f'Slight slowdown — {recent_avg:.0f} vs {prior_avg:.0f} commits/month prior'
-        elif velocity_ratio >= 0.4:
-            vel_score = 50
-            vel_desc = f'Noticeable slowdown — {recent_avg:.0f} vs {prior_avg:.0f} commits/month prior'
         else:
-            vel_score = 75
-            vel_desc = f'Sharp decline — {recent_avg:.0f} vs {prior_avg:.0f} commits/month prior'
+            # Smooth power curve preserving approximate anchors: 0.7→~22, 0.4→~47, 0.0→75
+            vel_score = min(75, int(75 * math.pow(1.0 - velocity_ratio, 0.65)))
+            if velocity_ratio >= 0.7:
+                vel_desc = f'Slight slowdown — {recent_avg:.0f} vs {prior_avg:.0f} commits/month prior'
+            elif velocity_ratio >= 0.4:
+                vel_desc = f'Noticeable slowdown — {recent_avg:.0f} vs {prior_avg:.0f} commits/month prior'
+            else:
+                vel_desc = f'Sharp decline — {recent_avg:.0f} vs {prior_avg:.0f} commits/month prior'
 
         signals.append({
             'signal': 'commit_velocity',
@@ -387,13 +409,22 @@ def compute_oss_score(signals: list[dict]) -> dict:
     """Compute a 0–10 OSS health score from heuristic signals. 10 = perfect."""
     signal_map = {s['signal']: s['score'] for s in signals}
 
+    # All 11 signals included. Weights sum to 1.0.
+    # Community/docs/CI weighted highest — they directly affect contributor experience.
+    # Security added at 12% — a committed secret or critical CVE should meaningfully lower the score.
+    # Monolith/velocity/burnout are lower weight — present but context-dependent.
     weights = {
-        'community_health': 0.25,
-        'documentation_quality': 0.20,
-        'ci_health': 0.20,
-        'release_cadence': 0.15,
-        'abandonment_risk': 0.10,
-        'bus_factor_risk': 0.10,
+        'community_health': 0.17,
+        'documentation_quality': 0.15,
+        'ci_health': 0.15,
+        'security_hygiene': 0.12,
+        'release_cadence': 0.10,
+        'abandonment_risk': 0.09,
+        'dependency_health': 0.08,
+        'bus_factor_risk': 0.07,
+        'monolith_growth': 0.03,
+        'commit_velocity': 0.02,
+        'burnout': 0.02,
     }
 
     weighted = 0.0
