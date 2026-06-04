@@ -170,6 +170,93 @@
   }
 }
 
+// ===== TAB GROUPS =====
+.tab-groups {
+  border-bottom: 1px solid var(--color-border);
+
+  &__group-row {
+    display: flex;
+    gap: $space-1;
+    padding: $space-2 0 0;
+    overflow-x: auto;
+  }
+
+  &__group-pill {
+    padding: $space-1 $space-4;
+    border: 1px solid var(--color-border);
+    border-bottom: none;
+    border-radius: $radius-sm $radius-sm 0 0;
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background $transition-fast, color $transition-fast, border-color $transition-fast;
+
+    &:hover {
+      color: var(--group-color, var(--color-text));
+      background: color-mix(in srgb, var(--group-color, var(--color-accent)) 8%, var(--color-surface));
+    }
+
+    &--active {
+      background: color-mix(in srgb, var(--group-color, var(--color-accent)) 10%, var(--color-bg));
+      color: var(--group-color, var(--color-accent));
+      border-color: color-mix(in srgb, var(--group-color, var(--color-accent)) 40%, var(--color-border));
+      border-bottom: 1px solid var(--color-bg);
+      position: relative;
+      z-index: 1;
+    }
+  }
+
+  &__tab-row {
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  &__tab {
+    padding: $space-3 $space-4;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: var(--color-text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color $transition-fast, border-color $transition-fast;
+    margin-bottom: -1px;
+
+    &:hover {
+      color: var(--color-text);
+    }
+
+    &--active {
+      color: var(--group-color, var(--color-accent));
+      border-bottom-color: var(--group-color, var(--color-accent));
+    }
+  }
+
+  &__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: $space-1;
+    padding: 1px 5px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.4;
+    border-radius: 999px;
+    background: var(--color-warning-bg, rgba(234, 179, 8, 0.15));
+    color: var(--color-warning);
+    vertical-align: middle;
+  }
+}
+
 // ===== SUB-PROJECT SELECTOR =====
 .subproject-selector {
   display: flex;

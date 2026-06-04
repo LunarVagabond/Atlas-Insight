@@ -3,7 +3,7 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAnalysisStore } from '../stores/analysis'
 import { useAuthStore } from '../stores/auth'
-import AppTabs from '../components/ui/AppTabs.vue'
+import AppTabGroups from '../components/ui/AppTabGroups.vue'
 import AppButton from '../components/ui/AppButton.vue'
 import AppBadge from '../components/ui/AppBadge.vue'
 import AnalysisStatusCard from '../components/analysis/AnalysisStatusCard.vue'
@@ -63,12 +63,24 @@ const currentStepLabel = computed(() => {
 
 const hasRoadmap = computed(() => (result.value?.structure?.roadmap_parsed?.milestones?.length ?? 0) > 0)
 
-const CHAPTER_TABS = ['Overview', 'Project', 'History', 'Architecture', 'Ownership', 'Dependencies', 'Security', 'Heuristics', 'Contributing', 'Tours']
+const CHAPTER_GROUPS = [
+  { label: 'Health',    tabs: ['Overview', 'Heuristics', 'Security', 'Dependencies'], color: '#f59e0b' },
+  { label: 'Codebase',  tabs: ['Architecture', 'Project', 'History', 'Ownership'],    color: '#6366f1' },
+  { label: 'Community', tabs: ['Contributing', 'Tours'],                               color: '#22c55e' },
+]
+const DOCS_ONLY_TABS = new Set(['Overview', 'Project', 'History', 'Ownership', 'Security', 'Contributing'])
 const isDocsOnly = computed(() => result.value?.is_docs_only === true)
-const TABS = computed(() => {
-  if (!isDocsOnly.value) return CHAPTER_TABS
-  return ['Overview', 'Project', 'History', 'Ownership', 'Security', 'Contributing']
-})
+const GROUPS = computed(() =>
+  CHAPTER_GROUPS
+    .map(g => ({
+      label: g.label,
+      color: g.color,
+      tabs: isDocsOnly.value ? g.tabs.filter(t => DOCS_ONLY_TABS.has(t)) : g.tabs,
+    }))
+    .filter(g => g.tabs.length > 0)
+)
+// Flat tab order derived from groups — keeps j/k navigation aligned with visual group order
+const TABS = computed(() => GROUPS.value.flatMap(g => g.tabs))
 
 const tabBadges = computed<Record<string, number | string>>(() => {
   if (!result.value) return {}
@@ -353,7 +365,7 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
-      <AppTabs v-if="result" :tabs="TABS" v-model="activeTab" :badges="tabBadges" />
+      <AppTabGroups v-if="result" :groups="GROUPS" v-model="activeTab" :badges="tabBadges" />
     </div>
 
     <!-- ── Scrollable content ───────────────────────────────────────── -->
