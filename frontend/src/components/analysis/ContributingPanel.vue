@@ -8,6 +8,7 @@ import ContributionDrawer from './ContributionDrawer.vue'
 import ContributionPathPanel from './ContributionPathPanel.vue'
 import type { ArchTour, ContributionOpportunity, StructureData, TodoData } from '../../stores/analysis'
 import type { CommitData } from '../../types/commits'
+import type { GitHubMeta } from '../../types/github'
 
 const props = defineProps<{
   opportunities: ContributionOpportunity[]
@@ -16,6 +17,8 @@ const props = defineProps<{
   todos?: TodoData
   archTours?: ArchTour[]
   commits?: CommitData
+  isDocsOnly?: boolean
+  githubMeta?: GitHubMeta
 }>()
 
 const STYLE_LABELS: Record<string, string> = {
@@ -110,11 +113,63 @@ const heuristicCount = computed(() => props.opportunities.filter(o => o.category
 
 const issuesUrl = computed(() => props.repoUrl ? `${props.repoUrl}/issues` : null)
 const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
+
+const docsDescription = computed(() => props.githubMeta?.github_description ?? null)
+const docsTopics = computed(() => props.githubMeta?.topics ?? [])
+const docsStars = computed(() => props.githubMeta?.stars ?? null)
+const docsHomepage = computed(() => props.githubMeta?.homepage ?? null)
 </script>
 
 <template>
   <div class="panel">
-    <h2 class="panel__title">Contributing Entry Points</h2>
+    <h2 class="panel__title">Contributing</h2>
+
+    <!-- ── Docs-only: prose view ─────────────────────────────────────── -->
+    <template v-if="isDocsOnly">
+      <div class="docs-contrib">
+        <p v-if="docsDescription" class="docs-contrib__about">{{ docsDescription }}</p>
+
+        <div v-if="docsTopics.length" class="docs-contrib__topics">
+          <span v-for="topic in docsTopics" :key="topic" class="docs-contrib__topic">{{ topic }}</span>
+        </div>
+
+        <div class="docs-contrib__body">
+          <p>This is a documentation or curated-list repository — there's no application code to patch. The best contributions here are content, not code.</p>
+          <p>If you know a tool, library, article, or resource that belongs on this list and isn't already there, a pull request is the right move. Keep the PR focused: one item or a small batch of related items, with a brief note on why it fits.</p>
+          <p v-if="docsHomepage">The project's homepage is <a :href="docsHomepage" target="_blank" rel="noopener noreferrer" class="docs-contrib__link">{{ docsHomepage }} ↗</a> — check there for any submission guidelines before opening a PR.</p>
+          <p v-else>Check the README for any submission guidelines before opening a PR — many curated lists have specific formatting requirements.</p>
+          <p v-if="docsStars !== null && docsStars > 1000">With {{ docsStars.toLocaleString() }} stars this list is widely referenced. High-quality additions get merged regularly.</p>
+        </div>
+
+        <div v-if="repoUrl" class="contrib-links" style="margin-top: 1.5rem">
+          <a :href="issuesUrl!" target="_blank" rel="noopener noreferrer" class="contrib-links__link">
+            🐛 Open Issues ↗
+          </a>
+          <a :href="pullsUrl!" target="_blank" rel="noopener noreferrer" class="contrib-links__link">
+            ⊞ Open PRs ↗
+          </a>
+        </div>
+
+        <!-- Commit conventions still useful for docs repos -->
+        <div v-if="conventions && conventions.style !== 'mixed'" class="contrib-conventions" style="margin-top: 1.5rem">
+          <h3 class="contrib-conventions__title">Commit Conventions</h3>
+          <div v-if="conventions.format_template" class="contrib-conventions__template-block">
+            <span class="contrib-conventions__template-label">Commit format</span>
+            <code class="contrib-conventions__template">{{ conventions.format_template }}</code>
+            <span class="contrib-conventions__template-sub">
+              {{ STYLE_LABELS[conventions.style] ?? conventions.style }} · {{ Math.round(conventions.style_confidence * 100) }}% of commits follow this pattern
+            </span>
+          </div>
+          <div v-if="conventions.examples.length" class="contrib-conventions__examples">
+            <span class="contrib-conventions__examples-label">Example</span>
+            <code class="contrib-conventions__example">{{ conventions.examples[0] }}</code>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ── Normal code repo view ─────────────────────────────────────── -->
+    <template v-else>
 
     <!-- Quick links to GitHub -->
     <div v-if="repoUrl" class="contrib-links">
@@ -330,5 +385,7 @@ const pullsUrl = computed(() => props.repoUrl ? `${props.repoUrl}/pulls` : null)
     />
 
     <ContributionDrawer :opportunity="activeOpp" :arch-tours="archTours" :repo-url="repoUrl" @close="activeOpp = null" />
+
+    </template>
   </div>
 </template>

@@ -3999,6 +3999,50 @@
   margin: 0 0 $space-5;
 }
 
+.docs-contrib {
+  &__about {
+    font-size: 1.05rem;
+    color: var(--color-text-primary);
+    margin: 0 0 $space-4;
+    font-style: italic;
+  }
+
+  &__topics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-2;
+    margin-bottom: $space-5;
+  }
+
+  &__topic {
+    padding: 2px $space-3;
+    border-radius: 9999px;
+    background: rgba(99, 179, 237, 0.12);
+    border: 1px solid rgba(99, 179, 237, 0.25);
+    font-size: 0.78rem;
+    color: var(--color-info, #63b3ed);
+    font-family: $font-mono;
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+    color: var(--color-text-secondary);
+    line-height: 1.65;
+    font-size: 0.92rem;
+    max-width: 680px;
+
+    p { margin: 0; }
+  }
+
+  &__link {
+    color: var(--color-accent);
+    text-decoration: none;
+    &:hover { text-decoration: underline; }
+  }
+}
+
 .contrib-conventions {
   background: var(--color-surface);
   border: 1px solid var(--color-border);

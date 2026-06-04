@@ -67,7 +67,7 @@ const CHAPTER_TABS = ['Overview', 'Project', 'History', 'Architecture', 'Ownersh
 const isDocsOnly = computed(() => result.value?.is_docs_only === true)
 const TABS = computed(() => {
   if (!isDocsOnly.value) return CHAPTER_TABS
-  return ['Overview', 'Project', 'History', 'Ownership', 'Security']
+  return ['Overview', 'Project', 'History', 'Ownership', 'Security', 'Contributing']
 })
 
 const tabBadges = computed<Record<string, number | string>>(() => {
@@ -413,7 +413,7 @@ onUnmounted(() => {
         </div>
         <div v-if="isDocsOnly" class="docs-only-banner" role="note">
           <span class="docs-only-banner__icon">📄</span>
-          <span class="docs-only-banner__text">This is a <strong>documentation repository</strong> — code analysis tabs are hidden. Showing overview, history, ownership, and security only.</span>
+          <span class="docs-only-banner__text">This is a <strong>documentation repository</strong> — code analysis tabs are hidden.</span>
         </div>
         <Transition name="fade">
           <div v-if="showEmbed" class="embed-panel">
@@ -547,7 +547,7 @@ onUnmounted(() => {
           :selected-sub-project="activeHeuristicsSubProject"
           @update:selected-sub-project="activeHeuristicsSubProject = $event"
         />
-        <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" :structure="result.structure" :todos="result.todos" :arch-tours="result.arch_tours ?? []" :commits="result.commits" />
+        <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" :structure="result.structure" :todos="result.todos" :arch-tours="result.arch_tours ?? []" :commits="result.commits" :is-docs-only="isDocsOnly" :github-meta="result.github_meta" />
         <ArchitectureToursPanel v-if="activeTab === 'Tours'" :tours="result.arch_tours ?? []" :repo-url="store.run?.repo_url" :run-id="runId" />
       </div>
       </Transition>
