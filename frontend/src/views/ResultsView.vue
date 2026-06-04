@@ -19,6 +19,9 @@ import RoadmapTimeline from '../components/analysis/RoadmapTimeline.vue'
 import SecurityPanel from '../components/analysis/SecurityPanel.vue'
 import ArchitectureToursPanel from '../components/analysis/ArchitectureToursPanel.vue'
 import OwnershipPanel from '../components/analysis/OwnershipPanel.vue'
+import LicensePanel from '../components/analysis/LicensePanel.vue'
+import CodeQualityPanel from '../components/analysis/CodeQualityPanel.vue'
+import DevOpsPanel from '../components/analysis/DevOpsPanel.vue'
 import DeltaPanel from '../components/analysis/DeltaPanel.vue'
 import ContributorGraph from '../components/analysis/ContributorGraph.vue'
 import StaleBranchesPanel from '../components/analysis/StaleBranchesPanel.vue'
@@ -64,9 +67,9 @@ const currentStepLabel = computed(() => {
 const hasRoadmap = computed(() => (result.value?.structure?.roadmap_parsed?.milestones?.length ?? 0) > 0)
 
 const CHAPTER_GROUPS = [
-  { label: 'Health',    tabs: ['Overview', 'Heuristics', 'Security', 'Dependencies'], color: '#f59e0b' },
-  { label: 'Codebase',  tabs: ['Architecture', 'Project', 'History', 'Ownership'],    color: '#6366f1' },
-  { label: 'Community', tabs: ['Contributing', 'Tours'],                               color: '#22c55e' },
+  { label: 'Health',    tabs: ['Overview', 'Heuristics', 'Security', 'Licenses', 'Dependencies'], color: '#f59e0b' },
+  { label: 'Codebase',  tabs: ['Architecture', 'Code Quality', 'Project', 'History', 'Ownership'], color: '#6366f1' },
+  { label: 'Community', tabs: ['Contributing', 'DevOps', 'Tours'],                                 color: '#22c55e' },
 ]
 const DOCS_ONLY_TABS = new Set(['Overview', 'Project', 'History', 'Ownership', 'Security', 'Contributing'])
 const isDocsOnly = computed(() => result.value?.is_docs_only === true)
@@ -98,6 +101,15 @@ const tabBadges = computed<Record<string, number | string>>(() => {
 
   const highRiskHeuristics = (r.heuristics ?? []).filter(h => h.score >= 60).length
   if (highRiskHeuristics > 0) badges['Heuristics'] = highRiskHeuristics
+
+  const licenseIssues = r.license?.issues?.length ?? 0
+  if (licenseIssues > 0) badges['Licenses'] = licenseIssues
+
+  const complexityHotspots = r.complexity?.files_over_threshold ?? 0
+  if (complexityHotspots > 0) badges['Code Quality'] = complexityHotspots
+
+  const containerIssues = r.containers?.total_issues ?? 0
+  if (containerIssues > 0) badges['DevOps'] = containerIssues
 
   return badges
 })
@@ -563,6 +575,19 @@ onUnmounted(() => {
           :sub-projects="result.repo_type?.sub_projects"
           :selected-sub-project="activeHeuristicsSubProject"
           @update:selected-sub-project="activeHeuristicsSubProject = $event"
+        />
+        <LicensePanel v-if="activeTab === 'Licenses'" :license="result.license" />
+        <CodeQualityPanel
+          v-if="activeTab === 'Code Quality'"
+          :complexity="result.complexity"
+          :dead-code="result.dead_code"
+          :test-coverage="result.test_coverage"
+        />
+        <DevOpsPanel
+          v-if="activeTab === 'DevOps'"
+          :cicd="result.cicd"
+          :containers="result.containers"
+          :changelog="result.changelog"
         />
         <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" :structure="result.structure" :todos="result.todos" :arch-tours="result.arch_tours ?? []" :commits="result.commits" :is-docs-only="isDocsOnly" :github-meta="result.github_meta" />
         <ArchitectureToursPanel v-if="activeTab === 'Tours'" :tours="result.arch_tours ?? []" :repo-url="store.run?.repo_url" :run-id="runId" />

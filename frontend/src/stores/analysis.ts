@@ -27,6 +27,15 @@ export type {
 }
 
 export type { SubProject, RepoTypeInfo } from '../types/run'
+export type {
+  LicenseData, LicenseDepEntry, LicenseIssue,
+  ComplexityData, ComplexityHotspot,
+  DeadCodeData, DeadCodeEntry,
+  TestCoverageData, UntestedDir,
+  ContainerData, DockerfileResult, ComposeResult, ContainerIssue,
+  CicdData, CicdWorkflow,
+  ChangelogData, ChangelogIssue,
+} from '../types/run'
 export type { RoadmapMilestone } from '../types/structure'
 export type { ContributionOpportunity, ArchTour, ArchTourFile, ArchTourStep } from '../types/contributions'
 export type { HeuristicDelta } from '../types/heuristics'

@@ -9349,3 +9349,177 @@ kbd {
     text-align: right;
   }
 }
+
+// ── License panel ────────────────────────────────────────────────────────────
+.license-panel {
+  &__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    align-items: center;
+  }
+
+  &__source {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+
+  &__section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin: 0 0 var(--space-3) 0;
+    color: var(--color-text-secondary);
+  }
+
+  &__sub {
+    font-weight: 400;
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+    margin-left: var(--space-2);
+  }
+}
+
+// ── Code quality panel ───────────────────────────────────────────────────────
+.cq-section {
+  margin-bottom: var(--space-8);
+
+  &__title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin: 0 0 var(--space-3) 0;
+    color: var(--color-text-secondary);
+  }
+
+  &__subtitle {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    margin: 0 0 var(--space-3) 0;
+    font-style: italic;
+  }
+}
+
+.cq-framework {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cq-dist {
+  margin-bottom: var(--space-4);
+
+  &__label {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-2);
+  }
+
+  &__bar {
+    display: flex;
+    height: 10px;
+    border-radius: 5px;
+    overflow: hidden;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    gap: 1px;
+  }
+
+  &__seg {
+    transition: width 0.3s ease;
+    min-width: 0;
+
+    &--ok   { background: var(--color-success); }
+    &--mild { background: color-mix(in srgb, var(--color-success) 50%, var(--color-warning)); }
+    &--warn { background: var(--color-warning); }
+    &--bad  { background: var(--color-error); }
+  }
+
+  &__legend {
+    display: flex;
+    gap: var(--space-4);
+    margin-top: var(--space-2);
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+  }
+
+  &__legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    &::before {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+    }
+
+    &--ok::before   { background: var(--color-success); }
+    &--mild::before { background: color-mix(in srgb, var(--color-success) 50%, var(--color-warning)); }
+    &--warn::before { background: var(--color-warning); }
+    &--bad::before  { background: var(--color-error); }
+  }
+}
+
+.cq-truncate {
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stat__value--ok   { color: var(--color-success); }
+.stat__value--warn { color: var(--color-warning); }
+
+// ── DevOps panel ─────────────────────────────────────────────────────────────
+.devops-section {
+  margin-bottom: var(--space-8);
+
+  &__title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin: 0 0 var(--space-3) 0;
+    color: var(--color-text-secondary);
+  }
+}
+
+.devops-ci-checklist {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+
+.devops-ci-check {
+  font-size: 0.8125rem;
+  padding: var(--space-1) 0;
+
+  &--ok   { color: var(--color-success); }
+  &--miss { color: var(--color-text-muted); }
+}
+
+.devops-system-tag {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.devops-triggers {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  max-width: 180px;
+}
+
+.devops-truncate {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mono {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+}

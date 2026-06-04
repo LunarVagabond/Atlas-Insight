@@ -9,6 +9,11 @@ def compute_heuristics(
     readme: dict | None = None,
     structure: dict | None = None,
     security: dict | None = None,
+    license_data: dict | None = None,
+    complexity_data: dict | None = None,
+    test_coverage_data: dict | None = None,
+    cicd_data: dict | None = None,
+    container_data: dict | None = None,
 ) -> list[dict]:
     signals = []
 
@@ -402,6 +407,134 @@ def compute_heuristics(
             'description': vel_desc,
         })
 
+    # ── License risk ─────────────────────────────────────────────────────────
+    if license_data is not None:
+        lic_score = license_data.get('score', 0)
+        lic_issues = license_data.get('issues', [])
+        spdx = license_data.get('spdx_id')
+        if lic_score == 0 and spdx:
+            lic_desc = f'Licensed under {spdx} — no compatibility issues detected'
+        elif not spdx:
+            lic_desc = 'No license detected — repository is implicitly all-rights-reserved'
+        else:
+            lic_desc = '; '.join(i['message'] for i in lic_issues[:3]) or f'{spdx} license present'
+        signals.append({
+            'signal': 'license_risk',
+            'label': 'License Risk',
+            'score': min(100, lic_score),
+            'confidence': 'high' if spdx else 'medium',
+            'description': lic_desc,
+        })
+
+    # ── Complexity debt ───────────────────────────────────────────────────────
+    if complexity_data is not None:
+        cplx_score = complexity_data.get('score', 0)
+        hotspots = complexity_data.get('hotspots', [])
+        files_over = complexity_data.get('files_over_threshold', 0)
+        threshold = complexity_data.get('threshold', 500)
+        untested = sum(1 for h in hotspots if not h.get('has_adjacent_test', True))
+        if cplx_score < 15:
+            cplx_desc = f'No files exceed {threshold} LOC — code stays manageable'
+        elif files_over == 1:
+            suffix = ', lacks adjacent tests' if untested else ''
+            cplx_desc = f'1 file exceeds {threshold} LOC{suffix}'
+        else:
+            cplx_desc = f'{files_over} files exceed {threshold} LOC' + (
+                f', {untested} without adjacent tests' if untested else ''
+            )
+        signals.append({
+            'signal': 'complexity_debt',
+            'label': 'Complexity Debt',
+            'score': min(100, cplx_score),
+            'confidence': 'medium',
+            'description': cplx_desc,
+        })
+
+    # ── Test coverage ─────────────────────────────────────────────────────────
+    if test_coverage_data is not None:
+        tc_score = test_coverage_data.get('score', 0)
+        test_ratio = test_coverage_data.get('test_ratio', 0)
+        framework = test_coverage_data.get('framework_detected')
+        untested_dirs = test_coverage_data.get('untested_dirs', [])
+        if tc_score < 15:
+            tc_desc = f'{test_ratio:.0%} test ratio' + (f' — {framework}' if framework else '')
+        elif test_ratio < 0.05:
+            tc_desc = f'Very low test coverage ({test_ratio:.0%} ratio)' + (
+                f'; {len(untested_dirs)} untested directories' if untested_dirs else ''
+            )
+        else:
+            tc_desc = f'{test_ratio:.0%} test ratio' + (
+                f', {len(untested_dirs)} directories without tests' if untested_dirs else ''
+            )
+        signals.append({
+            'signal': 'test_coverage',
+            'label': 'Test Coverage',
+            'score': min(100, tc_score),
+            'confidence': 'medium',
+            'description': tc_desc,
+        })
+
+    # ── CI/CD maturity ────────────────────────────────────────────────────────
+    if cicd_data is not None:
+        ci_maturity = cicd_data.get('score', 0)
+        ci_risk = max(0, 100 - ci_maturity)
+        summary = cicd_data.get('summary', {})
+        system = cicd_data.get('system')
+        missing: list[str] = []
+        if not cicd_data.get('workflow_count'):
+            missing.append('no CI configured')
+        else:
+            if not summary.get('has_tests'):
+                missing.append('no test step in CI')
+            if not summary.get('has_lint'):
+                missing.append('no lint step in CI')
+        if missing:
+            ci_maturity_desc = ', '.join(missing)
+        else:
+            parts = [system or 'CI'] + (
+                ['tests', 'lint'] if summary.get('has_lint') else ['tests']
+            )
+            ci_maturity_desc = f'{" + ".join(parts)} pipeline active'
+        signals.append({
+            'signal': 'cicd_maturity',
+            'label': 'CI/CD Maturity',
+            'score': min(100, ci_risk),
+            'confidence': 'high' if cicd_data.get('workflow_count', 0) > 0 else 'medium',
+            'description': ci_maturity_desc,
+        })
+
+    # ── Container hygiene ─────────────────────────────────────────────────────
+    if container_data is not None and container_data.get('dockerfile_count', 0) > 0:
+        cont_score = container_data.get('score', 0)
+        total_issues = container_data.get('total_issues', 0)
+        high_issues = sum(
+            sum(1 for i in d.get('issues', []) if i.get('severity') == 'high')
+            for d in container_data.get('dockerfiles', [])
+        )
+        root_count = sum(1 for d in container_data.get('dockerfiles', []) if d.get('runs_as_root'))
+        if cont_score < 15:
+            cont_desc = 'Dockerfiles follow best practices'
+        elif high_issues:
+            parts = []
+            if root_count:
+                root_s = 's' if root_count > 1 else ''
+                parts.append(f'{root_count} container{root_s} running as root')
+            other = high_issues - root_count
+            if other > 0:
+                other_s = 's' if other > 1 else ''
+                parts.append(f'{other} other high-severity issue{other_s}')
+            cont_desc = ', '.join(parts)
+        else:
+            issue_s = 's' if total_issues != 1 else ''
+            cont_desc = f'{total_issues} minor container hygiene issue{issue_s}'
+        signals.append({
+            'signal': 'container_hygiene',
+            'label': 'Container Hygiene',
+            'score': min(100, cont_score),
+            'confidence': 'high',
+            'description': cont_desc,
+        })
+
     return signals
 
 
@@ -409,22 +542,27 @@ def compute_oss_score(signals: list[dict]) -> dict:
     """Compute a 0–10 OSS health score from heuristic signals. 10 = perfect."""
     signal_map = {s['signal']: s['score'] for s in signals}
 
-    # All 11 signals included. Weights sum to 1.0.
-    # Community/docs/CI weighted highest — they directly affect contributor experience.
-    # Security added at 12% — a committed secret or critical CVE should meaningfully lower the score.
-    # Monolith/velocity/burnout are lower weight — present but context-dependent.
+    # 16 signals. Weights sum to 1.0.
+    # Community/docs/CI highest — directly affect contributor experience.
+    # New signals (license, complexity, test_coverage, cicd_maturity, container_hygiene)
+    # added at modest weights so they enrich without drowning the existing score.
     weights = {
-        'community_health': 0.17,
-        'documentation_quality': 0.15,
-        'ci_health': 0.15,
-        'security_hygiene': 0.12,
-        'release_cadence': 0.10,
-        'abandonment_risk': 0.09,
-        'dependency_health': 0.08,
-        'bus_factor_risk': 0.07,
-        'monolith_growth': 0.03,
-        'commit_velocity': 0.02,
-        'burnout': 0.02,
+        'community_health': 0.13,
+        'documentation_quality': 0.11,
+        'ci_health': 0.11,
+        'security_hygiene': 0.09,
+        'release_cadence': 0.08,
+        'abandonment_risk': 0.08,
+        'license_risk': 0.07,
+        'test_coverage': 0.07,
+        'dependency_health': 0.06,
+        'cicd_maturity': 0.05,
+        'bus_factor_risk': 0.05,
+        'complexity_debt': 0.04,
+        'container_hygiene': 0.03,
+        'monolith_growth': 0.02,
+        'commit_velocity': 0.01,
+        'burnout': 0.01,
     }
 
     weighted = 0.0

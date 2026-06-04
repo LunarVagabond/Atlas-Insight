@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from datetime import timezone as _tz
 
@@ -12,21 +13,28 @@ from prometheus_client import Counter, Gauge, Histogram
 from apps.repositories.models import AnalysisRun
 
 from .arch_tours import generate_arch_tours
+from .changelog_analysis import analyze_changelog
+from .cicd_analysis import analyze_cicd
 from .classifications import classify_repo
 from .commit_analysis import analyze_commits
+from .complexity import analyze_complexity
+from .container_analysis import analyze_containers
 from .contribution_analysis import analyze_contributions
+from .dead_code import analyze_dead_code
 from .dep_report import analyze_dependencies
 from .git_ops import clone_or_fetch
 from .github_meta import fetch_github_meta
 from .graph_analysis import analyze_graph
 from .heuristics import compute_heuristics, compute_oss_score
 from .import_parser import parse_imports
+from .license_analysis import analyze_license
 from .ownership_analysis import analyze_ownership
 from .project_structure import analyze_structure
 from .project_structure.tech_stack import detect_tech_stack
 from .readme_parser import parse_readme
 from .repo_type import detect_docs_only, detect_repo_type
 from .security_scan import scan_security
+from .test_coverage import analyze_test_coverage
 from .todo_scan import scan_todos
 from .vuln_scan import scan_vulnerabilities
 
@@ -266,7 +274,55 @@ def analyze_repository(self, run_id: str):
             run.progress_step = 'heuristics'
             run.save(update_fields=['progress_step'])
 
-            signals = compute_heuristics(commits, graph, deps, readme, structure, security)
+            def _run_license():
+                return analyze_license(repo_dir, deps, github_meta)
+
+            def _run_complexity():
+                return analyze_complexity(repo_dir, structure)
+
+            def _run_dead_code():
+                return analyze_dead_code(edges, repo_dir)
+
+            def _run_test_coverage():
+                return analyze_test_coverage(repo_dir, structure)
+
+            def _run_containers():
+                return analyze_containers(repo_dir)
+
+            def _run_cicd():
+                return analyze_cicd(repo_dir, structure)
+
+            def _run_changelog():
+                return analyze_changelog(repo_dir, structure, commits)
+
+            _extra_tasks = {
+                'license': _run_license,
+                'complexity': _run_complexity,
+                'dead_code': _run_dead_code,
+                'test_coverage': _run_test_coverage,
+                'containers': _run_containers,
+                'cicd': _run_cicd,
+                'changelog': _run_changelog,
+            }
+            _extra_results: dict = {}
+            with ThreadPoolExecutor(max_workers=4) as _pool:
+                _futures = {_pool.submit(fn): key for key, fn in _extra_tasks.items()}
+                for _future in as_completed(_futures):
+                    _key = _futures[_future]
+                    try:
+                        _extra_results[_key] = _future.result()
+                    except Exception:
+                        logger.warning('Extra analyzer %s failed', _key, exc_info=True)
+                        _extra_results[_key] = {}
+
+            signals = compute_heuristics(
+                commits, graph, deps, readme, structure, security,
+                license_data=_extra_results.get('license'),
+                complexity_data=_extra_results.get('complexity'),
+                test_coverage_data=_extra_results.get('test_coverage'),
+                cicd_data=_extra_results.get('cicd'),
+                container_data=_extra_results.get('containers'),
+            )
             oss_score = compute_oss_score(signals)
             classification = classify_repo(
                 commits, graph, deps, readme, structure, security, github_meta
@@ -292,6 +348,13 @@ def analyze_repository(self, run_id: str):
                 'contribution_opportunities': analyze_contributions(
                     commits, graph, deps, readme, structure, security, contribution_data, todos=todos
                 ),
+                'license': _extra_results.get('license', {}),
+                'complexity': _extra_results.get('complexity', {}),
+                'dead_code': _extra_results.get('dead_code', {}),
+                'test_coverage': _extra_results.get('test_coverage', {}),
+                'containers': _extra_results.get('containers', {}),
+                'cicd': _extra_results.get('cicd', {}),
+                'changelog': _extra_results.get('changelog', {}),
             }
             if repo_type_result is not None:
                 result['repo_type'] = repo_type_result

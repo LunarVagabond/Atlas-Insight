@@ -28,6 +28,138 @@ export interface RepoTypeInfo {
   sub_projects: SubProject[]
 }
 
+export interface LicenseDepEntry {
+  name: string
+  license: string | null
+  compatible: boolean | null
+}
+
+export interface LicenseIssue {
+  severity: 'high' | 'medium' | 'low'
+  message: string
+}
+
+export interface LicenseData {
+  spdx_id: string | null
+  name: string | null
+  osi_approved: boolean
+  copyleft: boolean
+  source: 'file' | 'github_api' | 'none'
+  source_file: string | null
+  dep_licenses: LicenseDepEntry[]
+  issues: LicenseIssue[]
+  score: number
+}
+
+export interface ComplexityHotspot {
+  file: string
+  loc: number
+  has_adjacent_test: boolean
+}
+
+export interface ComplexityData {
+  hotspots: ComplexityHotspot[]
+  avg_file_loc: number
+  files_over_threshold: number
+  threshold: number
+  distribution: { '0-100': number; '100-300': number; '300-500': number; '500+': number }
+  score: number
+}
+
+export interface DeadCodeEntry {
+  file: string
+  lang: string
+}
+
+export interface DeadCodeData {
+  unreferenced: DeadCodeEntry[]
+  count: number
+  filtered_entry_points: number
+  note: string | null
+}
+
+export interface UntestedDir {
+  path: string
+  source_files: number
+}
+
+export interface TestCoverageData {
+  test_ratio: number
+  test_file_count: number
+  source_file_count: number
+  framework_detected: string | null
+  untested_dirs: UntestedDir[]
+  well_tested_dirs: number
+  score: number
+}
+
+export interface ContainerIssue {
+  severity: 'high' | 'medium' | 'low'
+  line: number | null
+  message: string
+}
+
+export interface DockerfileResult {
+  path: string
+  issues: ContainerIssue[]
+  is_multistage: boolean
+  runs_as_root: boolean
+}
+
+export interface ComposeResult {
+  path: string
+  issues: ContainerIssue[]
+}
+
+export interface ContainerData {
+  dockerfiles: DockerfileResult[]
+  compose_files: ComposeResult[]
+  dockerfile_count: number
+  compose_count: number
+  total_issues: number
+  score: number
+}
+
+export interface CicdWorkflow {
+  name: string
+  triggers: string[]
+  has_tests: boolean
+  has_lint: boolean
+  has_deploy: boolean
+  has_container_build: boolean
+  job_count: number
+  uses_matrix: boolean
+}
+
+export interface CicdData {
+  system: string | null
+  workflow_count: number
+  workflows: CicdWorkflow[]
+  summary: {
+    has_tests: boolean
+    has_lint: boolean
+    has_deploy: boolean
+    has_matrix: boolean
+  }
+  score: number
+}
+
+export interface ChangelogIssue {
+  severity: 'high' | 'medium' | 'low'
+  message: string
+}
+
+export interface ChangelogData {
+  found: boolean
+  filename: string | null
+  format: 'keep-a-changelog' | 'versioned' | 'prose' | 'none'
+  entry_count: number
+  last_entry_date: string | null
+  last_entry_version: string | null
+  days_stale: number | null
+  issues: ChangelogIssue[]
+}
+
 export interface RunResult {
   is_docs_only?: boolean
   commits: CommitData
@@ -45,6 +177,13 @@ export interface RunResult {
   arch_tours?: ArchTour[]
   ownership?: OwnershipData
   repo_type?: RepoTypeInfo
+  license?: LicenseData
+  complexity?: ComplexityData
+  dead_code?: DeadCodeData
+  test_coverage?: TestCoverageData
+  containers?: ContainerData
+  cicd?: CicdData
+  changelog?: ChangelogData
   error?: string
 }
 
