@@ -10,6 +10,7 @@ import type {
   FileHistory,
   JitIssue,
   JitPrData,
+  PrImpactData,
 } from '../types'
 
 export type {
@@ -39,6 +40,7 @@ export type { VulnFinding, SecurityData } from '../types/security'
 export type { GitHubContributor, GitHubMeta } from '../types/github'
 export type { TodoItem, TodoData } from '../types/todos'
 export type { OwnershipSubsystem, OwnershipData } from '../types/ownership'
+export type { PrImpactData, PrImpactSubsystem, PrImpactReviewer } from '../types/pr-impact'
 
 export const useAnalysisStore = defineStore('analysis', {
   state: () => ({
@@ -57,6 +59,9 @@ export const useAnalysisStore = defineStore('analysis', {
     diffLoading: false,
     similarRuns: null as SimilarRun[] | null,
     similarLoading: false,
+    prImpactCache: {} as Record<number, PrImpactData>,
+    prImpactLoading: null as number | null,
+    prImpactError: null as number | null,
   }),
 
   actions: {
@@ -125,6 +130,22 @@ export const useAnalysisStore = defineStore('analysis', {
         this.similarRuns = []
       } finally {
         this.similarLoading = false
+      }
+    },
+
+    async fetchPrImpact(runId: string, prNumber: number): Promise<PrImpactData | null> {
+      if (this.prImpactLoading === prNumber) return null
+      this.prImpactLoading = prNumber
+      this.prImpactError = null
+      try {
+        const { data } = await axios.get(`/api/v1/repositories/runs/${runId}/pr-impact`, { params: { pr: prNumber } })
+        this.prImpactCache = { ...this.prImpactCache, [prNumber]: data as PrImpactData }
+        return data as PrImpactData
+      } catch {
+        this.prImpactError = prNumber
+        return null
+      } finally {
+        this.prImpactLoading = null
       }
     },
 
@@ -215,6 +236,9 @@ export const useAnalysisStore = defineStore('analysis', {
       this.jitPrs = null
       this.jitError = false
       this.similarRuns = null
+      this.prImpactCache = {}
+      this.prImpactLoading = null
+      this.prImpactError = null
     },
   },
 })

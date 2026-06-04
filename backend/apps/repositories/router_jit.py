@@ -566,3 +566,108 @@ def get_ai_summary(request, run_id: uuid.UUID):
 
     summary = '\n'.join(lines).rstrip()
     return {'summary': summary}
+
+
+@router.get('/runs/{run_id}/pr-impact')
+@ratelimit(key='user_or_ip', rate='30/h', method='GET', block=False)
+def get_pr_impact(request, run_id: uuid.UUID, pr: int):
+    _assert_not_limited(request)
+    import requests as _requests
+    from apps.analysis.pr_impact import affected_subsystems, suggest_reviewers, compute_complexity
+
+    try:
+        run = AnalysisRun.objects.select_related('repo').get(id=run_id)
+    except AnalysisRun.DoesNotExist:
+        raise HttpError(404, 'Run not found')
+    if run.repo.is_private and not request.user.is_authenticated:
+        raise HttpError(403, 'Access denied')
+    if run.status != 'completed' or not run.result:
+        raise HttpError(422, 'Analysis not yet complete')
+
+    from django.core.cache import cache
+    cache_key = f'jit_{run_id}_pr_impact_{pr}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    token = _jit_token(run)
+    headers = _jit_headers(token)
+    owner, name = run.repo.owner, run.repo.name
+    base = f'https://api.github.com/repos/{owner}/{name}'
+
+    pr_resp = _requests.get(f'{base}/pulls/{pr}', headers=headers, timeout=10)
+    if pr_resp.status_code == 404:
+        raise HttpError(404, 'Pull request not found')
+    if not pr_resp.ok:
+        raise HttpError(502, 'Failed to fetch PR from GitHub')
+
+    files_resp = _requests.get(
+        f'{base}/pulls/{pr}/files', headers=headers,
+        params={'per_page': 100}, timeout=10,
+    )
+    if not files_resp.ok:
+        raise HttpError(502, 'Failed to fetch PR files from GitHub')
+
+    pr_data = pr_resp.json()
+    files_data = files_resp.json() if isinstance(files_resp.json(), list) else []
+    changed_files = [f['filename'] for f in files_data if isinstance(f, dict) and 'filename' in f]
+
+    # Fetch recent committers for the most-changed files in this PR (max 8 files)
+    def _sort_key(f):
+        return (f.get('additions', 0) or 0) + (f.get('deletions', 0) or 0)
+    top_files = sorted(
+        [f for f in files_data if isinstance(f, dict) and 'filename' in f],
+        key=_sort_key, reverse=True,
+    )[:8]
+    # author email → set of PR files they've committed to
+    author_pr_files: dict[str, set] = {}
+    author_names: dict[str, str] = {}
+    for file_obj in top_files:
+        path = file_obj['filename']
+        c_resp = _requests.get(
+            f'{base}/commits', headers=headers,
+            params={'path': path, 'per_page': 10}, timeout=10,
+        )
+        if not c_resp.ok:
+            continue
+        for commit in c_resp.json():
+            if not isinstance(commit, dict):
+                continue
+            author_info = commit.get('commit', {}).get('author') or {}
+            email = author_info.get('email', '')
+            display = author_info.get('name', '') or email
+            if email and not email.endswith('@users.noreply.github.com') and display:
+                author_pr_files.setdefault(email, set()).add(path)
+                author_names[email] = display
+
+    result = run.result
+    hit_subsystems = affected_subsystems(changed_files, result)
+    reviewers = suggest_reviewers(changed_files, hit_subsystems, result, author_pr_files, author_names)
+    complexity = compute_complexity(
+        pr_data.get('additions', 0),
+        pr_data.get('deletions', 0),
+        changed_files,
+        hit_subsystems,
+        result,
+    )
+
+    impact = {
+        'pr_number': pr,
+        'title': pr_data.get('title', ''),
+        'state': pr_data.get('state', ''),
+        'pr_url': pr_data.get('html_url', ''),
+        'author': (pr_data.get('user') or {}).get('login', ''),
+        'additions': pr_data.get('additions', 0),
+        'deletions': pr_data.get('deletions', 0),
+        'files_changed': len(changed_files),
+        'complexity_score': complexity['score'],
+        'complexity_label': complexity['label'],
+        'touches_god_module': complexity['touches_god_module'],
+        'touches_deps': complexity['touches_deps'],
+        'complexity_notes': complexity['notes'],
+        'affected_subsystems': hit_subsystems,
+        'suggested_reviewers': reviewers,
+    }
+
+    cache.set(cache_key, impact, 900)
+    return impact

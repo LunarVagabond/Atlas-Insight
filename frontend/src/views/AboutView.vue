@@ -170,6 +170,15 @@ const GUIDE_ENTRIES: GuideEntry[] = [
     method: 'We match file paths against keyword patterns (e.g. paths containing "component", "view", "ui" → frontend subsystem). Files that do not match any pattern go into "other". Subsystems are ranked by commit activity.',
     searchText: 'subsystems frontend api data tests config path groups areas ownership activity',
   },
+  {
+    id: 'pr-impact',
+    term: 'PR Impact Preview',
+    section: 'Architecture',
+    defHtml: `On-demand complexity estimate for any open pull request. Enter a PR number on the <span class="guide-kw">Ownership</span> tab to see: <span class="guide-kw">complexity score</span> (0–100), which <span class="guide-kw">subsystems</span> the PR touches, whether it modifies a <span class="guide-kw">highly-imported module</span> or a <span class="guide-kw">dependency manifest</span>, and <span class="guide-kw">suggested reviewers</span> ranked by who has recently committed to the exact files in this PR.`,
+    methodLabel: 'How we compute it',
+    method: 'Complexity score: files changed (0–30 pts) + line delta (0–25 pts) + subsystems crossed (0–25 pts) + touches god module (+10 pts) + dependency manifest changed (+10 pts), capped at 100. Low < 30, Medium 30–59, High 60+. Reviewer suggestions: we fetch the last 10 commits for each of the most-changed files in the PR via GitHub API and rank authors by how many of those files they appear in — the person who has touched the most files in this specific PR comes first. Falls back to subsystem-activity-weighted top contributors if commit history is unavailable.',
+    searchText: 'pr impact pull request complexity reviewer suggestion review who subsystem files changed line delta god module dependency manifest score',
+  },
   // ── Project Health ───────────────────────────────────────────────────────
   {
     id: 'community-health-files',
@@ -401,7 +410,7 @@ function renderMd(text: string): string {
           <li><strong>Project</strong> — README content, community files, links, and release history.</li>
           <li><strong>Architecture</strong> — import graph, god modules, circular dependencies, hot files.</li>
           <li><strong>Tours</strong> — guided reading paths through major subsystems.</li>
-          <li><strong>Ownership</strong> — file ownership map, bus factor, subsystem breakdown.</li>
+          <li><strong>Ownership</strong> — file ownership map, bus factor, subsystem breakdown, and <strong>PR Impact Preview</strong> (enter any PR number to get a complexity score and reviewer suggestions).</li>
           <li><strong>Dependencies</strong> — all declared dependencies, Docker base image warnings, missing lockfiles.</li>
           <li><strong>Security</strong> — hardcoded secrets scan, gitignore gaps, common patterns.</li>
           <li><strong>History</strong> — commit timeline, contributor churn, monthly breakdown, roadmap milestones.</li>

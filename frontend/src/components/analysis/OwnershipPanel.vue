@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import type { GitHubContributor, OwnershipData, OwnershipSubsystem, JitIssue } from '../../stores/analysis'
 import FileHistoryDrawer from './FileHistoryDrawer.vue'
+import PrImpactCard from './PrImpactCard.vue'
 
 const props = defineProps<{
   ownership: OwnershipData
@@ -113,6 +114,13 @@ function toggleHint(e: Event, key: string) {
       </div>
     </div>
 
+    <PrImpactCard
+      v-if="runId"
+      :run-id="runId"
+      :repo-url="repoUrl"
+      style="margin-bottom: 1.5rem"
+    />
+
     <!-- Subsystem cards -->
     <div v-if="sortedSubsystems.length" class="ownership-grid">
       <div v-for="sub in sortedSubsystems" :key="sub.id" class="ownership-card">
@@ -194,6 +202,7 @@ function toggleHint(e: Event, key: string) {
     <div v-else class="empty-state">
       No subsystem data available — re-analyze the repository to generate ownership signals.
     </div>
+
 
     <FileHistoryDrawer
       :run-id="runId ?? null"
