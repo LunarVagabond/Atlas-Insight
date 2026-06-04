@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 SUBSYSTEM_PATTERNS: dict[str, list[str]] = {
     'frontend': ['src', 'frontend', 'client', 'ui', 'app', 'web', 'pages', 'components'],
-    'api':      ['api', 'routes', 'routers', 'endpoints', 'controllers', 'views', 'handlers', 'server'],
+    'api': ['api', 'routes', 'routers', 'endpoints', 'controllers', 'views', 'handlers', 'server'],
     'data':     ['models', 'db', 'database', 'migrations', 'schemas', 'entities', 'repositories'],
     'tests':    ['tests', '__tests__', 'spec', 'specs', 'test', 'e2e', 'integration'],
     'config':   ['.github', 'config', 'scripts', 'ci', 'infra', 'deploy', 'k8s', 'docker'],
@@ -147,7 +147,10 @@ def _kahn_topo(nodes: set[str], internal_edges: list[tuple[str, str]]) -> list[s
     return result
 
 
-def _file_note(file: str, subsystem_files: set[str], internal_in_degree: dict[str, int], graph_in_degree: dict[str, int]) -> str:
+def _file_note(
+    file: str, subsystem_files: set[str],
+    internal_in_degree: dict[str, int], graph_in_degree: dict[str, int],
+) -> str:
     basename = file.split('/')[-1].lower()
     if basename in ENTRY_FILENAMES:
         return 'Entry point'
@@ -155,7 +158,8 @@ def _file_note(file: str, subsystem_files: set[str], internal_in_degree: dict[st
         return 'Utilities'
     if internal_in_degree.get(file, 0) == 0 and len(subsystem_files) > 3:
         return 'Entry point'
-    if graph_in_degree.get(file, 0) == max((graph_in_degree.get(f, 0) for f in subsystem_files), default=0):
+    max_in = max((graph_in_degree.get(f, 0) for f in subsystem_files), default=0)
+    if graph_in_degree.get(file, 0) == max_in:
         if graph_in_degree.get(file, 0) > 0:
             return 'Core logic'
     # Fallback: file type label so no step is completely unlabelled
@@ -179,10 +183,14 @@ def _generate(structure: dict, graph: dict, commits: dict) -> list[dict]:
 
     # Build graph lookup structures
     graph_in_degree: dict[str, int] = {n['id']: n['in_degree'] for n in graph.get('nodes', [])}
-    graph_edges: list[tuple[str, str]] = [(e['source'], e['target']) for e in graph.get('edges', [])]
+    graph_edges: list[tuple[str, str]] = [
+        (e['source'], e['target']) for e in graph.get('edges', [])
+    ]
 
     # Hot files lookup: file path → commit_count
-    hot_file_map: dict[str, int] = {h['file']: h['commit_count'] for h in structure.get('hot_files', [])}
+    hot_file_map: dict[str, int] = {
+        h['file']: h['commit_count'] for h in structure.get('hot_files', [])
+    }
 
     # Group files by top-level dir
     dir_files: dict[str, list[str]] = collections.defaultdict(list)
@@ -247,7 +255,9 @@ def _generate(structure: dict, graph: dict, commits: dict) -> list[dict]:
         ][:5]
 
         # Reading order: topo sort on internal edges
-        internal_edges = [(s, t) for s, t in graph_edges if s in subsystem_set and t in subsystem_set]
+        internal_edges = [
+            (s, t) for s, t in graph_edges if s in subsystem_set and t in subsystem_set
+        ]
         if internal_edges:
             ordered = _kahn_topo(subsystem_set, internal_edges)
         else:
@@ -332,7 +342,10 @@ def _generate(structure: dict, graph: dict, commits: dict) -> list[dict]:
     overview = {
         'id': 'tour_overview',
         'name': 'Full Repository Overview',
-        'description': 'Top-level structure of the repository — a map of all major subsystems and primary entry points.',
+        'description': (
+            'Top-level structure of the repository'
+            ' — a map of all major subsystems and primary entry points.'
+        ),
         'subsystem_type': 'overview',
         'file_count': total_files,
         'entry_files': global_entry_files,

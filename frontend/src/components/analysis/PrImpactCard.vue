@@ -42,7 +42,9 @@ const impact = computed<PrImpactData | null>(() =>
   expanded.value !== null ? (store.prImpactCache[expanded.value] ?? null) : null
 )
 
-const isLoading = computed(() => store.prImpactLoading !== null)
+const isLoading = computed(() =>
+  parsedPr.value !== null && store.prImpactLoading === parsedPr.value
+)
 const hasError = computed(() => expanded.value !== null && store.prImpactError === expanded.value)
 
 const COMPLEXITY_ICONS: Record<string, string> = {
