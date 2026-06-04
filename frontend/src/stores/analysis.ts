@@ -11,6 +11,7 @@ import type {
   JitIssue,
   JitPrData,
   PrImpactData,
+  ConstellationData,
 } from '../types'
 
 export type {
@@ -41,6 +42,7 @@ export type { GitHubContributor, GitHubMeta } from '../types/github'
 export type { TodoItem, TodoData } from '../types/todos'
 export type { OwnershipSubsystem, OwnershipData } from '../types/ownership'
 export type { PrImpactData, PrImpactSubsystem, PrImpactReviewer } from '../types/pr-impact'
+export type { ConstellationData, ConstellationRelated } from '../types/constellation'
 
 export const useAnalysisStore = defineStore('analysis', {
   state: () => ({
@@ -62,6 +64,8 @@ export const useAnalysisStore = defineStore('analysis', {
     prImpactCache: {} as Record<number, PrImpactData>,
     prImpactLoading: null as number | null,
     prImpactError: null as number | null,
+    constellationData: null as ConstellationData | null,
+    constellationLoading: false,
   }),
 
   actions: {
@@ -130,6 +134,19 @@ export const useAnalysisStore = defineStore('analysis', {
         this.similarRuns = []
       } finally {
         this.similarLoading = false
+      }
+    },
+
+    async fetchConstellation(runId: string): Promise<void> {
+      if (this.constellationLoading) return
+      this.constellationLoading = true
+      try {
+        const { data } = await axios.get(`/api/v1/repositories/runs/${runId}/constellation`)
+        this.constellationData = data as ConstellationData
+      } catch {
+        this.constellationData = { related: [] }
+      } finally {
+        this.constellationLoading = false
       }
     },
 
@@ -239,6 +256,8 @@ export const useAnalysisStore = defineStore('analysis', {
       this.prImpactCache = {}
       this.prImpactLoading = null
       this.prImpactError = null
+      this.constellationData = null
+      this.constellationLoading = false
     },
   },
 })

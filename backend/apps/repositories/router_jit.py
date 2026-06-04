@@ -131,7 +131,7 @@ def get_run_issues(request, run_id: uuid.UUID):
         run = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
         raise HttpError(404, 'Run not found')
-    if run.repo.is_private and not request.user.is_authenticated:
+    if run.repo.is_private and (not request.user.is_authenticated or run.user != request.user):
         raise HttpError(403, 'Access denied')
 
     from django.core.cache import cache
@@ -155,7 +155,7 @@ def get_run_prs(request, run_id: uuid.UUID):
         run = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
         raise HttpError(404, 'Run not found')
-    if run.repo.is_private and not request.user.is_authenticated:
+    if run.repo.is_private and (not request.user.is_authenticated or run.user != request.user):
         raise HttpError(403, 'Access denied')
 
     from django.core.cache import cache
@@ -183,7 +183,7 @@ def get_run_diff(request, run_id: uuid.UUID):
         run = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
         raise HttpError(404, 'Run not found')
-    if run.repo.is_private and not request.user.is_authenticated:
+    if run.repo.is_private and (not request.user.is_authenticated or run.user != request.user):
         raise HttpError(403, 'Access denied')
     if run.status != 'completed' or not run.result:
         return {'available': False}
@@ -209,7 +209,7 @@ def get_similar_runs(request, run_id: uuid.UUID):
         run = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
         raise HttpError(404, 'Run not found')
-    if run.repo.is_private and not request.user.is_authenticated:
+    if run.repo.is_private and (not request.user.is_authenticated or run.user != request.user):
         raise HttpError(403, 'Access denied')
     if run.status != 'completed' or not run.result:
         return []
@@ -266,7 +266,7 @@ def get_file_history(request, run_id: uuid.UUID, path: str = ''):
         run = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
         raise HttpError(404, 'Run not found')
-    if run.repo.is_private and not request.user.is_authenticated:
+    if run.repo.is_private and (not request.user.is_authenticated or run.user != request.user):
         raise HttpError(403, 'Access denied')
     if not path:
         raise HttpError(422, 'path parameter required')
@@ -317,7 +317,7 @@ def get_run_vulnerabilities(request, run_id: uuid.UUID):
         run = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
         raise HttpError(404, 'Run not found')
-    if run.repo.is_private and not request.user.is_authenticated:
+    if run.repo.is_private and (not request.user.is_authenticated or run.user != request.user):
         raise HttpError(403, 'Access denied')
     if run.status != 'completed' or not run.result:
         return {'checked': 0, 'vulnerable': []}
@@ -579,7 +579,7 @@ def get_pr_impact(request, run_id: uuid.UUID, pr: int):
         run = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
         raise HttpError(404, 'Run not found')
-    if run.repo.is_private and not request.user.is_authenticated:
+    if run.repo.is_private and (not request.user.is_authenticated or run.user != request.user):
         raise HttpError(403, 'Access denied')
     if run.status != 'completed' or not run.result:
         raise HttpError(422, 'Analysis not yet complete')
@@ -671,3 +671,30 @@ def get_pr_impact(request, run_id: uuid.UUID, pr: int):
 
     cache.set(cache_key, impact, 900)
     return impact
+
+
+@router.get('/runs/{run_id}/constellation')
+@ratelimit(key='user_or_ip', rate='60/h', method='GET', block=False)
+def get_constellation(request, run_id: uuid.UUID):
+    _assert_not_limited(request)
+
+    try:
+        run = AnalysisRun.objects.select_related('repo').get(id=run_id)
+    except AnalysisRun.DoesNotExist:
+        raise HttpError(404, 'Run not found')
+    if run.repo.is_private and (not request.user.is_authenticated or run.user != request.user):
+        raise HttpError(403, 'Access denied')
+    if run.status != 'completed' or not run.result:
+        return {'related': []}
+
+    from django.core.cache import cache
+    cache_key = f'jit_{run_id}_constellation'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    from apps.analysis.constellation import detect_refs
+    edges = detect_refs(run)
+    result = {'related': edges}
+    cache.set(cache_key, result, 900)
+    return result

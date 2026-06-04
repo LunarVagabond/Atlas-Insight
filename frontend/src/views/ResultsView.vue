@@ -454,7 +454,7 @@ onUnmounted(() => {
         <template v-if="activeTab === 'Overview'">
           <div class="overview-split">
             <div class="overview-split__left">
-              <OverviewPanel :result="result" />
+              <OverviewPanel :result="result" :run-id="runId" />
               <SimilarReposPanel
                 v-if="store.similarRuns !== null || store.similarLoading"
                 :runs="store.similarRuns ?? []"

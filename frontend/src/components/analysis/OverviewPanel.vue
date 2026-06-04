@@ -2,9 +2,10 @@
 import { computed, ref } from 'vue'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
+import ConstellationPanel from './ConstellationPanel.vue'
 import type { RunResult } from '../../stores/analysis'
 
-const props = defineProps<{ result: RunResult }>()
+const props = defineProps<{ result: RunResult; runId?: string }>()
 
 const { commits, heuristics, structure, classification: cls } = props.result
 
@@ -172,6 +173,9 @@ function formatMonth(ym: string): string {
         </li>
       </ul>
     </div>
+
+    <!-- Constellation: related repos -->
+    <ConstellationPanel v-if="runId" :run-id="runId" />
 
     <!-- Sub-project scorecards -->
     <div v-if="result.repo_type?.sub_projects?.length" class="overview-subprojects">

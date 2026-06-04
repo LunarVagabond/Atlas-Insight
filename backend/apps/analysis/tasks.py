@@ -287,6 +287,14 @@ def analyze_repository(self, run_id: str):
     run.progress_step = ''
     run.save(update_fields=['status', 'result', 'completed_at', 'progress_step'])
 
+    if run.status == 'completed':
+        try:
+            from apps.analysis.constellation import detect_refs, upsert_constellation
+            edges = detect_refs(run)
+            upsert_constellation(run, edges)
+        except Exception:
+            logger.warning('Constellation detection failed for run %s', run_id, exc_info=True)
+
     # Fire webhook if configured
     if run.webhook_url:
         try:
