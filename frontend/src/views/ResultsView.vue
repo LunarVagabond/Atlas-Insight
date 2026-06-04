@@ -64,7 +64,11 @@ const currentStepLabel = computed(() => {
 const hasRoadmap = computed(() => (result.value?.structure?.roadmap_parsed?.milestones?.length ?? 0) > 0)
 
 const CHAPTER_TABS = ['Overview', 'Project', 'History', 'Architecture', 'Ownership', 'Dependencies', 'Security', 'Heuristics', 'Contributing', 'Tours']
-const TABS = computed(() => CHAPTER_TABS)
+const isDocsOnly = computed(() => result.value?.is_docs_only === true)
+const TABS = computed(() => {
+  if (!isDocsOnly.value) return CHAPTER_TABS
+  return ['Overview', 'Project', 'History', 'Ownership', 'Security']
+})
 
 const tabBadges = computed<Record<string, number | string>>(() => {
   if (!result.value) return {}
@@ -88,9 +92,9 @@ const tabBadges = computed<Record<string, number | string>>(() => {
 
 const activeTab = ref((route.query.tab as string) || 'Overview')
 
-const activeChapterIndex = computed(() => CHAPTER_TABS.indexOf(activeTab.value))
-const prevChapter = computed(() => activeChapterIndex.value > 0 ? CHAPTER_TABS[activeChapterIndex.value - 1] : null)
-const nextChapter = computed(() => activeChapterIndex.value < CHAPTER_TABS.length - 1 ? CHAPTER_TABS[activeChapterIndex.value + 1] : null)
+const activeChapterIndex = computed(() => TABS.value.indexOf(activeTab.value))
+const prevChapter = computed(() => activeChapterIndex.value > 0 ? TABS.value[activeChapterIndex.value - 1] : null)
+const nextChapter = computed(() => activeChapterIndex.value < TABS.value.length - 1 ? TABS.value[activeChapterIndex.value + 1] : null)
 
 const scrollRef = ref<HTMLElement | null>(null)
 
@@ -276,9 +280,10 @@ function onTabKey(e: KeyboardEvent) {
   const tag = (e.target as HTMLElement).tagName
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return
   if ((e.target as HTMLElement).isContentEditable) return
-  const idx = CHAPTER_TABS.indexOf(activeTab.value)
-  if (e.key === 'j') activeTab.value = CHAPTER_TABS[Math.max(idx - 1, 0)]
-  else if (e.key === 'k') activeTab.value = CHAPTER_TABS[Math.min(idx + 1, CHAPTER_TABS.length - 1)]
+  const tabs = TABS.value
+  const idx = tabs.indexOf(activeTab.value)
+  if (e.key === 'j') activeTab.value = tabs[Math.max(idx - 1, 0)]
+  else if (e.key === 'k') activeTab.value = tabs[Math.min(idx + 1, tabs.length - 1)]
 }
 
 onMounted(() => {
@@ -405,6 +410,10 @@ onUnmounted(() => {
         <div v-if="isArchived" class="archived-banner" role="alert">
           <span class="archived-banner__icon">📦</span>
           <span class="archived-banner__text">This repository is <strong>archived</strong> — read-only, no longer accepting contributions.</span>
+        </div>
+        <div v-if="isDocsOnly" class="docs-only-banner" role="note">
+          <span class="docs-only-banner__icon">📄</span>
+          <span class="docs-only-banner__text">This is a <strong>documentation repository</strong> — code analysis tabs are hidden. Showing overview, history, ownership, and security only.</span>
         </div>
         <Transition name="fade">
           <div v-if="showEmbed" class="embed-panel">
@@ -551,7 +560,7 @@ onUnmounted(() => {
       </button>
       <span v-else class="chapter-nav__spacer" />
       <span class="chapter-nav__position">
-        Ch.{{ activeChapterIndex + 1 }} / {{ CHAPTER_TABS.length }}
+        Ch.{{ activeChapterIndex + 1 }} / {{ TABS.length }}
       </span>
       <button v-if="nextChapter" class="btn btn--primary chapter-nav__btn" @click="goToChapter(nextChapter)">
         {{ nextChapter }} →

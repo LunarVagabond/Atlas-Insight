@@ -44,6 +44,17 @@ export const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
   { name: 'Kotlin',     iconUrl: DEVICON('kotlin'),          tier: 'full',         kind: 'language' },
   { name: 'C#',         iconUrl: DEVICON('csharp'),          tier: 'full',         kind: 'language' },
   { name: 'PHP',        iconUrl: DEVICON('php'),             tier: 'full',         kind: 'language' },
+  { name: 'Swift',      iconUrl: DEVICON('swift'),           tier: 'full',         kind: 'language' },
+  { name: 'Dart',       iconUrl: DEVICON('dart'),            tier: 'full',         kind: 'language' },
+  { name: 'Elixir',     iconUrl: DEVICON('elixir'),          tier: 'full',         kind: 'language' },
+  { name: 'Scala',      iconUrl: DEVICON('scala'),           tier: 'full',         kind: 'language' },
+  { name: 'Lua',        iconUrl: DEVICON('lua'),             tier: 'full',         kind: 'language' },
+
+  // ── Languages — dependency scanning only (no import graph) ───────────────
+  { name: 'C',          iconUrl: DEVICON('c'),               tier: 'dependencies', kind: 'language' },
+  { name: 'C++',        iconUrl: DEVICON('cplusplus'),       tier: 'dependencies', kind: 'language' },
+  { name: 'Haskell',    iconUrl: DEVICON('haskell'),         tier: 'dependencies', kind: 'language' },
+  { name: 'Zig',        iconUrl: DEVICON('zig', 'original'), tier: 'dependencies', kind: 'language' },
 
   // ── Frameworks — detected via dependency manifests ───────────────────────
   { name: 'React',      iconUrl: DEVICON('react'),           tier: 'dependencies', kind: 'framework' },
@@ -55,6 +66,8 @@ export const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
   { name: 'Spring',     iconUrl: DEVICON('spring'),          tier: 'dependencies', kind: 'framework' },
   { name: 'Laravel',    iconUrl: DEVICON('laravel'),         tier: 'dependencies', kind: 'framework' },
   { name: 'Node.js',    iconUrl: DEVICON('nodejs'),          tier: 'dependencies', kind: 'framework' },
+  { name: 'Flutter',    iconUrl: DEVICON('flutter'),         tier: 'dependencies', kind: 'framework' },
+  { name: 'Phoenix',    iconUrl: DEVICON('phoenix', 'plain'), tier: 'dependencies', kind: 'framework' },
 
   // ── Tools — infrastructure we inspect ────────────────────────────────────
   { name: 'Docker',     iconUrl: DEVICON('docker'),          tier: 'dependencies', kind: 'tool' },

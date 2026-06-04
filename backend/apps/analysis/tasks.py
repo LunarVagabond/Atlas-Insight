@@ -25,7 +25,7 @@ from .ownership_analysis import analyze_ownership
 from .project_structure import analyze_structure
 from .project_structure.tech_stack import detect_tech_stack
 from .readme_parser import parse_readme
-from .repo_type import detect_repo_type
+from .repo_type import detect_docs_only, detect_repo_type
 from .security_scan import scan_security
 from .todo_scan import scan_todos
 from .vuln_scan import scan_vulnerabilities
@@ -149,87 +149,152 @@ def analyze_repository(self, run_id: str):
         run.progress_step = 'parsing'
         run.save(update_fields=['progress_step'])
 
+        is_docs_only = detect_docs_only(repo_dir)
         commits = analyze_commits(repo_obj)
-        edges = parse_imports(repo_dir)
-
-        repo_type_info = detect_repo_type(repo_dir)
-        if repo_type_info['type'] != 'single':
-            try:
-                repo_type_result = _analyze_sub_projects(repo_type_info, edges, repo_obj, commits)
-            except Exception:
-                logger.warning('Sub-project analysis failed — continuing without repo_type', exc_info=True)
-                repo_type_result = None
-        else:
-            repo_type_result = None
-
-        graph = analyze_graph(edges)
-        deps = analyze_dependencies(repo_dir)
         readme = parse_readme(repo_dir)
-        structure = analyze_structure(repo_obj, repo_dir, deps=deps)
-        security = scan_security(repo_obj, repo_dir)
-        security['vulnerabilities'] = scan_vulnerabilities(deps)
-        todos = scan_todos(repo_dir)
 
-        run.progress_step = 'metadata'
-        run.save(update_fields=['progress_step'])
+        if is_docs_only:
+            _empty_graph = {
+                'node_count': 0, 'edge_count': 0, 'cycles': [], 'cycle_count': 0,
+                'god_modules': [], 'hotspots': [], 'nodes': [], 'edges': [],
+            }
+            _empty_deps = {'dependencies': [], 'dev_dependencies': [], 'tech_stack': []}
+            structure = analyze_structure(repo_obj, repo_dir, deps=_empty_deps)
+            security = scan_security(repo_obj, repo_dir)
+            security['vulnerabilities'] = []
 
-        github_meta = fetch_github_meta(run.repo.owner, run.repo.name, token=pat)
-        contribution_data = github_meta.pop('contribution_data', None)
-        github_languages = github_meta.pop('github_languages', None)
+            run.progress_step = 'metadata'
+            run.save(update_fields=['progress_step'])
 
-        # GitHub is authoritative for anything it provides — replace locally-computed values
-        if github_languages:
-            structure['languages'] = github_languages
+            github_meta = fetch_github_meta(run.repo.owner, run.repo.name, token=pat)
+            github_meta.pop('contribution_data', None)
+            github_languages = github_meta.pop('github_languages', None)
+            if github_languages:
+                structure['languages'] = github_languages
 
-        releases_meta = github_meta.get('releases_meta')
-        if releases_meta:
-            structure['release_count'] = releases_meta.get('stable_count', structure['release_count'])
-            if releases_meta.get('latest_stable'):
-                structure['last_release'] = {
-                    'name': releases_meta['latest_stable']['name'],
-                    'date': releases_meta['latest_stable']['date'],
-                }
+            releases_meta = github_meta.get('releases_meta')
+            if releases_meta:
+                structure['release_count'] = releases_meta.get('stable_count', structure['release_count'])
+                if releases_meta.get('latest_stable'):
+                    structure['last_release'] = {
+                        'name': releases_meta['latest_stable']['name'],
+                        'date': releases_meta['latest_stable']['date'],
+                    }
 
-        created_at = github_meta.get('created_at')
-        if created_at:
-            try:
-                created_dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-                structure['repo_age_days'] = (datetime.now(_tz.utc) - created_dt).days
-            except Exception:
-                pass
+            created_at = github_meta.get('created_at')
+            if created_at:
+                try:
+                    created_dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    structure['repo_age_days'] = (datetime.now(_tz.utc) - created_dt).days
+                except Exception:
+                    pass
 
-        run.progress_step = 'heuristics'
-        run.save(update_fields=['progress_step'])
+            run.progress_step = 'heuristics'
+            run.save(update_fields=['progress_step'])
 
-        signals = compute_heuristics(commits, graph, deps, readme, structure, security)
-        oss_score = compute_oss_score(signals)
-        classification = classify_repo(
-            commits, graph, deps, readme, structure, security, github_meta
-        )
+            classification = classify_repo(
+                commits, _empty_graph, _empty_deps, readme, structure, security, github_meta
+            )
 
-        run.progress_step = 'finalizing'
-        run.save(update_fields=['progress_step'])
+            run.progress_step = 'finalizing'
+            run.save(update_fields=['progress_step'])
 
-        result = {
-            'commits': commits,
-            'graph': graph,
-            'dependencies': deps,
-            'heuristics': signals,
-            'oss_score': oss_score,
-            'readme': readme,
-            'structure': structure,
-            'security': security,
-            'github_meta': github_meta,
-            'classification': classification,
-            'todos': todos,
-            'arch_tours': generate_arch_tours(structure, graph, commits),
-            'ownership': analyze_ownership(structure, commits, graph),
-            'contribution_opportunities': analyze_contributions(
-                commits, graph, deps, readme, structure, security, contribution_data, todos=todos
-            ),
-        }
-        if repo_type_result is not None:
-            result['repo_type'] = repo_type_result
+            result = {
+                'is_docs_only': True,
+                'commits': commits,
+                'graph': _empty_graph,
+                'dependencies': _empty_deps,
+                'heuristics': [],
+                'oss_score': 0,
+                'readme': readme,
+                'structure': structure,
+                'security': security,
+                'github_meta': github_meta,
+                'classification': classification,
+                'todos': {'todos': [], 'total': 0, 'by_type': {}},
+                'arch_tours': [],
+                'ownership': analyze_ownership(structure, commits, _empty_graph),
+                'contribution_opportunities': [],
+            }
+        else:
+            edges = parse_imports(repo_dir)
+
+            repo_type_info = detect_repo_type(repo_dir)
+            if repo_type_info['type'] != 'single':
+                try:
+                    repo_type_result = _analyze_sub_projects(repo_type_info, edges, repo_obj, commits)
+                except Exception:
+                    logger.warning('Sub-project analysis failed — continuing without repo_type', exc_info=True)
+                    repo_type_result = None
+            else:
+                repo_type_result = None
+
+            graph = analyze_graph(edges)
+            deps = analyze_dependencies(repo_dir)
+            structure = analyze_structure(repo_obj, repo_dir, deps=deps)
+            security = scan_security(repo_obj, repo_dir)
+            security['vulnerabilities'] = scan_vulnerabilities(deps)
+            todos = scan_todos(repo_dir)
+
+            run.progress_step = 'metadata'
+            run.save(update_fields=['progress_step'])
+
+            github_meta = fetch_github_meta(run.repo.owner, run.repo.name, token=pat)
+            contribution_data = github_meta.pop('contribution_data', None)
+            github_languages = github_meta.pop('github_languages', None)
+
+            if github_languages:
+                structure['languages'] = github_languages
+
+            releases_meta = github_meta.get('releases_meta')
+            if releases_meta:
+                structure['release_count'] = releases_meta.get('stable_count', structure['release_count'])
+                if releases_meta.get('latest_stable'):
+                    structure['last_release'] = {
+                        'name': releases_meta['latest_stable']['name'],
+                        'date': releases_meta['latest_stable']['date'],
+                    }
+
+            created_at = github_meta.get('created_at')
+            if created_at:
+                try:
+                    created_dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    structure['repo_age_days'] = (datetime.now(_tz.utc) - created_dt).days
+                except Exception:
+                    pass
+
+            run.progress_step = 'heuristics'
+            run.save(update_fields=['progress_step'])
+
+            signals = compute_heuristics(commits, graph, deps, readme, structure, security)
+            oss_score = compute_oss_score(signals)
+            classification = classify_repo(
+                commits, graph, deps, readme, structure, security, github_meta
+            )
+
+            run.progress_step = 'finalizing'
+            run.save(update_fields=['progress_step'])
+
+            result = {
+                'commits': commits,
+                'graph': graph,
+                'dependencies': deps,
+                'heuristics': signals,
+                'oss_score': oss_score,
+                'readme': readme,
+                'structure': structure,
+                'security': security,
+                'github_meta': github_meta,
+                'classification': classification,
+                'todos': todos,
+                'arch_tours': generate_arch_tours(structure, graph, commits),
+                'ownership': analyze_ownership(structure, commits, graph),
+                'contribution_opportunities': analyze_contributions(
+                    commits, graph, deps, readme, structure, security, contribution_data, todos=todos
+                ),
+            }
+            if repo_type_result is not None:
+                result['repo_type'] = repo_type_result
         run.result = result
         run.status = 'completed'
         run.progress_step = ''

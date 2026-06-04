@@ -8241,6 +8241,27 @@
   }
 }
 
+.docs-only-banner {
+  display: flex;
+  align-items: center;
+  gap: $space-3;
+  padding: $space-3 $space-4;
+  background: rgba(99, 179, 237, 0.10);
+  border: 1px solid rgba(99, 179, 237, 0.30);
+  border-radius: $radius-md;
+  margin-bottom: $space-4;
+
+  &__icon {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+
+  &__text {
+    font-size: 0.9rem;
+    color: var(--color-info, #63b3ed);
+  }
+}
+
 // ===== EMBED PANEL =====
 .embed-panel {
   background: var(--color-surface);

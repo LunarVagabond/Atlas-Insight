@@ -9,6 +9,7 @@ from apps.analysis.repo_type import (
     _dep_files_in_dir,
     _is_real_package_json,
     _quick_languages,
+    detect_docs_only,
     detect_repo_type,
     SubProject,
 )
@@ -233,3 +234,39 @@ class TestDetectRepoType:
             result = detect_repo_type(d)
         backend = next(sp for sp in result['sub_projects'] if sp['name'] == 'backend')
         assert 'Python' in backend['languages']
+
+
+class TestDetectDocsOnly:
+    def _make_repo(self, tmp_path: Path, files: list[str]) -> str:
+        for fname in files:
+            p = tmp_path / fname
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text('content')
+        return str(tmp_path)
+
+    def test_all_markdown_is_docs_only(self, tmp_path):
+        d = self._make_repo(tmp_path, [f'doc{i}.md' for i in range(20)])
+        assert detect_docs_only(d) is True
+
+    def test_mixed_mostly_docs(self, tmp_path):
+        files = [f'doc{i}.md' for i in range(18)] + ['main.py', 'util.py']
+        d = self._make_repo(tmp_path, files)
+        assert detect_docs_only(d) is True
+
+    def test_code_repo_not_docs_only(self, tmp_path):
+        files = [f'module{i}.py' for i in range(10)] + ['README.md']
+        d = self._make_repo(tmp_path, files)
+        assert detect_docs_only(d) is False
+
+    def test_too_few_files_not_docs_only(self, tmp_path):
+        d = self._make_repo(tmp_path, ['README.md', 'CONTRIBUTING.md'])
+        assert detect_docs_only(d) is False
+
+    def test_no_code_no_docs_not_docs_only(self, tmp_path):
+        d = self._make_repo(tmp_path, ['image.png', 'data.json', 'config.yaml'])
+        assert detect_docs_only(d) is False
+
+    def test_rst_and_txt_count_as_docs(self, tmp_path):
+        files = [f'page{i}.rst' for i in range(10)] + [f'note{i}.txt' for i in range(5)]
+        d = self._make_repo(tmp_path, files)
+        assert detect_docs_only(d) is True

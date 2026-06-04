@@ -28,7 +28,33 @@ LANG_EXT_MAP = {
     '.dart': 'Dart',
     '.ex': 'Elixir',
     '.exs': 'Elixir',
+    '.scala': 'Scala',
+    '.lua': 'Lua',
+    '.c': 'C',
+    '.h': 'C',
+    '.cpp': 'C++',
+    '.cc': 'C++',
+    '.cxx': 'C++',
+    '.hpp': 'C++',
+    '.hxx': 'C++',
+    '.hs': 'Haskell',
+    '.zig': 'Zig',
+    '.sh': 'Shell',
+    '.bash': 'Shell',
+    '.nim': 'Nim',
+    '.cr': 'Crystal',
+    '.clj': 'Clojure',
+    '.cljs': 'Clojure',
+    '.erl': 'Erlang',
+    '.hrl': 'Erlang',
 }
+
+_DOC_EXTENSIONS = frozenset({
+    '.md', '.mdx', '.rst', '.txt', '.html', '.htm', '.adoc', '.asciidoc',
+    '.tex', '.org', '.wiki', '.textile', '.pod',
+})
+
+_CODE_EXTENSIONS = frozenset(LANG_EXT_MAP.keys())
 
 
 @dataclass
@@ -38,6 +64,29 @@ class SubProject:
     abs_path: str
     dep_files: list[str] = field(default_factory=list)
     languages: list[str] = field(default_factory=list)
+
+
+def detect_docs_only(repo_dir: str) -> bool:
+    """Return True if the repo is primarily documentation with negligible code."""
+    code_count = 0
+    doc_count = 0
+    skip_dirs = {'.git', 'node_modules', '__pycache__', 'vendor', 'dist', 'build', '.venv', 'venv'}
+    try:
+        for root, dirs, files in os.walk(repo_dir):
+            dirs[:] = [d for d in dirs if d not in skip_dirs and not d.startswith('.')]
+            for fname in files:
+                ext = os.path.splitext(fname)[1].lower()
+                if ext in _CODE_EXTENSIONS:
+                    code_count += 1
+                elif ext in _DOC_EXTENSIONS:
+                    doc_count += 1
+    except OSError:
+        return False
+
+    total = code_count + doc_count
+    if total < 5:
+        return False
+    return code_count == 0 or (doc_count / total) >= 0.85
 
 
 def detect_repo_type(repo_dir: str) -> dict:
@@ -110,6 +159,11 @@ def _dep_files_in_dir(directory: Path) -> list[str]:
     candidates = [
         'requirements.txt', 'pyproject.toml', 'setup.py', 'setup.cfg',
         'go.mod', 'Cargo.toml', 'Gemfile',
+        'CMakeLists.txt', 'conanfile.txt', 'conanfile.py', 'vcpkg.json',
+        'build.sbt', 'build.gradle', 'build.gradle.kts',
+        'pubspec.yaml',
+        'mix.exs',
+        'stack.yaml', 'cabal.project',
     ]
     found = [f for f in candidates if (directory / f).exists()]
 

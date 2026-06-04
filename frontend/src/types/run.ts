@@ -29,6 +29,7 @@ export interface RepoTypeInfo {
 }
 
 export interface RunResult {
+  is_docs_only?: boolean
   commits: CommitData
   graph: GraphData
   dependencies: DepsData
