@@ -463,6 +463,7 @@ function renderMd(text: string): string {
         <ol class="about-view__steps">
           <li>Paste a GitHub repository URL into the input on the home page.</li>
           <li>Click <strong>Analyze</strong>. Analysis takes 30–90 seconds for most repos.</li>
+          <li>To analyze a non-default branch, use the branch selector next to the URL bar — pick any branch and re-analyze. Each branch gets its own cached result.</li>
           <li>Explore the tabs — each one surfaces a different lens on the codebase.</li>
           <li>Share the permalink or export raw JSON for further processing.</li>
         </ol>
