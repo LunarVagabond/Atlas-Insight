@@ -144,6 +144,7 @@ def get_similar_runs(request, run_id: uuid.UUID):
 
     qs = AnalysisRun.objects.select_related('repo').filter(
         status='completed',
+        branch='',
         repo__is_private=False,
     ).exclude(repo=run.repo).order_by('-completed_at')
 

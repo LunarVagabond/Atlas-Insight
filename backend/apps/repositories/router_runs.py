@@ -269,6 +269,18 @@ def analyze(request, payload: AnalyzeRequest):
         repo.save(update_fields=['auth_token'])
 
     branch = (payload.branch or '').strip()
+    # Normalize: if the requested branch is the repo's default branch, store as ''
+    # so it doesn't count as a separate scanned branch from default-branch runs.
+    if branch:
+        default_run = (
+            repo.runs
+            .filter(status='completed', branch='')
+            .values('result__github_meta__default_branch')
+            .first()
+        )
+        default_name = (default_run or {}).get('result__github_meta__default_branch') or ''
+        if default_name and branch == default_name:
+            branch = ''
     latest_sha = fetch_latest_sha(owner, name, token=token, branch=branch)
 
     if latest_sha:

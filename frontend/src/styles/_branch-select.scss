@@ -185,6 +185,19 @@
   white-space: nowrap;
 }
 
+.branch-total-count {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.docs-only-header-note {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
 .stale-branch-notice {
   display: flex;
   align-items: flex-start;

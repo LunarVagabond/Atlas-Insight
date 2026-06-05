@@ -440,6 +440,8 @@ onUnmounted(() => {
           @update:model-value="onBranchSelect"
         />
         <span v-else class="branch-select__loading">Loading branches…</span>
+        <span v-if="store.branches !== null" class="branch-total-count">({{ store.branches.length }} total branches)</span>
+        <span v-if="isDocsOnly" class="docs-only-header-note">📄 Documentation repository — code analysis tabs hidden</span>
         <span v-if="result.commits?.abandoned" class="branch-stale-badge" title="No commits in the last year — this branch is inactive">
           Stale branch
         </span>
@@ -503,10 +505,7 @@ onUnmounted(() => {
           <span class="archived-banner__icon">📦</span>
           <span class="archived-banner__text">This repository is <strong>archived</strong> — read-only, no longer accepting contributions.</span>
         </div>
-        <div v-if="isDocsOnly" class="docs-only-banner" role="note">
-          <span class="docs-only-banner__icon">📄</span>
-          <span class="docs-only-banner__text">This is a <strong>documentation repository</strong> — code analysis tabs are hidden.</span>
-        </div>
+
         <Transition name="fade">
           <div v-if="showEmbed" class="embed-panel">
             <div class="embed-panel__header">
