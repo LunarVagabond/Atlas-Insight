@@ -43,7 +43,11 @@ def scan_todos(repo_dir: str) -> dict:
                     if not m:
                         continue
                     marker_type = m.group(1).upper()
-                    text = _ARTIFACT_RE.sub('', m.group(2).strip()).strip()[:120]
+                    raw = m.group(2).strip()
+                    # Truncate at literal \n — signals we matched inside a string literal
+                    if '\\n' in raw:
+                        raw = raw.split('\\n')[0]
+                    text = _ARTIFACT_RE.sub('', raw).strip()[:120]
                     total += 1
                     by_type[marker_type] = by_type.get(marker_type, 0) + 1
                     if len(items) < MAX_ITEMS:
