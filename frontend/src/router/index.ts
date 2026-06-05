@@ -71,6 +71,11 @@ const router = createRouter({
       component: () => import('../views/TrendingView.vue'),
     },
     {
+      path: '/docs/:slug',
+      name: 'docs',
+      component: () => import('../views/DocsPageView.vue'),
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('../views/NotFoundView.vue'),

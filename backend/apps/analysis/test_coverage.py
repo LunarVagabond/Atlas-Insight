@@ -6,6 +6,7 @@ _MIN_SOURCE_FILES_PER_DIR = 3
 _TEST_FILE_PATTERNS = (
     'test_', '_test.', '.test.', '.spec.', '_spec.',
     'tests/', '__tests__/', 'test/', 'spec/',
+    '_spec.lua', 'test_',
 )
 _FRAMEWORK_SIGNATURES = {
     'pytest':       {'conftest.py', 'pytest.ini', 'pyproject.toml', 'setup.cfg'},
@@ -20,6 +21,7 @@ _FRAMEWORK_SIGNATURES = {
     'phpunit':      {'phpunit.xml', 'phpunit.xml.dist'},
     'xunit':        {'xunit.runner.json'},
     'junit':        {'pom.xml'},
+    'busted':       {'.busted', 'spec/'},
 }
 
 

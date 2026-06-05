@@ -9,9 +9,92 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: atlas_insight
+          POSTGRES_USER: atlas
+          POSTGRES_PASSWORD: atlas_secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install backend deps
+        run: python -m venv backend/.venv && backend/.venv/bin/pip install -r backend/requirements-dev.txt
+
+      - name: Run backend tests
+        working-directory: backend
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.development
+          SECRET_KEY: ci-secret-key-not-for-production
+          DEBUG: 'True'
+          ALLOWED_HOSTS: localhost,127.0.0.1
+          POSTGRES_DB: atlas_insight
+          POSTGRES_USER: atlas
+          POSTGRES_PASSWORD: atlas_secret
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          CELERY_BROKER_URL: redis://localhost:6379/0
+          CELERY_RESULT_BACKEND: redis://localhost:6379/1
+          GITHUB_TOKEN: ''
+          FRONTEND_URL: http://localhost:4501
+          REPO_CACHE_DIR: _running/repo_cache
+          STALE_AFTER_DAYS: '7'
+          EVICT_AFTER_HOURS: '24'
+          MAX_CACHE_GB: '10'
+          RUNS_TO_KEEP_PER_REPO: '10'
+          LOG_TO_FILE: 'False'
+          LOG_LEVEL: INFO
+          LOG_RETENTION_DAYS: '30'
+          SECURE_SSL_REDIRECT: 'False'
+          FIELD_ENCRYPTION_KEY: ''
+          SITE_NAME: Atlas Insight
+        run: .venv/bin/pytest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Frontend type check
+        working-directory: frontend
+        run: node_modules/.bin/vue-tsc --noEmit
+
+      - name: Frontend tests
+        working-directory: frontend
+        run: npm test
+
   build-backend:
     name: Backend image
     runs-on: ubuntu-latest
+    needs: test
     permissions:
       contents: read
       packages: write
@@ -48,6 +131,7 @@ jobs:
   build-frontend:
     name: Frontend image
     runs-on: ubuntu-latest
+    needs: test
     permissions:
       contents: read
       packages: write

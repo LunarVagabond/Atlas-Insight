@@ -100,7 +100,9 @@ class TestCooldownUntil:
         from apps.repositories.router_runs import _cooldown_until
         repo = Repository.objects.create(
             url='https://github.com/cool/test2', owner='cool', name='test2',
-            last_analyzed_at=timezone.now(),
+        )
+        AnalysisRun.objects.create(
+            repo=repo, status='completed', branch='', completed_at=timezone.now()
         )
         result = _cooldown_until(repo)
         assert result is not None

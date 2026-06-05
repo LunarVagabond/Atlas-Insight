@@ -32,7 +32,7 @@ class TestIssuesEndpoint:
     @patch('apps.repositories.router_jit.fetch_contribution_data')
     def test_cache_miss_calls_github(self, mock_fetch, completed_run):
         mock_fetch.return_value = {
-            'issues': [{'number': 1, 'title': 'Bug'}],
+            'issues': [{'number': 1, 'title': 'Bug', 'url': 'https://github.com/test/repo/issues/1', 'labels': ['bug'], 'body_excerpt': ''}],
             'pr_issue_refs': [],
         }
         resp = self.client.get(f'/api/v1/repositories/runs/{completed_run.id}/issues')
@@ -43,7 +43,7 @@ class TestIssuesEndpoint:
 
     @patch('apps.repositories.router_jit.fetch_contribution_data')
     def test_cache_hit_skips_github(self, mock_fetch, completed_run):
-        cache.set(f'jit_{completed_run.id}_issues', [{'number': 99, 'title': 'Cached'}], 900)
+        cache.set(f'jit_{completed_run.id}_issues', [{'number': 99, 'title': 'Cached', 'url': 'https://github.com/test/repo/issues/99', 'labels': [], 'body_excerpt': ''}], 900)
         resp = self.client.get(f'/api/v1/repositories/runs/{completed_run.id}/issues')
         assert resp.status_code == 200
         assert resp.json()[0]['number'] == 99
@@ -62,7 +62,7 @@ class TestPrsEndpoint:
 
     @patch('apps.repositories.router_jit.fetch_contribution_data')
     def test_returns_pr_structure(self, mock_fetch, completed_run):
-        mock_fetch.return_value = {'issues': [], 'pr_issue_refs': [{'number': 5}]}
+        mock_fetch.return_value = {'issues': [], 'pr_issue_refs': [5]}
         resp = self.client.get(f'/api/v1/repositories/runs/{completed_run.id}/prs')
         assert resp.status_code == 200
         data = resp.json()
@@ -71,7 +71,7 @@ class TestPrsEndpoint:
 
     @patch('apps.repositories.router_jit.fetch_contribution_data')
     def test_cache_hit_skips_github(self, mock_fetch, completed_run):
-        cached_result = {'pr_issue_refs': [{'number': 42}], 'open_prs': 1}
+        cached_result = {'pr_issue_refs': [42], 'open_prs': 1}
         cache.set(f'jit_{completed_run.id}_prs', cached_result, 900)
         resp = self.client.get(f'/api/v1/repositories/runs/{completed_run.id}/prs')
         assert resp.status_code == 200

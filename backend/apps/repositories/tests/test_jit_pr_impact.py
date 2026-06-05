@@ -128,11 +128,18 @@ class TestPrImpactEndpoint:
     @patch('requests.get')
     def test_cache_hit_skips_github(self, mock_get, db):
         run = _make_run(db)
-        cached = {'pr_number': 42, 'cached': True}
+        cached = {
+            'pr_number': 42, 'title': 'Fix bug', 'state': 'open',
+            'pr_url': 'https://github.com/test/repo/pull/42', 'author': 'alice',
+            'additions': 10, 'deletions': 2, 'files_changed': 1,
+            'complexity_score': 15.0, 'complexity_label': 'low',
+            'touches_god_module': False, 'touches_deps': False,
+            'complexity_notes': [], 'affected_subsystems': [], 'suggested_reviewers': [],
+        }
         cache.set(f'jit_{run.id}_pr_impact_42', cached, 900)
         resp = self.client.get(f'/api/v1/repositories/runs/{run.id}/pr-impact?pr=42')
         assert resp.status_code == 200
-        assert resp.json()['cached'] is True
+        assert resp.json()['pr_number'] == 42
         mock_get.assert_not_called()
 
     def test_unknown_run_returns_404(self):

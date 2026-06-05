@@ -44,7 +44,167 @@ class SimilarRunOut(Schema):
     stars: int
 
 
-@router.get('/runs/{run_id}/issues')
+class IssueOut(Schema):
+    number: int
+    title: str
+    url: str
+    labels: list[str]
+    body_excerpt: str
+
+
+class PrsOut(Schema):
+    pr_issue_refs: list[int]
+    open_prs: int
+
+
+class HeuristicDeltaOut(Schema):
+    signal: str
+    label: str
+    before: float
+    after: float
+    delta: float
+    direction: str
+
+
+class DepDeltaOut(Schema):
+    added: list[str]
+    removed: list[str]
+    added_count: int
+    removed_count: int
+
+
+class ContribDeltaOut(Schema):
+    before: int
+    after: int
+    delta: int
+
+
+class GraphDeltaOut(Schema):
+    nodes_before: int
+    nodes_after: int
+    nodes_delta: int
+    god_modules_before: int
+    god_modules_after: int
+    god_modules_delta: int
+
+
+class StructDeltaOut(Schema):
+    files_before: int
+    files_after: int
+    files_delta: int
+    test_ratio_before: float
+    test_ratio_after: float
+
+
+class ClassDeltaItem(Schema):
+    before_label: Optional[str]
+    after_label: Optional[str]
+    delta: float
+    changed: bool
+
+
+class ClassDeltaOut(Schema):
+    project_health: Optional[ClassDeltaItem] = None
+    contribution_difficulty: Optional[ClassDeltaItem] = None
+    documentation_grade: Optional[ClassDeltaItem] = None
+    code_complexity: Optional[ClassDeltaItem] = None
+
+
+class DiffOut(Schema):
+    available: bool
+    previous_run_id: Optional[str] = None
+    previous_triggered_at: Optional[str] = None
+    heuristics: list[HeuristicDeltaOut] = []
+    dependencies: Optional[DepDeltaOut] = None
+    contributors: Optional[ContribDeltaOut] = None
+    graph: Optional[GraphDeltaOut] = None
+    structure: Optional[StructDeltaOut] = None
+    classification: Optional[ClassDeltaOut] = None
+
+
+class FileCommitOut(Schema):
+    sha: str
+    full_sha: str
+    message: str
+    date: str
+    author: str
+    url: str
+    issue_refs: list[int]
+
+
+class FileHistoryOut(Schema):
+    path: str
+    commits: list[FileCommitOut]
+
+
+class VulnOut(Schema):
+    name: str
+    version: str
+    ecosystem: str
+    vuln_id: str
+    summary: str
+    severity: Optional[str]
+    severity_score: Optional[float]
+    url: str
+
+
+class VulnerabilitiesOut(Schema):
+    checked: int
+    vulnerable: list[VulnOut]
+
+
+class AiSummaryOut(Schema):
+    summary: str
+
+
+class SubsystemHitOut(Schema):
+    id: str
+    name: str
+    subsystem_type: str
+    activity_score: float
+    has_god_modules: bool
+    matched_files: int
+
+
+class ReviewerOut(Schema):
+    author: str
+    email: str
+    pr_files_touched: int
+    match_reason: str
+
+
+class PrImpactOut(Schema):
+    pr_number: int
+    title: str
+    state: str
+    pr_url: str
+    author: str
+    additions: int
+    deletions: int
+    files_changed: int
+    complexity_score: float
+    complexity_label: str
+    touches_god_module: bool
+    touches_deps: bool
+    complexity_notes: list[str]
+    affected_subsystems: list[SubsystemHitOut]
+    suggested_reviewers: list[ReviewerOut]
+
+
+class ConstellationEdgeOut(Schema):
+    repo_id: str
+    owner: str
+    name: str
+    run_id: str
+    ref_type: str
+    evidence: str
+
+
+class ConstellationOut(Schema):
+    related: list[ConstellationEdgeOut]
+
+
+@router.get('/runs/{run_id}/issues', response=list[IssueOut])
 @ratelimit(key='user_or_ip', rate='30/m', method='GET', block=False)
 def get_run_issues(request, run_id: uuid.UUID):
     _assert_not_limited(request)
@@ -68,7 +228,7 @@ def get_run_issues(request, run_id: uuid.UUID):
     return issues
 
 
-@router.get('/runs/{run_id}/prs')
+@router.get('/runs/{run_id}/prs', response=PrsOut)
 @ratelimit(key='user_or_ip', rate='30/m', method='GET', block=False)
 def get_run_prs(request, run_id: uuid.UUID):
     _assert_not_limited(request)
@@ -96,7 +256,7 @@ def get_run_prs(request, run_id: uuid.UUID):
     return result
 
 
-@router.get('/runs/{run_id}/diff')
+@router.get('/runs/{run_id}/diff', response=DiffOut)
 @ratelimit(key='user_or_ip', rate='60/m', method='GET', block=False)
 def get_run_diff(request, run_id: uuid.UUID):
     _assert_not_limited(request)
@@ -180,7 +340,7 @@ def get_similar_runs(request, run_id: uuid.UUID):
     return results
 
 
-@router.get('/runs/{run_id}/file-history')
+@router.get('/runs/{run_id}/file-history', response=FileHistoryOut)
 @ratelimit(key='user_or_ip', rate='30/m', method='GET', block=False)
 def get_file_history(request, run_id: uuid.UUID, path: str = ''):
     _assert_not_limited(request)
@@ -237,7 +397,7 @@ def get_file_history(request, run_id: uuid.UUID, path: str = ''):
     return result
 
 
-@router.get('/runs/{run_id}/vulnerabilities')
+@router.get('/runs/{run_id}/vulnerabilities', response=VulnerabilitiesOut)
 @ratelimit(key='user_or_ip', rate='30/m', method='GET', block=False)
 def get_run_vulnerabilities(request, run_id: uuid.UUID):
     _assert_not_limited(request)
@@ -320,7 +480,7 @@ def get_run_vulnerabilities(request, run_id: uuid.UUID):
     return result
 
 
-@router.get('/runs/{run_id}/ai-summary')
+@router.get('/runs/{run_id}/ai-summary', response=AiSummaryOut)
 @ratelimit(key='user_or_ip', rate='60/m', method='GET', block=False)
 def get_ai_summary(request, run_id: uuid.UUID):
     """AI onboarding brief — paste this at the start of a chat to orient the AI to the project."""
@@ -556,7 +716,7 @@ def get_ai_summary(request, run_id: uuid.UUID):
     return {'summary': summary}
 
 
-@router.get('/runs/{run_id}/pr-impact')
+@router.get('/runs/{run_id}/pr-impact', response=PrImpactOut)
 @ratelimit(key='user_or_ip', rate='30/m', method='GET', block=False)
 def get_pr_impact(request, run_id: uuid.UUID, pr: int):
     _assert_not_limited(request)
@@ -661,7 +821,7 @@ def get_pr_impact(request, run_id: uuid.UUID, pr: int):
     return impact
 
 
-@router.get('/runs/{run_id}/constellation')
+@router.get('/runs/{run_id}/constellation', response=ConstellationOut)
 @ratelimit(key='user_or_ip', rate='60/m', method='GET', block=False)
 def get_constellation(request, run_id: uuid.UUID):
     _assert_not_limited(request)

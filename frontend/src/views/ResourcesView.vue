@@ -24,6 +24,16 @@ const TYPE_LABELS: Record<Resource['type'], string> = {
 
 const SECTIONS: ResourceSection[] = [
   {
+    heading: 'Atlas Insight API',
+    intro: 'Machine-readable docs, schema references, and integration guides for building on top of Atlas Insight.',
+    items: [
+      { title: 'Interactive API Docs', url: '/api/docs', desc: 'Try every endpoint live in your browser. Full request/response schemas, auth setup, and example payloads. Powered by Swagger UI.', free: true, type: 'docs' },
+      { title: 'OpenAPI Schema (JSON)', url: '/api/openapi.json', desc: 'Machine-readable OpenAPI 3.x schema. Import into Postman, Insomnia, or any OpenAPI-compatible tool. Always reflects the live API.', free: true, type: 'tool' },
+      { title: 'API Reference', url: '/docs/api', desc: 'Human-readable endpoint reference covering branch analysis, CI/CD integration, webhooks, and authentication. Includes curl examples.', free: true, type: 'docs' },
+      { title: 'Webhooks Guide', url: '/docs/webhooks', desc: 'How to receive push notifications when an analysis run completes. Includes payload schema and HMAC signature verification.', free: true, type: 'docs' },
+    ],
+  },
+  {
     heading: 'Git & Version Control',
     intro: 'Git is the foundation of modern software development. These resources go from absolute beginner to advanced internals.',
     items: [

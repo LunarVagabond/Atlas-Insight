@@ -1,3 +1,4 @@
+import json
 import os
 
 from django.conf import settings
@@ -5,6 +6,7 @@ from django.contrib import admin
 from django.http import FileResponse, HttpResponse
 from django.urls import include, path
 from ninja import NinjaAPI  # noqa: E402
+from ninja.openapi.docs import Swagger, _csrf_needed, _render_cdn_template
 
 from apps.api.router import router as api_router
 from apps.repositories.router import router as repositories_router
@@ -17,11 +19,26 @@ from config.error_views import (  # noqa: I001
     handler500 as custom_handler500,
 )
 
+
+class _CdnSwagger(Swagger):
+    """Always render the CDN-hosted Swagger UI — avoids relying on collectstatic."""
+
+    def render_page(self, request, api, **kwargs):
+        self.settings['url'] = self.get_openapi_url(api, kwargs)
+        context = {
+            'swagger_settings': json.dumps(self.settings, indent=1),
+            'api': api,
+            'add_csrf': _csrf_needed(api),
+        }
+        return _render_cdn_template(request, self.template_cdn, context)
+
+
 api = NinjaAPI(
     title='Atlas Insight API',
     version='1.0.0',
     description='Repository archaeology and static analysis platform.',
     docs_url='/docs',
+    docs=_CdnSwagger(),
 )
 api.add_router('/v1/', api_router)
 api.add_router('/v1/repositories/', repositories_router)

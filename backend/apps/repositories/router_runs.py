@@ -516,7 +516,9 @@ def get_branches(request, run_id: uuid.UUID):
 
 
 @router.get('/runs/{run_id}/timeline')
+@ratelimit(key='user_or_ip', rate='60/m', method='GET', block=False)
 def get_timeline(request, run_id: uuid.UUID):
+    _assert_not_limited(request)
     try:
         run = AnalysisRun.objects.select_related('repo').get(id=run_id, status='completed')
     except AnalysisRun.DoesNotExist:
@@ -536,7 +538,9 @@ def get_timeline(request, run_id: uuid.UUID):
 
 
 @router.delete('/runs/{run_id}', response={204: None})
+@ratelimit(key='user_or_ip', rate='30/m', method='DELETE', block=False)
 def delete_run(request, run_id: uuid.UUID):
+    _assert_not_limited(request)
     if not request.user.is_authenticated:
         raise HttpError(403, 'Authentication required')
     try:

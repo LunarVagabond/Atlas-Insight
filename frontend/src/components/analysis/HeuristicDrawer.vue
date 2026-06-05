@@ -136,6 +136,61 @@ const SIGNAL_INFO: Record<HeuristicSignalKey, SignalInfo> = {
     guidance:
       'Context matters: a summer slowdown or post-release quiet period is normal. Look at the commit timeline chart to distinguish a one-time dip from a sustained trend. Rising velocity is a strong signal of active investment.',
   },
+  license_risk: {
+    overview:
+      'Checks whether the repository has a machine-readable open source license and flags compatibility concerns when the detected SPDX identifier is a restrictive or copyleft license.',
+    raises: [
+      'No LICENSE file detected — repo is implicitly all-rights-reserved',
+      'License uses a restrictive or copyleft SPDX identifier',
+      'License file exists but is not a recognized SPDX expression',
+    ],
+    guidance:
+      'A missing license is the most impactful thing to fix — without one, downstream users cannot legally use, modify, or redistribute the code even if it is public. Adding an MIT, Apache-2.0, or similar permissive license takes minutes and removes a significant adoption barrier.',
+  },
+  complexity_debt: {
+    overview:
+      'Counts files that exceed a line-of-code threshold and flags high-complexity files that lack adjacent test files. Large, untested files are the highest-risk items for future refactoring.',
+    raises: [
+      'Files exceeding 500 LOC threshold',
+      'High-LOC files with no adjacent test file',
+      'Score scales with both the count and the size of over-threshold files',
+    ],
+    guidance:
+      'Large files are not automatically a problem — a 1000-line file with clear structure and full test coverage is fine. The concern is large files with no tests and high change frequency, which combine complexity, risk, and regressions.',
+  },
+  test_coverage: {
+    overview:
+      'Estimates test coverage by comparing the ratio of test files to source files across directories. Directories with source code but no test files are flagged as untested coverage gaps.',
+    raises: [
+      'Very low test-to-source file ratio across the repo',
+      'Source directories with no corresponding test files',
+      'Score is higher when untested directories contain many files',
+    ],
+    guidance:
+      'This metric counts files, not lines or branches — a directory with 20 source files and 1 test file still counts as covered. Focus first on directories that are completely absent from testing, then on raising overall test file density.',
+  },
+  cicd_maturity: {
+    overview:
+      'Evaluates the quality of the CI/CD pipeline beyond just its existence — looking for test steps, lint steps, and a meaningful workflow configuration. A CI pipeline that only builds the app without running tests offers limited safety.',
+    raises: [
+      'No CI workflows configured',
+      'CI configured but no test step detected in any workflow',
+      'CI configured but no lint or format check step',
+    ],
+    guidance:
+      'The most impactful addition is an automated test run on every push. Even a single `pytest` or `npm test` step in a GitHub Actions workflow catches regressions before they merge. Linting is a quick second step — most formatters run in under 10 seconds.',
+  },
+  container_hygiene: {
+    overview:
+      'Audits Dockerfiles for common security and best-practice issues: running as root, using deprecated or floating base image tags, missing health checks, and other patterns that increase container attack surface.',
+    raises: [
+      'Container process runs as root (no USER instruction)',
+      'Base image uses a floating tag like :latest or :stable',
+      'Other high-severity Dockerfile issues detected',
+    ],
+    guidance:
+      'Running containers as root is the most common and impactful issue — add a non-root USER instruction before the CMD. Pinning base image tags (e.g. python:3.12.3-slim instead of python:latest) improves reproducibility and eliminates surprise dependency updates.',
+  },
 }
 
 const info = computed(() =>
@@ -159,6 +214,8 @@ const ICONS: Record<HeuristicSignalKey, string> = {
   dependency_health: '📦', documentation_quality: '📝', ci_health: '⚙️',
   bus_factor_risk: '🚌', security_hygiene: '🔒', release_cadence: '🏷️',
   community_health: '🤝', commit_velocity: '📈',
+  license_risk: '⚖️', complexity_debt: '🧩', test_coverage: '🧪',
+  cicd_maturity: '🚀', container_hygiene: '🐳',
 }
 
 interface RepoInsightItem {
@@ -330,6 +387,68 @@ const repoInsight = computed<RepoInsightItem[] | null>(() => {
       if (priorAvg > 0) {
         const ratio = ((recentAvg / priorAvg) * 100).toFixed(0)
         items.push({ text: `${ratio}% of prior pace` })
+      }
+    }
+  }
+
+  if (sig === 'license_risk') {
+    const lic = r.structure?.license_type ?? r.structure?.license_file
+    if (!lic) {
+      items.push({ text: 'No license file detected', highlight: true, sub: 'legally all-rights-reserved without one' })
+    } else {
+      items.push({ text: lic, sub: 'detected license' })
+    }
+  }
+
+  if (sig === 'complexity_debt') {
+    const hotspots = (r as any)?.complexity?.hotspots ?? []
+    const threshold = (r as any)?.complexity?.threshold ?? 500
+    if (hotspots.length) {
+      for (const h of hotspots.slice(0, 5)) {
+        const noTest = !h.has_adjacent_test
+        items.push({ text: h.path ?? h.file ?? 'unknown', sub: `${h.lines ?? h.loc ?? '?'} lines${noTest ? ' · no adjacent tests' : ''}`, highlight: noTest, monospace: true })
+      }
+      if (hotspots.length > 5) items.push({ text: `…and ${hotspots.length - 5} more` })
+    } else {
+      items.push({ text: `No files exceed ${threshold} LOC` })
+    }
+  }
+
+  if (sig === 'test_coverage') {
+    const tc = (r as any)?.test_coverage
+    if (tc) {
+      const ratio = tc.test_ratio ?? 0
+      items.push({ text: `${(ratio * 100).toFixed(1)}% test file ratio`, highlight: ratio < 0.05 })
+      if (tc.framework_detected) items.push({ text: tc.framework_detected, sub: 'test framework detected' })
+      const untested = tc.untested_dirs ?? []
+      for (const d of untested.slice(0, 5)) {
+        items.push({ text: d, sub: 'no test files', highlight: true, monospace: true })
+      }
+      if (untested.length > 5) items.push({ text: `…and ${untested.length - 5} more untested directories` })
+    }
+  }
+
+  if (sig === 'cicd_maturity') {
+    const cicd = (r as any)?.cicd
+    if (cicd) {
+      items.push({ text: cicd.system ?? 'CI detected', sub: cicd.workflow_count ? `${cicd.workflow_count} workflow${cicd.workflow_count !== 1 ? 's' : ''}` : 'no workflows' })
+      const s = cicd.summary ?? {}
+      items.push({ text: s.has_tests ? '✓ Test step in CI' : '✗ No test step in CI', highlight: !s.has_tests })
+      items.push({ text: s.has_lint ? '✓ Lint step in CI' : '✗ No lint step in CI', highlight: !s.has_lint })
+      if (s.has_deploy != null) items.push({ text: s.has_deploy ? '✓ Deploy step present' : '✗ No deploy step' })
+    }
+  }
+
+  if (sig === 'container_hygiene') {
+    const cont = (r as any)?.container
+    if (cont) {
+      const dockerfiles = cont.dockerfiles ?? []
+      for (const d of dockerfiles.slice(0, 4)) {
+        const rootFlag = d.runs_as_root ? ' · runs as root' : ''
+        items.push({ text: d.path ?? 'Dockerfile', sub: `${(d.issues ?? []).length} issue${(d.issues ?? []).length !== 1 ? 's' : ''}${rootFlag}`, highlight: d.runs_as_root, monospace: true })
+        for (const issue of (d.issues ?? []).filter((i: any) => i.severity === 'high').slice(0, 2)) {
+          items.push({ text: issue.message ?? issue.code ?? 'high-severity issue', highlight: true })
+        }
       }
     }
   }

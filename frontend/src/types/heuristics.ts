@@ -10,6 +10,11 @@ export type HeuristicSignalKey =
   | 'release_cadence'
   | 'community_health'
   | 'commit_velocity'
+  | 'license_risk'
+  | 'complexity_debt'
+  | 'test_coverage'
+  | 'cicd_maturity'
+  | 'container_hygiene'
 
 export interface HeuristicSignal {
   signal: HeuristicSignalKey

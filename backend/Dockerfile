@@ -25,6 +25,7 @@ WORKDIR /app
 COPY --from=deps /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=deps /usr/local/bin /usr/local/bin
 COPY backend/ .
+COPY docs/ docs/
 COPY --from=git-stats /repo/backend/contributors_stats.json ./contributors_stats.json
 COPY backend/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

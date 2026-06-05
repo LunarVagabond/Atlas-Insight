@@ -1,9 +1,12 @@
 import re
 from pathlib import Path
 
-SCAN_EXTS = {'.py', '.js', '.ts', '.tsx', '.jsx', '.go', '.java', '.rb', '.rs', '.php', '.cs', '.cpp', '.c'}
+SCAN_EXTS = {'.py', '.js', '.ts', '.tsx', '.jsx', '.go', '.java', '.rb', '.rs', '.php', '.cs', '.cpp', '.c', '.lua'}
 SKIP_DIRS = {'node_modules', '.git', 'venv', '.venv', 'dist', 'build', '__pycache__', '.next', '.nuxt', 'coverage'}
 MARKER_RE = re.compile(r'(?:#|//)\s*(TODO|FIXME|HACK|XXX|BUG|OPTIMIZE)\b[:\s]*(.*)', re.IGNORECASE)
+# Strips trailing code artifacts that appear when the marker was inside a string literal:
+# e.g. "# HACK: msg\n')" captured from raise Exception('# HACK: msg\n')
+_ARTIFACT_RE = re.compile(r'(\\[nrt]|[\'\")\];,>])+$')
 MAX_FILE_BYTES = 512 * 1024
 MAX_ITEMS = 500
 
@@ -40,7 +43,7 @@ def scan_todos(repo_dir: str) -> dict:
                     if not m:
                         continue
                     marker_type = m.group(1).upper()
-                    text = m.group(2).strip()[:120]
+                    text = _ARTIFACT_RE.sub('', m.group(2).strip()).strip()[:120]
                     total += 1
                     by_type[marker_type] = by_type.get(marker_type, 0) + 1
                     if len(items) < MAX_ITEMS:

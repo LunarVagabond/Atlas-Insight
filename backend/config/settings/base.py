@@ -15,6 +15,7 @@ ALLOWED_HOSTS = config(
 )
 
 SITE_NAME = config('SITE_NAME', default='Atlas Insight')
+APP_VERSION = '1.0.0'
 
 # ── CORS / CSRF ──────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = config(
@@ -59,6 +60,7 @@ SILENCED_SYSTEM_CHECKS = ['django_ratelimit.W001']
 MIDDLEWARE = [
     'django_prometheus.middleware.PrometheusBeforeMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'apps.users.middleware.OAuthCallbackHostMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',

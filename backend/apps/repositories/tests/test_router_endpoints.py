@@ -109,9 +109,8 @@ class TestRetryRun:
 
     @patch('apps.repositories.router_runs.analyze_repository')
     def test_cooldown_blocks_retry(self, mock_task, completed_run):
-        # Simulate recent analysis
-        completed_run.repo.last_analyzed_at = timezone.now()
-        completed_run.repo.save(update_fields=['last_analyzed_at'])
+        completed_run.completed_at = timezone.now()
+        completed_run.save(update_fields=['completed_at'])
         client = Client()
         resp = client.post(f'/api/v1/repositories/runs/{completed_run.id}/retry')
         assert resp.status_code == 429
@@ -287,8 +286,9 @@ class TestFileHistory:
     def test_cache_hit_returns_cached_data(self, completed_run):
         path = 'src/main.py'
         path_hash = hashlib.md5(path.encode()).hexdigest()[:8]
+        branch_slug = completed_run.branch.replace('/', '_')[:20] if completed_run.branch else 'default'
         cached = {'path': path, 'commits': [{'sha': 'abc1234', 'message': 'fix', 'date': '', 'author': '', 'url': '', 'issue_refs': [], 'full_sha': 'abc1234abc1234'}]}
-        cache.set(f'jit_{completed_run.id}_fh_{path_hash}', cached, 900)
+        cache.set(f'jit_{completed_run.id}_fh_{branch_slug}_{path_hash}', cached, 900)
         client = Client()
         resp = client.get(
             f'/api/v1/repositories/runs/{completed_run.id}/file-history',
