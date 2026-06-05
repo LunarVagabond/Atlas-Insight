@@ -299,8 +299,8 @@ def get_similar_runs(request, run_id: uuid.UUID):
     if run.status != 'completed' or not run.result:
         return []
 
-    lang = (run.result.get('github_meta') or {}).get('primary_language')
-    score = (run.result.get('oss_score') or {}).get('score', 5)
+    lang = run.primary_language or None
+    score = run.oss_score if run.oss_score is not None else 5
 
     qs = AnalysisRun.objects.select_related('repo').filter(
         status='completed',
@@ -309,21 +309,21 @@ def get_similar_runs(request, run_id: uuid.UUID):
     ).exclude(repo=run.repo).order_by('-completed_at')
 
     if lang:
-        qs = qs.filter(result__github_meta__primary_language=lang)
+        qs = qs.filter(primary_language=lang)
 
     results = []
     for candidate in qs[:50]:
-        if not candidate.result:
+        if candidate.oss_score is None:
             continue
-        cand_score = (candidate.result.get('oss_score') or {}).get('score', 5)
+        cand_score = candidate.oss_score
         if abs(cand_score - score) > 2:
             continue
         health_key = (
-            (candidate.result.get('classification') or {})
+            (candidate.classification_data or {})
             .get('project_health', {})
             .get('key', '')
         )
-        stars = (candidate.result.get('github_meta') or {}).get('stars', 0)
+        stars = candidate.github_stars or 0
         results.append(SimilarRunOut(
             run_id=str(candidate.id),
             owner=candidate.repo.owner,

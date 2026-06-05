@@ -275,10 +275,10 @@ def analyze(request, payload: AnalyzeRequest):
         default_run = (
             repo.runs
             .filter(status='completed', branch='')
-            .values('result__github_meta__default_branch')
+            .values('github_meta_data__default_branch')
             .first()
         )
-        default_name = (default_run or {}).get('result__github_meta__default_branch') or ''
+        default_name = (default_run or {}).get('github_meta_data__default_branch') or ''
         if default_name and branch == default_name:
             branch = ''
     latest_sha = fetch_latest_sha(owner, name, token=token, branch=branch)

@@ -214,7 +214,7 @@ class TestGetTimeline:
             },
             'dependencies': {'dependency_count': 5},
         }
-        completed_run.save(update_fields=['result'])
+        completed_run.save(update_fields=['commits_data', 'deps_data', 'dependency_count'])
         resp = Client().get(f'/api/v1/repositories/runs/{completed_run.id}/timeline')
         assert resp.status_code == 200
         data = resp.json()

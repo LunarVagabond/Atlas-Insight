@@ -41,6 +41,85 @@ from .vuln_scan import scan_vulnerabilities
 
 logger = logging.getLogger(__name__)
 
+_RESULT_UPDATE_FIELDS = [
+    'status', 'completed_at', 'progress_step', 'commit_sha',
+    'oss_score', 'oss_badge', 'primary_language', 'github_stars', 'archived',
+    'total_commits', 'total_contributors', 'days_since_last_commit', 'abandoned',
+    'bus_factor', 'security_issue_count', 'dependency_count', 'test_ratio',
+    'is_docs_only', 'error_message',
+    'commits_data', 'graph_data', 'deps_data', 'heuristics_data', 'oss_score_data',
+    'readme_data', 'structure_data', 'security_data', 'github_meta_data',
+    'classification_data', 'todos_data', 'arch_tours_data', 'ownership_data',
+    'contribution_opportunities_data', 'repo_type_data', 'license_data',
+    'complexity_data', 'dead_code_data', 'test_coverage_data', 'containers_data',
+    'cicd_data', 'changelog_data', 'diff_data', 'similar_runs_data',
+    'issues_data', 'pr_refs_data',
+]
+
+
+def _extract_run_fields(run: 'AnalysisRun', result: dict) -> None:
+    oss_raw = result.get('oss_score')
+    if isinstance(oss_raw, dict):
+        run.oss_score = oss_raw.get('score')
+        run.oss_badge = oss_raw.get('badge', '') or ''
+        run.oss_score_data = oss_raw
+    else:
+        run.oss_score = None
+        run.oss_badge = ''
+        run.oss_score_data = None
+
+    gm = result.get('github_meta') or {}
+    run.primary_language = gm.get('primary_language') or ''
+    run.github_stars = gm.get('stars')
+    run.archived = gm.get('archived')
+
+    cm = result.get('commits') or {}
+    run.total_commits = cm.get('total_commits')
+    run.total_contributors = cm.get('total_contributors')
+    run.days_since_last_commit = cm.get('days_since_last_commit')
+    run.abandoned = cm.get('abandoned')
+
+    st = result.get('structure') or {}
+    run.bus_factor = st.get('bus_factor')
+
+    sec = result.get('security') or {}
+    run.security_issue_count = sec.get('issue_count')
+
+    deps = result.get('dependencies') or {}
+    run.dependency_count = deps.get('dependency_count')
+
+    tc = result.get('test_coverage') or {}
+    run.test_ratio = tc.get('test_ratio')
+
+    run.is_docs_only = bool(result.get('is_docs_only', False))
+    run.error_message = None
+
+    run.commits_data = result.get('commits')
+    run.graph_data = result.get('graph')
+    run.deps_data = result.get('dependencies')
+    run.heuristics_data = result.get('heuristics')
+    run.readme_data = result.get('readme')
+    run.structure_data = result.get('structure')
+    run.security_data = result.get('security')
+    run.github_meta_data = result.get('github_meta')
+    run.classification_data = result.get('classification')
+    run.todos_data = result.get('todos')
+    run.arch_tours_data = result.get('arch_tours')
+    run.ownership_data = result.get('ownership')
+    run.contribution_opportunities_data = result.get('contribution_opportunities')
+    run.repo_type_data = result.get('repo_type')
+    run.license_data = result.get('license')
+    run.complexity_data = result.get('complexity')
+    run.dead_code_data = result.get('dead_code')
+    run.test_coverage_data = result.get('test_coverage')
+    run.containers_data = result.get('containers')
+    run.cicd_data = result.get('cicd')
+    run.changelog_data = result.get('changelog')
+    run.diff_data = result.get('diff')
+    run.similar_runs_data = result.get('similar_runs')
+    run.issues_data = result.get('issues')
+    run.pr_refs_data = result.get('pr_refs')
+
 
 def _analyze_sub_projects(
     repo_type_info: dict,
@@ -394,12 +473,12 @@ def analyze_repository(self, run_id: str):
                 .order_by('-completed_at')
             )
             if lang:
-                sim_qs = sim_qs.filter(result__github_meta__primary_language=lang)
+                sim_qs = sim_qs.filter(primary_language=lang)
             similar: list[dict] = []
             for c in sim_qs[:50]:
-                if not c.result:
+                if c.oss_score is None:
                     continue
-                cand_score = (c.result.get('oss_score') or {}).get('score', 5)
+                cand_score = c.oss_score
                 if abs(cand_score - score) > 2:
                     continue
                 similar.append({
@@ -408,9 +487,9 @@ def analyze_repository(self, run_id: str):
                     'name': c.repo.name,
                     'repo_url': c.repo.url,
                     'oss_score': round(float(cand_score), 1),
-                    'health_key': (c.result.get('classification') or {}).get('project_health', {}).get('key', ''),
+                    'health_key': ((c.classification_data or {}).get('project_health') or {}).get('key', ''),
                     'primary_language': lang,
-                    'stars': (c.result.get('github_meta') or {}).get('stars', 0),
+                    'stars': c.github_stars or 0,
                 })
                 if len(similar) >= 5:
                     break
@@ -418,7 +497,7 @@ def analyze_repository(self, run_id: str):
         except Exception:
             result['similar_runs'] = []
 
-        run.result = result
+        _extract_run_fields(run, result)
         run.status = 'completed'
         run.progress_step = ''
         run.commit_sha = sha
@@ -470,13 +549,13 @@ def analyze_repository(self, run_id: str):
             friendly = str(exc)
         else:
             friendly = 'An unexpected error occurred during analysis. Please try again.'
-        run.result = {'error': friendly}
+        run.error_message = friendly
         analysis_runs_total.labels(status='failed').inc()
 
     analysis_duration_seconds.observe(time.monotonic() - _start)
     run.completed_at = timezone.now()
     run.progress_step = ''
-    run.save(update_fields=['status', 'result', 'completed_at', 'progress_step', 'commit_sha'])
+    run.save(update_fields=_RESULT_UPDATE_FIELDS)
 
     if run.status == 'completed':
         try:
@@ -499,7 +578,7 @@ def analyze_repository(self, run_id: str):
                     'repo_owner': run.repo.owner,
                     'repo_name': run.repo.name,
                     'completed_at': run.completed_at.isoformat() if run.completed_at else None,
-                    'error': run.result.get('error') if run.result else None,
+                    'error': run.error_message or None,
                 },
                 timeout=10,
                 headers={'Content-Type': 'application/json', 'User-Agent': 'AtlasInsight/1.0'},
@@ -519,8 +598,8 @@ def analyze_repository(self, run_id: str):
                 f'Status: {run.status}\n\n'
                 f'View results: {result_url}\n'
             )
-            if run.result and run.result.get('error'):
-                body += f'\nError: {run.result["error"]}\n'
+            if run.error_message:
+                body += f'\nError: {run.error_message}\n'
             send_mail(subject, body, None, [run.notification_email], fail_silently=True)
         except Exception:
             logger.warning('Email notification failed for run %s', run.id)
