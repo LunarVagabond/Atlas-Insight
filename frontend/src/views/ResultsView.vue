@@ -6,6 +6,7 @@ import { useAuthStore } from '../stores/auth'
 import AppTabGroups from '../components/ui/AppTabGroups.vue'
 import AppButton from '../components/ui/AppButton.vue'
 import AppBadge from '../components/ui/AppBadge.vue'
+import AppBranchSelect from '../components/ui/AppBranchSelect.vue'
 import AnalysisStatusCard from '../components/analysis/AnalysisStatusCard.vue'
 import OverviewPanel from '../components/analysis/OverviewPanel.vue'
 import CommitTimelineChart from '../components/analysis/CommitTimelineChart.vue'
@@ -144,18 +145,16 @@ watch(runId, async (id) => {
   if (!id) { router.push('/'); return }
   activeTab.value = (route.query.tab as string) || 'Overview'
   store._stopPolling()
-  store.jitIssues = null
-  store.jitPrs = null
-  store.diffData = null
-  store.similarRuns = null
+  store.branches = null
+  store.scannedBranches = null
   await store.pollRun(id)
 }, { immediate: true })
 
 watch(() => store.run?.status, (status) => {
   if (status === 'completed' && runId.value) {
-    store.fetchJitData(runId.value)
-    store.fetchDiff(runId.value)
-    store.fetchSimilar(runId.value)
+    if (!store.branches && !store.branchesLoading) {
+      store.fetchBranches(runId.value)
+    }
   }
 })
 
@@ -201,11 +200,39 @@ async function forceReanalyze() {
   }
 }
 
+const switchingBranch = ref(false)
+
+async function onBranchSelect(branch: string) {
+  if (!store.run || branch === (store.run.branch || '')) return
+  switchingBranch.value = true
+  try {
+    // Check if we already have a completed run for this branch
+    const owner = store.run.repo_owner
+    const name = store.run.repo_name
+    const branchParam = `?branch=${encodeURIComponent(branch)}`
+    try {
+      const { data } = await axios.get(`/api/v1/repositories/by-slug/${owner}/${name}${branchParam}`)
+      if (data.run_id && data.status === 'completed') {
+        router.push(`/results/${data.run_id}`)
+        return
+      }
+    } catch {
+      // No existing run — fall through to submit
+    }
+    const newId = await store.submitBranch(branch)
+    router.push(`/results/${newId}`)
+  } finally {
+    switchingBranch.value = false
+  }
+}
+
 // Export JSON
 function exportJson() {
   if (!result.value || !store.run) return
+  const branch = store.run.branch || ''
   const payload = {
     ...result.value,
+    branch,
     tab_exports: {
       code_quality: {
         complexity: result.value.complexity ?? null,
@@ -223,7 +250,8 @@ function exportJson() {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${store.run.repo_owner}-${store.run.repo_name}-analysis.json`
+  const branchSegment = branch ? `-${branch.replace(/\//g, '-')}` : ''
+  a.download = `${store.run.repo_owner}-${store.run.repo_name}${branchSegment}-analysis.json`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
@@ -241,7 +269,9 @@ function closeOverflow() { showOverflow.value = false }
 // Copy permalink
 const copied = ref(false)
 function copyLink() {
-  const url = `${window.location.origin}/r/${store.run?.repo_owner}/${store.run?.repo_name}`
+  const branch = store.run?.branch || ''
+  const base = `${window.location.origin}/r/${store.run?.repo_owner}/${store.run?.repo_name}`
+  const url = branch ? `${base}?branch=${encodeURIComponent(branch)}` : base
   navigator.clipboard.writeText(url)
   copied.value = true
   setTimeout(() => { copied.value = false }, 2000)
@@ -260,6 +290,8 @@ const badgeUrl = computed(() => {
   const { repo_owner: o, repo_name: n } = store.run
   return `${_apiOrigin}/api/v1/repositories/badge/${o}/${n}.svg`
 })
+
+const _runBranch = computed(() => store.run?.branch || '')
 const embedMarkdown = computed(() => {
   if (!store.run) return ''
   const { repo_owner: o, repo_name: n } = store.run
@@ -267,7 +299,8 @@ const embedMarkdown = computed(() => {
 })
 const cardUrl = computed(() => {
   if (!store.run) return ''
-  return `${_apiOrigin}/api/v1/repositories/runs/${store.run.id}/card.svg?theme=${cardTheme.value}`
+  const branch = _runBranch.value ? `&branch=${encodeURIComponent(_runBranch.value)}` : ''
+  return `${_apiOrigin}/api/v1/repositories/runs/${store.run.id}/card.svg?theme=${cardTheme.value}${branch}`
 })
 const cardMarkdown = computed(() => {
   if (!store.run) return ''
@@ -396,6 +429,21 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
+      <div v-if="result && (store.branches !== null || store.branchesLoading)" class="results-header__branch-row">
+        <AppBranchSelect
+          v-if="store.branches !== null"
+          :branches="store.branches"
+          :scanned="store.scannedBranches ?? []"
+          :default-branch="result?.github_meta?.default_branch"
+          :model-value="store.run?.branch || ''"
+          :loading="switchingBranch"
+          @update:model-value="onBranchSelect"
+        />
+        <span v-else class="branch-select__loading">Loading branches…</span>
+        <span v-if="result.commits?.abandoned" class="branch-stale-badge" title="No commits in the last year — this branch is inactive">
+          Stale branch
+        </span>
+      </div>
       <AppTabGroups v-if="result" :groups="GROUPS" v-model="activeTab" :badges="tabBadges" />
     </div>
 
@@ -509,17 +557,17 @@ onUnmounted(() => {
             <div class="overview-split__left">
               <OverviewPanel :result="result" :run-id="runId" />
               <SimilarReposPanel
-                v-if="store.similarRuns !== null || store.similarLoading"
-                :runs="store.similarRuns ?? []"
-                :loading="store.similarLoading"
+                v-if="result.similar_runs !== undefined"
+                :runs="result.similar_runs ?? []"
+                :loading="false"
               />
             </div>
             <div class="overview-split__right">
               <AnalysisStatusCard v-if="store.run" :run="store.run" />
               <DeltaPanel
-                v-if="store.diffData || store.diffLoading"
-                :diff-data="store.diffData ?? { available: false }"
-                :loading="store.diffLoading"
+                v-if="result.diff"
+                :diff-data="result.diff"
+                :loading="false"
               />
             </div>
           </div>
@@ -562,14 +610,11 @@ onUnmounted(() => {
             />
           </div>
         </template>
-        <div v-if="(activeTab === 'Ownership' || activeTab === 'Contributing') && store.jitError" class="jit-error-notice">
-          Could not load live GitHub data (issues / PRs). Showing static analysis only.
-        </div>
         <OwnershipPanel
           v-if="activeTab === 'Ownership'"
           :ownership="result.ownership ?? { subsystems: [], top_contributors: [], bus_factor: 0 }"
-          :jit-issues="store.jitIssues"
-          :jit-loading="store.jitLoading"
+          :jit-issues="result.issues ?? null"
+          :jit-loading="false"
           :repo-url="store.run?.repo_url"
           :github-contributors="result.github_meta?.contributors"
           :run-id="runId"

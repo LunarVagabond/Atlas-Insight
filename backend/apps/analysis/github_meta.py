@@ -8,15 +8,20 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
-def fetch_latest_sha(owner: str, name: str, token: Optional[str] = None) -> Optional[str]:
+def fetch_latest_sha(
+    owner: str, name: str, token: Optional[str] = None, branch: str = ''
+) -> Optional[str]:
     headers = {'Accept': 'application/vnd.github.v3+json'}
     effective_token = token or getattr(settings, 'GITHUB_TOKEN', '')
     if effective_token:
         headers['Authorization'] = f'Bearer {effective_token}'
+    params: dict = {'per_page': 1}
+    if branch:
+        params['sha'] = branch
     try:
         resp = requests.get(
             f'https://api.github.com/repos/{owner}/{name}/commits',
-            params={'per_page': 1},
+            params=params,
             headers=headers,
             timeout=10,
         )

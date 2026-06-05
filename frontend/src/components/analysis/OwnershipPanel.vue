@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { GitHubContributor, OwnershipData, OwnershipSubsystem, JitIssue } from '../../stores/analysis'
+import type { GitHubContributor, OwnershipData, OwnershipSubsystem } from '../../stores/analysis'
+import type { JitIssue } from '../../types/jit'
 import FileHistoryDrawer from './FileHistoryDrawer.vue'
 import PrImpactCard from './PrImpactCard.vue'
 

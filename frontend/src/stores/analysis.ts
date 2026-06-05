@@ -8,8 +8,6 @@ import type {
   SimilarRun,
   DiffData,
   FileHistory,
-  JitIssue,
-  JitPrData,
   PrImpactData,
   ConstellationData,
 } from '../types'
@@ -22,8 +20,6 @@ export type {
   SimilarRun,
   DiffData,
   FileHistory,
-  JitIssue,
-  JitPrData,
 }
 
 export type { SubProject, RepoTypeInfo } from '../types/run'
@@ -53,6 +49,9 @@ export type { OwnershipSubsystem, OwnershipData } from '../types/ownership'
 export type { PrImpactData, PrImpactSubsystem, PrImpactReviewer } from '../types/pr-impact'
 export type { ConstellationData, ConstellationRelated } from '../types/constellation'
 
+// Per-repo branch list cache (keyed by "owner/name")
+type BranchEntry = { branches: string[]; scanned: string[] }
+
 export const useAnalysisStore = defineStore('analysis', {
   state: () => ({
     url: '' as string,
@@ -62,23 +61,20 @@ export const useAnalysisStore = defineStore('analysis', {
     staleRun: null as AnalysisRun | null,
     error: null as string | null,
     _pollInterval: null as ReturnType<typeof setInterval> | null,
-    jitIssues: null as JitIssue[] | null,
-    jitPrs: null as JitPrData | null,
-    jitLoading: false,
-    jitError: false,
-    diffData: null as DiffData | null,
-    diffLoading: false,
-    similarRuns: null as SimilarRun[] | null,
-    similarLoading: false,
     prImpactCache: {} as Record<number, PrImpactData>,
     prImpactLoading: null as number | null,
     prImpactError: null as number | null,
     constellationData: null as ConstellationData | null,
     constellationLoading: false,
+    branches: null as string[] | null,
+    scannedBranches: null as string[] | null,
+    branchesLoading: false,
+    // Branch list cache keyed by "owner/name" — survives branch navigation, cleared on clearRun()
+    _branchCache: {} as Record<string, BranchEntry>,
   }),
 
   actions: {
-    async submitUrl(url: string, pat?: string) {
+    async submitUrl(url: string, pat?: string, branch?: string) {
       this.url = url
       this.status = 'submitting'
       this.error = null
@@ -88,6 +84,7 @@ export const useAnalysisStore = defineStore('analysis', {
         const { data } = await axios.post('/api/v1/repositories/analyze', {
           url,
           pat: pat || undefined,
+          branch: branch || undefined,
         })
         this.currentRunId = data.run_id
         this.status = 'polling'
@@ -101,50 +98,6 @@ export const useAnalysisStore = defineStore('analysis', {
       }
     },
 
-    async fetchJitData(runId: string) {
-      if (this.jitLoading) return
-      this.jitLoading = true
-      this.jitError = false
-      try {
-        const [issuesRes, prsRes] = await Promise.allSettled([
-          axios.get(`/api/v1/repositories/runs/${runId}/issues`),
-          axios.get(`/api/v1/repositories/runs/${runId}/prs`),
-        ])
-        this.jitIssues = issuesRes.status === 'fulfilled' ? issuesRes.value.data : null
-        this.jitPrs = prsRes.status === 'fulfilled' ? prsRes.value.data : null
-        if (issuesRes.status === 'rejected' && prsRes.status === 'rejected') {
-          this.jitError = true
-        }
-      } finally {
-        this.jitLoading = false
-      }
-    },
-
-    async fetchDiff(runId: string) {
-      if (this.diffLoading) return
-      this.diffLoading = true
-      try {
-        const { data } = await axios.get(`/api/v1/repositories/runs/${runId}/diff`)
-        this.diffData = data
-      } catch {
-        this.diffData = { available: false }
-      } finally {
-        this.diffLoading = false
-      }
-    },
-
-    async fetchSimilar(runId: string) {
-      if (this.similarLoading) return
-      this.similarLoading = true
-      try {
-        const { data } = await axios.get(`/api/v1/repositories/runs/${runId}/similar`)
-        this.similarRuns = data
-      } catch {
-        this.similarRuns = []
-      } finally {
-        this.similarLoading = false
-      }
-    },
 
     async fetchConstellation(runId: string): Promise<void> {
       if (this.constellationLoading) return
@@ -232,12 +185,54 @@ export const useAnalysisStore = defineStore('analysis', {
         this.run = data
         return true
       } catch (err: unknown) {
+        const axiosErr = err as { response?: { status?: number; data?: { detail?: string } } }
+        const status = axiosErr.response?.status
+        // 429 = transient rate limit — skip this tick, keep polling, don't blow up the page
+        if (status === 429) return false
         this.status = 'error'
-        const axiosErr = err as { response?: { data?: { detail?: string } } }
         this.error = axiosErr.response?.data?.detail ?? 'Failed to fetch run'
         this._stopPolling()
         return false
       }
+    },
+
+    async fetchBranches(runId: string): Promise<void> {
+      const repoKey = this.run ? `${this.run.repo_owner}/${this.run.repo_name}` : ''
+      if (repoKey && this._branchCache[repoKey]) {
+        // Populate active state from cache, then refresh scanned list in background
+        const c = this._branchCache[repoKey]
+        this.branches = c.branches
+        this.scannedBranches = c.scanned
+        // Refresh scanned (branch scan state changes) but not the full list (rarely changes)
+        try {
+          const { data } = await axios.get(`/api/v1/repositories/runs/${runId}/branches`)
+          const refreshed = { branches: data.branches as string[], scanned: data.scanned as string[] }
+          this._branchCache[repoKey] = refreshed
+          this.branches = refreshed.branches
+          this.scannedBranches = refreshed.scanned
+        } catch { /* keep cached data on failure */ }
+        return
+      }
+      if (this.branchesLoading) return
+      this.branchesLoading = true
+      try {
+        const { data } = await axios.get(`/api/v1/repositories/runs/${runId}/branches`)
+        this.branches = data.branches as string[]
+        this.scannedBranches = data.scanned as string[]
+        if (repoKey) this._branchCache[repoKey] = { branches: this.branches, scanned: this.scannedBranches }
+      } catch {
+        this.branches = []
+        this.scannedBranches = []
+      } finally {
+        this.branchesLoading = false
+      }
+    },
+
+    async submitBranch(branch: string): Promise<string> {
+      if (!this.run) throw new Error('No active run')
+      const url = this.run.repo_url
+      const pat = this.run.result ? undefined : undefined
+      return this.submitUrl(url, pat, branch)
     },
 
     async retryRun(runId: string): Promise<string> {
@@ -257,16 +252,15 @@ export const useAnalysisStore = defineStore('analysis', {
       this.run = null
       this.staleRun = null
       this.error = null
-      this.diffData = null
-      this.jitIssues = null
-      this.jitPrs = null
-      this.jitError = false
-      this.similarRuns = null
       this.prImpactCache = {}
       this.prImpactLoading = null
       this.prImpactError = null
       this.constellationData = null
       this.constellationLoading = false
+      this.branches = null
+      this.scannedBranches = null
+      this.branchesLoading = false
+      this._branchCache = {}
     },
   },
 })

@@ -47,6 +47,7 @@ def _make_card_svg(
     owner: str, name: str, health_label: str, color: str,
     oss_score, total_commits: int, total_files: int, contributors: int,
     theme: str = 'dark',
+    branch: str = '',
 ) -> str:
     owner = _svg_escape(owner[:22])
     name = _svg_escape(name[:30])
@@ -61,6 +62,13 @@ def _make_card_svg(
         bg, title, sub, muted = '#ffffff', '#24292f', '#57606a', '#8c959f'
     else:
         bg, title, sub, muted = '#0d1117', '#e6edf3', '#8b949e', '#6e7681'
+    branch_line = ''
+    if branch:
+        branch_escaped = _svg_escape(branch[:40])
+        branch_line = f'<text x="18" y="104" font-family="{f}" font-size="10" fill="{muted}">@ {branch_escaped}</text>'
+        pill_y, pill_text_y = 112, 127
+    else:
+        pill_y, pill_text_y = 100, 115
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}">'
         f'<rect width="{W}" height="{H}" rx="10" fill="{bg}"/>'
@@ -71,8 +79,9 @@ def _make_card_svg(
         f'<text x="{W - 16}" y="54" font-family="{f}" font-size="10" fill="{sub}" text-anchor="end">/10  OSS Score</text>'
         f'<line x1="18" y1="62" x2="{W - 16}" y2="62" stroke="{muted}" stroke-width="0.5" stroke-opacity="0.35"/>'
         f'<text x="18" y="90" font-family="{f}" font-size="18" font-weight="700" fill="{title}">{owner}/{name}</text>'
-        f'<rect x="18" y="100" width="{pill_w}" height="22" rx="11" fill="{color}" fill-opacity="0.15" stroke="{color}" stroke-width="1"/>'
-        f'<text x="{pill_cx}" y="115" font-family="{f}" font-size="11" font-weight="600" fill="{color}" text-anchor="middle">{health_label}</text>'
+        f'{branch_line}'
+        f'<rect x="18" y="{pill_y}" width="{pill_w}" height="22" rx="11" fill="{color}" fill-opacity="0.15" stroke="{color}" stroke-width="1"/>'
+        f'<text x="{pill_cx}" y="{pill_text_y}" font-family="{f}" font-size="11" font-weight="600" fill="{color}" text-anchor="middle">{health_label}</text>'
         f'<line x1="18" y1="130" x2="{W - 16}" y2="130" stroke="{muted}" stroke-width="0.5" stroke-opacity="0.35"/>'
         f'<text x="18" y="144" font-family="{f}" font-size="10" fill="{muted}">{stats}</text>'
         f'</svg>'
@@ -106,7 +115,7 @@ def _make_svg(label: str, value: str, color: str) -> str:
 
 
 def _spotlight_to_schema(spot: 'RepoOfTheWeek'):
-    run = spot.repo.runs.filter(status='completed').order_by('-triggered_at').first()
+    run = spot.repo.runs.filter(status='completed', branch='').order_by('-triggered_at').first()
     if not run or not run.result:
         return None
     meta = run.result.get('github_meta', {})
@@ -224,6 +233,7 @@ def run_card(request, run_id: uuid.UUID, theme: str = 'dark'):
         total_files=structure.get('total_files', 0),
         contributors=commits.get('total_contributors', 0),
         theme=card_theme,
+        branch=run.branch or '',
     )
     resp = HttpResponse(svg, content_type='image/svg+xml')
     resp['Cache-Control'] = 'public, max-age=300, stale-while-revalidate=3600'
@@ -241,7 +251,7 @@ def repo_badge(request, owner: str, name: str):
         svg = _make_svg('atlas insight', 'not found', _BADGE_NOT_ANALYZED)
         return HttpResponse(svg, content_type='image/svg+xml', status=404)
 
-    run = repo.runs.filter(status='completed').order_by('-triggered_at').first()
+    run = repo.runs.filter(status='completed', branch='').order_by('-triggered_at').first()
     if not run or not run.result:
         svg = _make_svg('atlas insight', 'not analyzed', _BADGE_NOT_ANALYZED)
         resp = HttpResponse(svg, content_type='image/svg+xml')
@@ -302,7 +312,7 @@ def get_featured(request):
         return 200, None
     if repo.is_private:
         return 200, None
-    run = repo.runs.filter(status='completed').order_by('-triggered_at').first()
+    run = repo.runs.filter(status='completed', branch='').order_by('-triggered_at').first()
     if not run or not run.result:
         return 200, None
     meta = run.result.get('github_meta', {})
@@ -388,7 +398,7 @@ def get_spotlight_history(request, page: int = 1, per_page: int = 20):
     spots = list(qs[offset: offset + per_page])
     items = []
     for spot in spots:
-        run = spot.repo.runs.filter(status='completed').order_by('-triggered_at').first()
+        run = spot.repo.runs.filter(status='completed', branch='').order_by('-triggered_at').first()
         meta = run.result.get('github_meta', {}) if run and run.result else {}
         cls = run.result.get('classification', {}) if run and run.result else {}
         health = cls.get('project_health', {})

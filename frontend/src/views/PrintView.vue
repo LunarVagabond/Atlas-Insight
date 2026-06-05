@@ -231,7 +231,10 @@ function exportCvesCsv() {
           <span class="print-cover__report-type">Repository Analysis Report</span>
         </div>
 
-        <h1 class="print-cover__repo">{{ run.repo_owner }} / {{ run.repo_name }}</h1>
+        <h1 class="print-cover__repo">
+          {{ run.repo_owner }} / {{ run.repo_name }}
+          <span v-if="run.branch" class="print-cover__branch">@ {{ run.branch }}</span>
+        </h1>
         <div class="print-cover__repo-url">{{ run.repo_url }}</div>
 
         <!-- Key stats summary row -->
@@ -1005,7 +1008,7 @@ function exportCvesCsv() {
         <div class="print-report-footer__left">
           <div class="print-report-footer__brand">Atlas Insight</div>
           <div class="print-report-footer__meta">
-            {{ run.repo_owner }}/{{ run.repo_name }} · {{ formatDate(run.completed_at) }} · {{ run.id }}
+            {{ run.repo_owner }}/{{ run.repo_name }}<template v-if="run.branch"> @ {{ run.branch }}</template> · {{ formatDate(run.completed_at) }} · {{ run.id }}
           </div>
         </div>
         <div class="print-report-footer__disclaimer">

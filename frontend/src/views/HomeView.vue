@@ -99,10 +99,6 @@ function sortIcon(field: string) {
   return order.value === 'desc' ? '↓' : '↑'
 }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString()
-}
-
 function goToRun(id: string) {
   router.push(`/results/${id}`)
 }
@@ -225,10 +221,7 @@ function langIconUrl(name: string | null): string | null {
               <th class="runs-table__sortable" @click="setSort('status')">
                 Status {{ sortIcon('status') }}
               </th>
-              <th class="runs-table__sortable" @click="setSort('triggered_at')">
-                Last Scan {{ sortIcon('triggered_at') }}
-              </th>
-              <th></th>
+              <th>Branches</th>
             </tr>
           </thead>
           <tbody>
@@ -273,9 +266,11 @@ function langIconUrl(name: string | null): string | null {
                   <AppBadge v-if="run.is_stale" variant="warning">Stale</AppBadge>
                 </div>
               </td>
-              <td>{{ formatDate(run.triggered_at) }}</td>
-              <td>
-                <AppButton variant="secondary" @click.stop="goToRun(run.id)" style="font-size:0.8125rem;padding:4px 12px">View</AppButton>
+              <td class="runs-table__branches-cell">
+                <span v-if="run.scanned_branch_count > 0" class="runs-table__branch-count">
+                  {{ run.scanned_branch_count }}<template v-if="run.cached_branch_count != null"> / {{ run.cached_branch_count }}</template>
+                </span>
+                <span v-else class="runs-table__branch-count runs-table__branch-count--none">—</span>
               </td>
             </tr>
 
@@ -284,7 +279,7 @@ function langIconUrl(name: string | null): string | null {
               :key="'ghost-' + i"
               class="runs-table__row runs-table__row--ghost"
             >
-              <td colspan="7">&nbsp;</td>
+              <td colspan="6">&nbsp;</td>
             </tr>
           </tbody>
         </table>

@@ -9,6 +9,8 @@ import type { GitHubMeta } from './github'
 import type { ContributionOpportunity, ArchTour } from './contributions'
 import type { TodoData } from './todos'
 import type { OwnershipData } from './ownership'
+import type { JitIssue, JitPrData } from './jit'
+import type { DiffData } from './diff'
 
 export interface SubProject {
   name: string
@@ -184,6 +186,11 @@ export interface RunResult {
   containers?: ContainerData
   cicd?: CicdData
   changelog?: ChangelogData
+  // Baked in at scan time — no JIT fetching needed
+  issues?: JitIssue[]
+  pr_refs?: JitPrData['pr_issue_refs']
+  diff?: DiffData
+  similar_runs?: SimilarRun[]
   error?: string
 }
 
@@ -197,6 +204,7 @@ export interface AnalysisRun {
   repo_url: string
   repo_owner: string
   repo_name: string
+  branch: string
   is_stale: boolean
   is_private: boolean
   last_fetched_at: string | null
@@ -220,6 +228,8 @@ export interface RunListItem {
   tags: string[]
   has_previous_run: boolean
   primary_language: string | null
+  scanned_branch_count: number
+  cached_branch_count: number | null
 }
 
 export interface FeaturedRepo {

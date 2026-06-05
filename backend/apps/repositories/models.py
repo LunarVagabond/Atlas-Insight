@@ -21,6 +21,7 @@ class Repository(models.Model):
     view_count = models.IntegerField(default=0)
     scan_count = models.IntegerField(default=0)
     is_watched = models.BooleanField(default=False)
+    cached_branch_count = models.IntegerField(null=True, blank=True, default=None)
 
     class Meta:
         verbose_name_plural = 'repositories'
@@ -58,6 +59,8 @@ class AnalysisRun(models.Model):
     completed_at = models.DateTimeField(null=True, blank=True)
     result = models.JSONField(null=True, blank=True)
     celery_task_id = models.CharField(max_length=255, blank=True, default='')
+    branch = models.CharField(max_length=255, blank=True, default='')
+    commit_sha = models.CharField(max_length=40, blank=True, default='')
     webhook_url = models.URLField(blank=True, default='')
     notification_email = models.EmailField(blank=True, default='')
 

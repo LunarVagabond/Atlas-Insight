@@ -83,23 +83,6 @@ const filteredItems = computed(() =>
   activeTag.value ? items.value.filter(r => r.tags?.includes(activeTag.value!)) : items.value
 )
 
-function setSort(field: typeof sort.value) {
-  if (sort.value === field) {
-    order.value = order.value === 'desc' ? 'asc' : 'desc'
-  } else {
-    sort.value = field
-    order.value = 'desc'
-  }
-}
-
-function sortIcon(field: string) {
-  if (sort.value !== field) return '↕'
-  return order.value === 'desc' ? '↓' : '↑'
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString()
-}
 
 function goToRun(id: string) {
   router.push(`/results/${id}`)
@@ -184,9 +167,7 @@ function goToRun(id: string) {
               <th>Author</th>
               <th>Repository</th>
               <th>Status</th>
-              <th class="runs-table__sortable" @click="setSort('triggered_at')">
-                Last Scan {{ sortIcon('triggered_at') }}
-              </th>
+              <th>Branches</th>
             </tr>
           </thead>
           <tbody>
@@ -212,11 +193,11 @@ function goToRun(id: string) {
                   <AppBadge v-if="run.has_previous_run" variant="info" title="A previous scan exists — delta comparison available">△ Updated</AppBadge>
                 </div>
               </td>
-              <td>{{ formatDate(run.triggered_at) }}</td>
-              <td>
-                <AppButton variant="secondary" @click.stop="goToRun(run.id)" style="font-size:0.8125rem;padding:4px 12px">
-                  View
-                </AppButton>
+              <td class="runs-table__branches-cell">
+                <span v-if="run.scanned_branch_count > 0" class="runs-table__branch-count">
+                  {{ run.scanned_branch_count }}<template v-if="run.cached_branch_count != null"> / {{ run.cached_branch_count }}</template>
+                </span>
+                <span v-else class="runs-table__branch-count runs-table__branch-count--none">—</span>
               </td>
             </tr>
           </tbody>

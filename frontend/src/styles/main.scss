@@ -6,6 +6,7 @@
 @use 'components';
 @use 'print-view';
 @use 'animations';
+@use 'branch-select';
 
 body {
   background: var(--color-bg);

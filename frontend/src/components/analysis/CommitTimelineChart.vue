@@ -351,6 +351,17 @@ const commitDateRange = computed<string>(() => {
         </div>
       </div>
     </div>
+    <div v-else-if="commits.total_commits > 0" class="stale-branch-notice">
+      <span class="stale-branch-notice__icon">🕰</span>
+      <div class="stale-branch-notice__body">
+        <strong>Stale branch</strong> — no commits in the last 2 years.
+        <span v-if="commits.last_commit_date">
+          Last activity {{ new Date(commits.last_commit_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) }}
+          ({{ commits.days_since_last_commit != null ? Math.floor(commits.days_since_last_commit / 365) + ' yr' : '' }} ago).
+        </span>
+        Commit graph only shows the active window — the full history still exists on disk.
+      </div>
+    </div>
     <div v-else class="empty-state">No commit data available</div>
 
     <!-- Stats row -->

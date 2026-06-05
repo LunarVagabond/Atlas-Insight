@@ -10,8 +10,10 @@ const errorMsg = ref<string | null>(null)
 
 onMounted(async () => {
   const { owner, name } = route.params as { owner: string; name: string }
+  const branch = route.query.branch as string | undefined
+  const branchParam = branch ? `?branch=${encodeURIComponent(branch)}` : ''
   try {
-    const { data } = await axios.get(`/api/v1/repositories/by-slug/${owner}/${name}`)
+    const { data } = await axios.get(`/api/v1/repositories/by-slug/${owner}/${name}${branchParam}`)
     router.replace(`/results/${data.run_id}`)
   } catch (err: unknown) {
     const status = (err as { response?: { status?: number } }).response?.status

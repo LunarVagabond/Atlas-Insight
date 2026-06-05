@@ -22,6 +22,7 @@ from .container_analysis import analyze_containers
 from .contribution_analysis import analyze_contributions
 from .dead_code import analyze_dead_code
 from .dep_report import analyze_dependencies
+from .diff_analysis import compute_run_diff
 from .git_ops import clone_or_fetch
 from .github_meta import fetch_github_meta
 from .graph_analysis import analyze_graph
@@ -151,7 +152,7 @@ def analyze_repository(self, run_id: str):
         pass
 
     try:
-        repo_obj, sha, fetched_at = clone_or_fetch(run.repo.url, pat=pat)
+        repo_obj, sha, fetched_at = clone_or_fetch(run.repo.url, pat=pat, branch=run.branch)
         repo_dir = repo_obj.working_dir
 
         run.progress_step = 'parsing'
@@ -160,6 +161,7 @@ def analyze_repository(self, run_id: str):
         is_docs_only = detect_docs_only(repo_dir)
         commits = analyze_commits(repo_obj)
         readme = parse_readme(repo_dir)
+        contribution_data: dict | None = None
 
         if is_docs_only:
             _empty_graph = {
@@ -358,19 +360,80 @@ def analyze_repository(self, run_id: str):
             }
             if repo_type_result is not None:
                 result['repo_type'] = repo_type_result
+
+            # Bake contribution issues + pr refs into result (eliminates JIT GitHub calls)
+            result['issues'] = (contribution_data or {}).get('issues', [])
+            result['pr_refs'] = (contribution_data or {}).get('pr_issue_refs', [])
+
+        # Compute diff vs previous run on same branch — baked in so frontend needs no extra call
+        try:
+            prev_run = (
+                AnalysisRun.objects
+                .filter(repo=run.repo, status='completed', branch=run.branch,
+                        triggered_at__lt=run.triggered_at)
+                .exclude(id=run.id)
+                .order_by('-triggered_at')
+                .first()
+            )
+            result['diff'] = (
+                compute_run_diff(result, prev_run.result, prev_run.id, prev_run.triggered_at)
+                if prev_run and prev_run.result
+                else {'available': False}
+            )
+        except Exception:
+            result['diff'] = {'available': False}
+
+        # Compute similar repos — baked in so frontend needs no extra call
+        try:
+            lang = (result.get('github_meta') or {}).get('primary_language')
+            score = (result.get('oss_score') or {}).get('score', 5)
+            sim_qs = (
+                AnalysisRun.objects.select_related('repo')
+                .filter(status='completed', repo__is_private=False)
+                .exclude(repo=run.repo)
+                .order_by('-completed_at')
+            )
+            if lang:
+                sim_qs = sim_qs.filter(result__github_meta__primary_language=lang)
+            similar: list[dict] = []
+            for c in sim_qs[:50]:
+                if not c.result:
+                    continue
+                cand_score = (c.result.get('oss_score') or {}).get('score', 5)
+                if abs(cand_score - score) > 2:
+                    continue
+                similar.append({
+                    'run_id': str(c.id),
+                    'owner': c.repo.owner,
+                    'name': c.repo.name,
+                    'repo_url': c.repo.url,
+                    'oss_score': round(float(cand_score), 1),
+                    'health_key': (c.result.get('classification') or {}).get('project_health', {}).get('key', ''),
+                    'primary_language': lang,
+                    'stars': (c.result.get('github_meta') or {}).get('stars', 0),
+                })
+                if len(similar) >= 5:
+                    break
+            result['similar_runs'] = similar
+        except Exception:
+            result['similar_runs'] = []
+
         run.result = result
         run.status = 'completed'
         run.progress_step = ''
+        run.commit_sha = sha
         analysis_runs_total.labels(status='completed').inc()
 
         from django.db.models import F
         repo = run.repo
-        repo.last_commit_sha = sha
         repo.last_analyzed_at = timezone.now()
         repo.last_fetched_at = fetched_at
         repo.is_stale = False
         repo.is_private = github_meta.get('is_private', False)
-        update_fields = ['last_commit_sha', 'last_analyzed_at', 'last_fetched_at', 'is_stale', 'is_private']
+        update_fields = ['last_analyzed_at', 'last_fetched_at', 'is_stale', 'is_private']
+        if not run.branch:
+            repo.last_commit_sha = sha
+            update_fields.append('last_commit_sha')
         if pat and pat != repo.auth_token:
             repo.auth_token = pat
             repo.auth_token_warning = ''
@@ -413,7 +476,7 @@ def analyze_repository(self, run_id: str):
     analysis_duration_seconds.observe(time.monotonic() - _start)
     run.completed_at = timezone.now()
     run.progress_step = ''
-    run.save(update_fields=['status', 'result', 'completed_at', 'progress_step'])
+    run.save(update_fields=['status', 'result', 'completed_at', 'progress_step', 'commit_sha'])
 
     if run.status == 'completed':
         try:

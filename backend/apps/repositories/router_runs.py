@@ -12,6 +12,7 @@ from django_ratelimit.decorators import ratelimit
 from ninja import Router, Schema
 from ninja.errors import HttpError
 
+from apps.analysis.git_ops import list_remote_branches
 from apps.analysis.github_meta import fetch_latest_sha
 from apps.analysis.tasks import analyze_repository
 
@@ -81,12 +82,19 @@ def _validate_webhook_url(url: str) -> None:
 RERUN_COOLDOWN_HOURS = 4
 
 
-def _cooldown_until(repo) -> Optional[str]:
+def _cooldown_until(repo, branch: str = '') -> Optional[str]:
     from datetime import timedelta
-    if not repo.last_analyzed_at:
-        return None
     from django.utils import timezone
-    cutoff = repo.last_analyzed_at + timedelta(hours=RERUN_COOLDOWN_HOURS)
+    last_run = (
+        repo.runs
+        .filter(status='completed', branch=branch)
+        .order_by('-completed_at')
+        .values_list('completed_at', flat=True)
+        .first()
+    )
+    if not last_run:
+        return None
+    cutoff = last_run + timedelta(hours=RERUN_COOLDOWN_HOURS)
     if timezone.now() < cutoff:
         return cutoff.isoformat()
     return None
@@ -167,6 +175,7 @@ def _user_can_access_repo(user, owner: str, name: str) -> bool:
 class AnalyzeRequest(Schema):
     url: str
     pat: Optional[str] = None
+    branch: Optional[str] = None
     webhook_url: Optional[str] = None
     notification_email: Optional[str] = None
 
@@ -187,6 +196,7 @@ class RunStatusSchema(Schema):
     repo_url: str
     repo_owner: str
     repo_name: str
+    branch: str = ''
     is_stale: bool
     is_private: bool
     last_fetched_at: Optional[str]
@@ -210,6 +220,13 @@ class RunListItemSchema(Schema):
     tags: list[str] = []
     has_previous_run: bool = False
     primary_language: Optional[str] = None
+    scanned_branch_count: int = 0
+    cached_branch_count: Optional[int] = None
+
+
+class BranchesResponse(Schema):
+    branches: list[str]
+    scanned: list[str]
 
 
 class RunListSchema(Schema):
@@ -251,12 +268,27 @@ def analyze(request, payload: AnalyzeRequest):
         repo.auth_token = token
         repo.save(update_fields=['auth_token'])
 
-    latest_sha = fetch_latest_sha(owner, name, token=token)
+    branch = (payload.branch or '').strip()
+    latest_sha = fetch_latest_sha(owner, name, token=token, branch=branch)
 
-    if latest_sha and latest_sha == repo.last_commit_sha:
-        latest_run = repo.runs.order_by('-triggered_at').first()
-        if latest_run and latest_run.status == 'completed':
-            return AnalyzeResponse(run_id=latest_run.id, status='completed', cached=True)
+    if latest_sha:
+        if branch:
+            # Branch-specific cache: look for a completed run on this branch with the same SHA
+            cached_run = (
+                repo.runs
+                .filter(status='completed', branch=branch, commit_sha=latest_sha)
+                .order_by('-triggered_at')
+                .first()
+            )
+        else:
+            cached_run = None
+            if latest_sha == repo.last_commit_sha:
+                cached_run = (
+                    repo.runs.filter(status='completed', branch='')
+                    .order_by('-triggered_at').first()
+                )
+        if cached_run:
+            return AnalyzeResponse(run_id=cached_run.id, status='completed', cached=True)
 
     user = request.user if request.user.is_authenticated else _resolve_api_token_user(request)
 
@@ -270,6 +302,7 @@ def analyze(request, payload: AnalyzeRequest):
 
     run = AnalysisRun.objects.create(
         repo=repo, status='pending', user=user,
+        branch=branch,
         webhook_url=payload.webhook_url or '',
         notification_email=notification_email,
     )
@@ -281,7 +314,7 @@ def analyze(request, payload: AnalyzeRequest):
 
 
 @router.get('/runs/', response=RunListSchema)
-@ratelimit(key='user_or_ip', rate='120/h', method='GET', block=False)
+@ratelimit(key='user_or_ip', rate='300/m', method='GET', block=False)
 def list_runs(
     request,
     q: str = '',
@@ -293,10 +326,11 @@ def list_runs(
 ):
     _assert_not_limited(request)
     per_page = min(per_page, 25)
-    from django.db.models import Exists, OuterRef, Subquery
+    from django.db.models import Count, Exists, OuterRef, Subquery
 
     latest_per_repo = AnalysisRun.objects.filter(
         repo=OuterRef('pk'),
+        branch='',  # default branch only — branch runs are accessed via the branch selector
         status__in=['completed', 'pending', 'running'],
     ).order_by('-triggered_at').values('id')[:1]
     latest_ids = Repository.objects.annotate(
@@ -304,6 +338,15 @@ def list_runs(
     ).exclude(latest_id=None).values('latest_id')
 
     qs = AnalysisRun.objects.filter(pk__in=latest_ids).select_related('repo', 'user')
+
+    scanned_branch_sq = (
+        AnalysisRun.objects
+        .filter(repo_id=OuterRef('repo_id'), status='completed')
+        .values('repo_id')
+        .annotate(c=Count('branch', distinct=True))
+        .values('c')
+    )
+    qs = qs.annotate(scanned_branch_count=Subquery(scanned_branch_sq))
 
     prev_run_exists = AnalysisRun.objects.filter(
         repo=OuterRef('repo'),
@@ -363,6 +406,8 @@ def list_runs(
                 tags=r.result.get('classification', {}).get('tags', []) if r.result else [],
                 has_previous_run=getattr(r, 'has_previous_run', False),
                 primary_language=r.result.get('github_meta', {}).get('primary_language') if r.result else None,
+                scanned_branch_count=getattr(r, 'scanned_branch_count', 0) or 0,
+                cached_branch_count=r.repo.cached_branch_count,
             )
             for r in runs
         ],
@@ -373,7 +418,7 @@ def list_runs(
 
 
 @router.get('/runs/{run_id}', response=RunStatusSchema)
-@ratelimit(key='user_or_ip', rate='120/h', method='GET', block=False)
+@ratelimit(key='user_or_ip', rate='300/m', method='GET', block=False)
 def get_run(request, run_id: uuid.UUID):
     _assert_not_limited(request)
     from django.db.models import F
@@ -399,11 +444,12 @@ def get_run(request, run_id: uuid.UUID):
         repo_url=run.repo.url,
         repo_owner=run.repo.owner,
         repo_name=run.repo.name,
+        branch=run.branch or '',
         is_stale=run.repo.is_stale,
         is_private=run.repo.is_private,
         last_fetched_at=run.repo.last_fetched_at.isoformat() if run.repo.last_fetched_at else None,
         auth_token_warning=run.repo.auth_token_warning,
-        cooldown_until=_cooldown_until(run.repo),
+        cooldown_until=_cooldown_until(run.repo, branch=run.branch or ''),
     )
 
 
@@ -420,18 +466,41 @@ def retry_run(request, run_id: uuid.UUID):
             raise HttpError(403, 'Access denied')
     is_super = request.user.is_authenticated and request.user.is_superuser
     if not is_super:
-        cooldown = _cooldown_until(original.repo)
+        cooldown = _cooldown_until(original.repo, branch=original.branch or '')
         if cooldown:
             raise HttpError(
                 429,
                 f'This repository was analyzed recently. Re-analysis available after {cooldown}.',
             )
     user = request.user if request.user.is_authenticated else None
-    run = AnalysisRun.objects.create(repo=original.repo, status='pending', user=user)
+    run = AnalysisRun.objects.create(
+        repo=original.repo, status='pending', user=user, branch=original.branch or ''
+    )
     task = analyze_repository.delay(str(run.id))
     run.celery_task_id = task.id
     run.save(update_fields=['celery_task_id'])
     return AnalyzeResponse(run_id=run.id, status='pending', cached=False)
+
+
+@router.get('/runs/{run_id}/branches', response=BranchesResponse)
+@ratelimit(key='user_or_ip', rate='60/m', method='GET', block=False)
+def get_branches(request, run_id: uuid.UUID):
+    _assert_not_limited(request)
+    try:
+        run = AnalysisRun.objects.select_related('repo').get(id=run_id)
+    except AnalysisRun.DoesNotExist:
+        raise HttpError(404, 'Run not found')
+    if run.repo.is_private:
+        if not request.user.is_authenticated:
+            raise HttpError(403, 'Access denied')
+    branches = list_remote_branches(run.repo.url, pat=run.repo.auth_token or None)
+    scanned = list(
+        AnalysisRun.objects.filter(repo=run.repo, status='completed')
+        .values_list('branch', flat=True).distinct()
+    )
+    if branches:
+        Repository.objects.filter(pk=run.repo_id).update(cached_branch_count=len(branches))
+    return BranchesResponse(branches=branches, scanned=scanned)
 
 
 @router.get('/runs/{run_id}/timeline')
@@ -474,7 +543,7 @@ def delete_run(request, run_id: uuid.UUID):
 
 
 @router.get('/by-slug/{owner}/{name}', response=SlugRunSchema)
-def get_by_slug(request, owner: str, name: str):
+def get_by_slug(request, owner: str, name: str, branch: Optional[str] = None):
     """Return the latest run for owner/name — used by permalink routes."""
     try:
         repo = Repository.objects.get(owner__iexact=owner, name__iexact=name)
@@ -483,7 +552,10 @@ def get_by_slug(request, owner: str, name: str):
     if repo.is_private:
         if not request.user.is_authenticated:
             raise HttpError(403, 'Access denied')
-    run = repo.runs.select_related('user').order_by('-triggered_at').first()
+    # No branch param → default branch (branch=''); explicit ?branch= value → that branch
+    effective_branch = branch if branch is not None else ''
+    qs = repo.runs.select_related('user').filter(status='completed', branch=effective_branch)
+    run = qs.order_by('-triggered_at').first()
     if not run:
         raise HttpError(404, 'No runs found for this repository')
     if repo.is_private and run.user != request.user:

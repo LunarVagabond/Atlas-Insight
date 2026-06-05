@@ -33,13 +33,48 @@ _GIT_ENV = {
 }
 
 
-def get_cache_path(url: str) -> str:
+def get_cache_path(url: str, branch: str = '') -> str:
     match = re.match(r'https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$', url)
     if not match:
         raise ValueError(f'Invalid GitHub URL: {url}')
     owner, name = match.group(1), match.group(2)
-    cache_dir = settings.REPO_CACHE_DIR / f'{owner}_{name}'
+    suffix = f'__{branch}' if branch else ''
+    cache_dir = settings.REPO_CACHE_DIR / f'{owner}_{name}{suffix}'
     return str(cache_dir)
+
+
+def list_remote_branches(url: str, pat: Optional[str] = None) -> list[str]:
+    """Return sorted list of branch names from GitHub API."""
+    import requests as _requests
+    match = re.match(r'https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$', url)
+    if not match:
+        return []
+    owner, name = match.group(1), match.group(2)
+    headers = {'Accept': 'application/vnd.github+json'}
+    from django.conf import settings as _s
+    token = pat or getattr(_s, 'GITHUB_TOKEN', '')
+    if token:
+        headers['Authorization'] = f'Bearer {token}'
+    branches: list[str] = []
+    for page in range(1, 6):
+        try:
+            resp = _requests.get(
+                f'https://api.github.com/repos/{owner}/{name}/branches',
+                params={'per_page': 100, 'page': page},
+                headers=headers,
+                timeout=10,
+            )
+        except Exception:
+            break
+        if resp.status_code != 200:
+            break
+        data = resp.json()
+        if not data:
+            break
+        branches.extend(b['name'] for b in data if isinstance(b, dict) and b.get('name'))
+        if len(data) < 100:
+            break
+    return sorted(branches)
 
 
 def _inject_pat(url: str, pat: str) -> str:
@@ -106,8 +141,19 @@ def _sync_to_origin_head(repo: git.Repo) -> str:
     return repo.head.commit.hexsha
 
 
-def clone_or_fetch(url: str, pat: Optional[str] = None) -> tuple:
-    cache_path = get_cache_path(url)
+def _checkout_branch(repo: git.Repo, branch: str) -> str:
+    """Checkout a specific remote branch and return its HEAD SHA."""
+    if branch in repo.heads:
+        repo.git.checkout(branch)
+    else:
+        repo.git.checkout('-B', branch, f'origin/{branch}')
+    repo.git.reset('--hard', f'origin/{branch}')
+    repo.git.clean('-fdx')
+    return repo.head.commit.hexsha
+
+
+def clone_or_fetch(url: str, pat: Optional[str] = None, branch: str = '') -> tuple:
+    cache_path = get_cache_path(url, branch)
     clone_url = _inject_pat(url, pat) if pat else url
 
     if os.path.exists(cache_path):
@@ -134,7 +180,7 @@ def clone_or_fetch(url: str, pat: Optional[str] = None) -> tuple:
                 raise _sanitize_exc(exc, pat) if pat else exc
             if pat:
                 repo.remotes.origin.set_url(url)
-            sha = _sync_to_origin_head(repo)
+            sha = _checkout_branch(repo, branch) if branch else _sync_to_origin_head(repo)
             return repo, sha, timezone.now()
 
     # Fresh clone (or after wipe above)
@@ -156,4 +202,8 @@ def clone_or_fetch(url: str, pat: Optional[str] = None) -> tuple:
     if pat:
         repo.remotes.origin.set_url(url)
 
-    return repo, repo.head.commit.hexsha, timezone.now()
+    if branch:
+        sha = _checkout_branch(repo, branch)
+    else:
+        sha = repo.head.commit.hexsha
+    return repo, sha, timezone.now()
