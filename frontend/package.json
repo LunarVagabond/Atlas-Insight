@@ -20,7 +20,7 @@
     "cytoscape-fcose": ">=2.2.0",
     "dompurify": ">=3.4.8",
     "marked": ">=18.0.4",
-    "pinia": ">=2.3.1",
+    "pinia": ">=3.0.4",
     "vue": ">=3.5.35",
     "vue-chartjs": ">=5.3.3",
     "vue-router": ">=4.6.4"
