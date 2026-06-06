@@ -483,7 +483,7 @@ def get_run_vulnerabilities(request, run_id: uuid.UUID):
 @router.get('/runs/{run_id}/ai-summary', response=AiSummaryOut)
 @ratelimit(key='user_or_ip', rate='60/m', method='GET', block=False)
 def get_ai_summary(request, run_id: uuid.UUID):
-    """AI onboarding brief — paste this at the start of a chat to orient the AI to the project."""
+    """Export deterministic run context for external AI tools; Atlas Insight does not use AI for scanning."""
     _assert_not_limited(request)
     try:
         run = AnalysisRun.objects.select_related('repo').get(id=run_id, status='completed')

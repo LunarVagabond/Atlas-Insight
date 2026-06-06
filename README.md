@@ -6,7 +6,7 @@
 [![Django](https://img.shields.io/badge/Django-5-092e20.svg)](https://www.djangoproject.com/)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/lunarvagabond)
 
-**Repository archaeology and static analysis platform.** Paste a GitHub URL and get deep architecture insights, commit history analysis, dependency health reports, and heuristic risk scores — no AI, just deterministic data.
+**Repository archaeology and static analysis platform.** Paste a GitHub URL and get deep architecture insights, commit history analysis, dependency health reports, and heuristic risk scores — deterministic in-app analysis, plus optional AI context export for tools outside Atlas Insight.
 
 Analysis results are archived. Re-running a repo first checks for new commits; no work is done if nothing has changed.
 

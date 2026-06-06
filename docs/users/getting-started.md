@@ -48,7 +48,7 @@ Eleven heuristic risk signals give you a quick read on project health:
 | **Missing lockfile** | Dependencies declared but not pinned |
 | **Secret exposure** | Credentials or tokens found in commit history |
 
-Each signal is **deterministic and data-driven** — no AI involved, no guesswork.
+Each signal is **deterministic and data-driven** — no AI models are used for scanning. Atlas Insight can optionally export a context block for AI tools outside the app.
 
 ### Commit history
 

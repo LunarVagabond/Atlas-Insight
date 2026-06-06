@@ -445,7 +445,7 @@ function renderMd(text: string): string {
   <div class="about-view">
     <div class="about-view__hero">
       <h1 class="about-view__title">Atlas Insight</h1>
-      <p class="about-view__tagline">Repository archaeology — no AI, just data.</p>
+      <p class="about-view__tagline">Repository archaeology — deterministic analysis, with optional AI context export.</p>
     </div>
 
     <AppTabs :tabs="TABS" v-model="activeTab" />
@@ -454,7 +454,7 @@ function renderMd(text: string): string {
     <div v-if="activeTab === 'About'" class="about-view__body" style="margin-top: 2rem">
       <section class="about-view__section">
         <h2 class="about-view__section-title">What is this?</h2>
-        <p>Atlas Insight analyzes public GitHub repositories and surfaces patterns that are hard to see at a glance — commit velocity trends, contributor burnout signals, architectural complexity, dependency health, and more. Everything is deterministic and computed directly from the git history and source files. No LLMs, no guessing.</p>
+        <p>Atlas Insight analyzes public GitHub repositories and surfaces patterns that are hard to see at a glance — commit velocity trends, contributor burnout signals, architectural complexity, dependency health, and more. Core analysis is deterministic and computed directly from git history and source files. Atlas Insight does not use LLMs for scanning, and can optionally export a context block for external AI tools.</p>
       </section>
 
       <section class="about-view__section">

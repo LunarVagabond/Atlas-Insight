@@ -414,7 +414,7 @@ onUnmounted(() => {
                 <button class="results-header__overflow-item" @click="exportJson(); showOverflow = false">↓ Export JSON</button>
                 <button class="results-header__overflow-item" @click="printPage(); showOverflow = false">⎙ Print / PDF</button>
                 <button class="results-header__overflow-item" @click="openAiSummary(); showOverflow = false">
-                  🤖 AI Summary
+                  🤖 External AI Context
                 </button>
               </div>
             </div>
@@ -682,12 +682,12 @@ onUnmounted(() => {
 
   <CompareModal v-if="showCompareModal" @close="showCompareModal = false" />
 
-  <!-- AI Summary modal -->
+  <!-- External AI context modal -->
   <Teleport to="body">
     <div v-if="showAiSummaryModal" class="ai-summary-overlay" @click.self="showAiSummaryModal = false">
       <div class="ai-summary-modal">
         <div class="ai-summary-modal__header">
-          <span class="ai-summary-modal__title">AI Context Block</span>
+          <span class="ai-summary-modal__title">External AI Context Block</span>
           <div class="ai-summary-modal__actions">
             <button
               class="ai-summary-modal__copy"
