@@ -15,6 +15,15 @@ Atlas Insight analyzes GitHub repositories and surfaces architecture insights, h
 
 ---
 
+## The repository list
+
+Your analyzed repositories are shown in a table with:
+
+- **Language icons** — top 3 languages by percentage of code (hover for name and %)
+- **Health badge** — a quick tier label (`champion` / `thriving` / `growing` / `seedling` / `struggling` / `dormant`) derived from the OSS Score; hover for the numeric score
+
+---
+
 ## Reading the results
 
 ### OSS Score
@@ -28,7 +37,7 @@ Eleven heuristic risk signals give you a quick read on project health:
 | Signal | What it means |
 |---|---|
 | **Abandonment risk** | Commit activity has gone quiet for an extended period |
-| **Bus factor** | Most commits come from a single contributor |
+| **Bus factor** | Most commits come from a single contributor — not flagged for solo projects |
 | **Monolith growth** | Files are growing large and tightly coupled |
 | **CI health** | CI configuration is absent or broken |
 | **Burnout signal** | Contributor output spiked then dropped sharply |

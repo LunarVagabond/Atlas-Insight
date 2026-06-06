@@ -228,6 +228,9 @@ export interface RunListItem {
   tags: string[]
   has_previous_run: boolean
   primary_language: string | null
+  top_languages: { name: string; pct: number }[]
+  oss_score: number | null
+  oss_badge: 'champion' | 'thriving' | 'growing' | 'seedling' | 'struggling' | 'dormant' | null
   scanned_branch_count: number
   cached_branch_count: number | null
 }

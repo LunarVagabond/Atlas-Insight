@@ -67,6 +67,11 @@ const topContributors = computed(() =>
     : null
 )
 
+const isSolo = computed(() => {
+  const count = props.githubContributors?.length ?? props.ownership.top_contributors.length
+  return count <= 1
+})
+
 const activeHint = ref<string | null>(null)
 function toggleHint(e: Event, key: string) {
   e.stopPropagation()
@@ -79,7 +84,7 @@ function toggleHint(e: Event, key: string) {
     <h2 class="panel__title">Repository Ownership</h2>
     <p class="ownership-intro">
       Which areas of this codebase are most active, and who works on them.
-      <span v-if="ownership.bus_factor > 0">
+      <span v-if="ownership.bus_factor > 0 && !isSolo">
         <strong>Knowledge risk:</strong> only <strong>{{ ownership.bus_factor }}</strong>
         contributor{{ ownership.bus_factor !== 1 ? 's' : '' }} account for 80% of the codebase —
         if they left, progress could slow significantly.

@@ -305,6 +305,9 @@ GET /repositories/runs/
       "tags": ["typescript", "library"],
       "has_previous_run": true,
       "primary_language": "TypeScript",
+      "top_languages": [{"name": "TypeScript", "pct": 72.4}, {"name": "CSS", "pct": 11.2}],
+      "oss_score": 7.3,
+      "oss_badge": "thriving",
       "scanned_branch_count": 2,
       "cached_branch_count": 5
     }
@@ -314,6 +317,14 @@ GET /repositories/runs/
   "per_page": 25
 }
 ```
+
+Notable list-item fields:
+
+| Field | Description |
+|---|---|
+| `top_languages` | Up to 3 languages with ≥5% share (by byte count from GitHub Linguist) |
+| `oss_score` | 0–10 OSS readiness score; `null` while pending |
+| `oss_badge` | Human tier: `champion` · `thriving` · `growing` · `seedling` · `struggling` · `dormant` |
 
 ---
 

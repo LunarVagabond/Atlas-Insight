@@ -77,14 +77,9 @@ def _fetch_contributors(owner: str, name: str, headers: dict) -> list[dict]:
         return []
 
 
-def fetch_github_meta(owner: str, name: str, token: Optional[str] = None) -> dict:
-    headers: dict[str, str] = {'Accept': 'application/vnd.github+json'}
-    effective_token = token or getattr(settings, 'GITHUB_TOKEN', '')
-    if effective_token:
-        headers['Authorization'] = f'Bearer {effective_token}'
-
+def _fetch_github_meta_rest(owner: str, name: str, headers: dict) -> dict:
+    """REST fallback for fetch_github_meta(). Called only when GraphQL fails."""
     base_url = f'https://api.github.com/repos/{owner}/{name}'
-
     try:
         r = requests.get(base_url, headers=headers, timeout=15)
         if _rate_limited(r):
@@ -96,10 +91,9 @@ def fetch_github_meta(owner: str, name: str, token: Optional[str] = None) -> dic
             return {}
         data = r.json()
     except Exception as exc:
-        logger.warning('GitHub API fetch failed for %s/%s: %s', owner, name, exc)
+        logger.warning('GitHub REST fetch failed for %s/%s: %s', owner, name, exc)
         return {}
 
-    # Open PR count via pulls endpoint + Link header pagination
     open_prs: int | None = None
     try:
         pr_r = requests.get(
@@ -116,8 +110,6 @@ def fetch_github_meta(owner: str, name: str, token: Optional[str] = None) -> dic
         pass
 
     license_info = data.get('license') or {}
-    contributors = _fetch_contributors(owner, name, headers)
-    contribution_data = fetch_contribution_data(owner, name, headers)
     releases_meta = _fetch_releases_meta(owner, name, headers)
     github_languages = _fetch_languages(owner, name, headers)
 
@@ -143,10 +135,34 @@ def fetch_github_meta(owner: str, name: str, token: Optional[str] = None) -> dic
         'created_at': data.get('created_at'),
         'pushed_at': data.get('pushed_at'),
         'homepage': data.get('homepage') or None,
-        'contributors': contributors,
-        'contribution_data': contribution_data,
         'releases_meta': releases_meta,
         'github_languages': github_languages,
+    }
+
+
+def fetch_github_meta(owner: str, name: str, token: Optional[str] = None) -> dict:
+    from apps.analysis.github_graphql import fetch_repo_meta_graphql
+
+    effective_token = token or getattr(settings, 'GITHUB_TOKEN', '') or None
+    headers: dict[str, str] = {'Accept': 'application/vnd.github+json'}
+    if effective_token:
+        headers['Authorization'] = f'Bearer {effective_token}'
+
+    try:
+        gql_meta = fetch_repo_meta_graphql(owner, name, token=effective_token)
+    except Exception as exc:
+        logger.warning('GraphQL fetch failed for %s/%s (%s), falling back to REST', owner, name, exc)  # noqa: E501
+        gql_meta = _fetch_github_meta_rest(owner, name, headers)
+        if not gql_meta:
+            return {}
+
+    contributors = _fetch_contributors(owner, name, headers)
+    contribution_data = fetch_contribution_data(owner, name, headers)
+
+    return {
+        **gql_meta,
+        'contributors': contributors,
+        'contribution_data': contribution_data,
     }
 
 

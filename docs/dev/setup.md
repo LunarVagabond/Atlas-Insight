@@ -75,6 +75,10 @@ api.add_router('/v1/<area>/', router)
 
 The `NinjaAPI` instance lives in `config/urls.py`. Django Ninja generates OpenAPI docs automatically.
 
+### GitHub metadata fetching
+
+`apps/analysis/github_meta.py` is the public entry point. It calls `github_graphql.py` first (richer data, fewer round-trips), then falls back to REST if GraphQL fails or the token is missing. Both paths return the same dict shape. `GITHUB_TOKEN` in `.env` is required for GraphQL; without it everything degrades to REST.
+
 ### Adding a Celery task
 
 Tasks live in `apps/analysis/tasks.py` (or sub-modules). `autodiscover_tasks()` picks them up from all `INSTALLED_APPS` — no manual registration needed.

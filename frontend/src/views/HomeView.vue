@@ -235,11 +235,12 @@ function langIconUrl(name: string | null): string | null {
               <th style="width:2rem"></th>
               <th>Author</th>
               <th>Repository</th>
-              <th>Primary Language</th>
+              <th>Primary Language(s)</th>
               <th class="runs-table__sortable" @click="setSort('status')">
                 Status {{ sortIcon('status') }}
               </th>
               <th>Branches</th>
+              <th>Health</th>
             </tr>
           </thead>
           <tbody>
@@ -264,17 +265,18 @@ function langIconUrl(name: string | null): string | null {
                 </div>
               </td>
               <td class="runs-table__lang-cell">
-                <template v-if="run.primary_language">
-                  <img
-                    v-if="langIconUrl(run.primary_language)"
-                    :src="langIconUrl(run.primary_language)!"
-                    :alt="run.primary_language"
-                    class="runs-table__lang-icon"
-                    width="16"
-                    height="16"
-                  />
-                  <span v-else class="runs-table__lang-unknown" title="Unknown language">?</span>
-                  <span class="runs-table__lang-name">{{ run.primary_language }}</span>
+                <template v-if="run.top_languages.length">
+                  <template v-for="lang in run.top_languages" :key="lang.name">
+                    <img
+                      v-if="langIconUrl(lang.name)"
+                      :src="langIconUrl(lang.name)!"
+                      :alt="lang.name"
+                      :title="`${lang.name} (${lang.pct}%)`"
+                      class="runs-table__lang-icon"
+                      width="16"
+                      height="16"
+                    />
+                  </template>
                 </template>
                 <span v-else class="runs-table__lang-empty">—</span>
               </td>
@@ -290,6 +292,15 @@ function langIconUrl(name: string | null): string | null {
                 </span>
                 <span v-else class="runs-table__branch-count runs-table__branch-count--none">—</span>
               </td>
+              <td class="runs-table__health-cell">
+                <span
+                  v-if="run.oss_badge"
+                  class="runs-table__health-badge"
+                  :class="`runs-table__health-badge--${run.oss_badge}`"
+                  :title="`${run.oss_score?.toFixed(1)}/10`"
+                >{{ run.oss_badge }}</span>
+                <span v-else class="runs-table__lang-empty">—</span>
+              </td>
             </tr>
 
             <tr
@@ -297,7 +308,7 @@ function langIconUrl(name: string | null): string | null {
               :key="'ghost-' + i"
               class="runs-table__row runs-table__row--ghost"
             >
-              <td colspan="6">&nbsp;</td>
+              <td colspan="7">&nbsp;</td>
             </tr>
           </tbody>
         </table>

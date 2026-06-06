@@ -10,6 +10,7 @@ frontend/coverage/
 
 # Python
 backend/.venv/
+backend/venv/
 **/__pycache__/
 **/*.pyc
 **/*.pyo

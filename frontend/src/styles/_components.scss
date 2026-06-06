@@ -3725,33 +3725,37 @@
 
 .runs-table__lang-icon {
   vertical-align: middle;
-  margin-right: 0.375rem;
-}
 
-.runs-table__lang-name {
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-  vertical-align: middle;
-}
-
-.runs-table__lang-unknown {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--color-border);
-  color: var(--color-text-muted);
-  font-size: 0.65rem;
-  font-weight: 700;
-  margin-right: 0.375rem;
-  vertical-align: middle;
+  & + & {
+    margin-left: 0.25rem;
+  }
 }
 
 .runs-table__lang-empty {
   color: var(--color-text-muted);
   font-size: 0.8125rem;
+}
+
+.runs-table__health-cell {
+  white-space: nowrap;
+}
+
+.runs-table__health-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--color-border);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  background: var(--color-surface);
+
+  &--champion  { border-color: #f59e0b; background: rgba(245, 158, 11, 0.1); color: #92400e; }
+  &--thriving  { border-color: #6366f1; background: rgba(99, 102, 241, 0.1); color: #3730a3; }
+  &--growing   { border-color: #22c55e; background: rgba(34, 197, 94, 0.1); color: #14532d; }
+  &--seedling  { border-color: #84cc16; background: rgba(132, 204, 22, 0.1); color: #3f6212; }
+  &--struggling { border-color: #f97316; background: rgba(249, 115, 22, 0.1); color: #7c2d12; }
+  &--dormant   { border-color: #6b7280; background: rgba(107, 114, 128, 0.1); color: #374151; }
 }
 
 .runs-table__divider td {

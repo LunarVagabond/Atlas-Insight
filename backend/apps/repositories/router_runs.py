@@ -220,6 +220,9 @@ class RunListItemSchema(Schema):
     tags: list[str] = []
     has_previous_run: bool = False
     primary_language: Optional[str] = None
+    top_languages: list[dict] = []
+    oss_score: Optional[float] = None
+    oss_badge: Optional[str] = None
     scanned_branch_count: int = 0
     cached_branch_count: Optional[int] = None
 
@@ -325,6 +328,11 @@ def analyze(request, payload: AnalyzeRequest):
     return AnalyzeResponse(run_id=run.id, status='pending', cached=False)
 
 
+def _top_languages(result) -> list[dict]:
+    langs = (result or {}).get('github_meta', {}).get('github_languages', [])
+    return [{"name": lang["name"], "pct": lang["pct"]} for lang in langs if lang.get("pct", 0) >= 5.0][:3]
+
+
 @router.get('/runs/', response=RunListSchema)
 @ratelimit(key='user_or_ip', rate='300/m', method='GET', block=False)
 def list_runs(
@@ -423,6 +431,9 @@ def list_runs(
                 tags=r.result.get('classification', {}).get('tags', []) if r.result else [],
                 has_previous_run=getattr(r, 'has_previous_run', False),
                 primary_language=r.result.get('github_meta', {}).get('primary_language') if r.result else None,
+                top_languages=_top_languages(r.result),
+                oss_score=r.oss_score,
+                oss_badge=r.oss_badge,
                 scanned_branch_count=getattr(r, 'scanned_branch_count', 0) or 0,
                 cached_branch_count=r.repo.cached_branch_count,
             )
