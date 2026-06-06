@@ -194,6 +194,7 @@ const improvementHints = computed<string[]>(() => {
 
     <!-- Score Breakdown -->
     <div v-if="overallScore !== null" class="score-breakdown">
+      <h4 class="score-breakdown__heading">At a Glance</h4>
       <div class="score-breakdown__body">
         <div class="score-breakdown__summary">
           <span class="score-breakdown__title">
@@ -205,14 +206,16 @@ const improvementHints = computed<string[]>(() => {
         </div>
         <div class="score-breakdown__bars">
           <div v-for="item in scoreBreakdown" :key="item.label" class="score-breakdown__row">
-            <span class="score-breakdown__label">{{ item.label }}</span>
+            <span class="score-breakdown__label">
+              {{ item.label }}
+              <span :class="['score-breakdown__val', `score-breakdown__val--${item.level}`]">({{ item.score }})</span>
+            </span>
             <div class="score-breakdown__track">
               <div
                 :class="['score-breakdown__fill', `score-breakdown__fill--${item.level}`]"
                 :style="{ width: `${item.pct}%` }"
               />
             </div>
-            <span :class="['score-breakdown__val', `score-breakdown__val--${item.level}`]">{{ item.score }}</span>
           </div>
         </div>
       </div>

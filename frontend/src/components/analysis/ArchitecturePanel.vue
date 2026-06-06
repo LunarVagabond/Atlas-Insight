@@ -493,7 +493,7 @@ const explorerResults = computed(() => {
             <div class="arch-file-drawer__header">
               <div class="arch-file-drawer__title-group">
                 <div class="arch-file-drawer__badges">
-                  <span v-if="drawerFile.isGod" class="arch-file-drawer__badge arch-file-drawer__badge--god">God module</span>
+                  <span v-if="drawerFile.isGod" class="arch-file-drawer__badge arch-file-drawer__badge--god">Core file</span>
                   <span v-if="drawerFile.isHotspot" class="arch-file-drawer__badge arch-file-drawer__badge--hot">Hotspot · {{ drawerFile.degree }} connections</span>
                 </div>
                 <h3 class="arch-file-drawer__filename" :title="drawerFile.id">{{ drawerFile.label }}</h3>

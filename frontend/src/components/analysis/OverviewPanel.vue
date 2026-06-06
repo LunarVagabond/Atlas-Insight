@@ -65,7 +65,7 @@ const notableFindings = computed<Finding[]>(() => {
 
   const godModules = r.graph?.god_modules?.length ?? 0
   if (godModules > 0) {
-    findings.push({ icon: '🕸️', text: `${godModules} god module${godModules > 1 ? 's' : ''} — highly coupled files that many things depend on`, variant: 'info' })
+    findings.push({ icon: '🕸️', text: `${godModules} core file${godModules > 1 ? 's' : ''} — imported by many others, changing them ripples wide (see Core Files in Architecture tab)`, variant: 'info' })
   }
 
   const beginnerIssues = (r.contribution_opportunities ?? []).filter(

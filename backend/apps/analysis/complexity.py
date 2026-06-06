@@ -22,10 +22,20 @@ def _has_adjacent_test(rel_path: str, all_source_files: set[str]) -> bool:
         f'{parent}/{stem}.test{p.suffix}',
         f'{parent}/{stem}.spec{p.suffix}',
         f'{parent}/tests/{stem}{p.suffix}',
+        f'{parent}/tests/test_{stem}{p.suffix}',
+        f'{parent}/tests/{stem}_test{p.suffix}',
         f'tests/{stem}{p.suffix}',
+        f'tests/test_{stem}{p.suffix}',
         f'test/{stem}{p.suffix}',
+        f'test/test_{stem}{p.suffix}',
     ):
         if candidate in all_source_files:
+            return True
+    # Fuzzy fallback: any test file in the sibling tests/ dir whose stem contains
+    # this stem (catches router_jit -> test_jit_endpoints, etc.)
+    tests_prefix = f'{parent}/tests/'
+    for f in all_source_files:
+        if f.startswith(tests_prefix) and _is_test_file(f) and stem in Path(f).stem:
             return True
     return False
 

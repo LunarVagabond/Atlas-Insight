@@ -7989,6 +7989,16 @@
   padding: $space-5;
   margin-bottom: $space-6;
 
+  &__heading {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-muted);
+    margin: 0 0 $space-4;
+    text-align: center;
+  }
+
   &__body {
     display: grid;
     grid-template-columns: 120px 1fr;
@@ -8051,20 +8061,27 @@
   }
 
   &__bars {
-    display: flex;
-    flex-direction: column;
-    gap: $space-2;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: $space-2 $space-5;
+
+    @media (max-width: $bp-md) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    @media (max-width: $bp-sm) {
+      grid-template-columns: 1fr;
+    }
   }
 
   &__row {
-    display: grid;
-    grid-template-columns: 10rem 1fr 2.5rem;
-    align-items: center;
-    gap: $space-3;
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
   }
 
   &__label {
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     color: var(--color-text-secondary);
     white-space: nowrap;
     overflow: hidden;
@@ -8072,6 +8089,7 @@
   }
 
   &__track {
+    width: 100%;
     height: 6px;
     background: var(--color-border);
     border-radius: 3px;
@@ -8089,9 +8107,8 @@
   }
 
   &__val {
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    text-align: right;
 
     &--low { color: var(--color-success); }
     &--medium { color: var(--color-warning); }
