@@ -624,6 +624,11 @@
   margin: 0 auto;
   padding: 0 $space-6 $space-12;
 
+  &__table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
   &__header {
     display: flex;
     align-items: center;
@@ -1171,6 +1176,11 @@
 
   @media (max-width: $bp-sm) {
     padding: 0 $space-4;
+    grid-template-columns: 1fr;
+  }
+
+  @media (max-width: 400px) {
+    padding: 0 $space-3;
   }
 }
 
@@ -1182,6 +1192,9 @@
     &__nav-links { display: none; }
     &__hamburger { display: flex; }
   }
+
+  // Shortcuts hint is keyboard-only — hide when hamburger is shown
+  .app-footer__shortcuts-hint { display: none; }
 }
 
 @media (max-width: $bp-md) {
@@ -1205,11 +1218,13 @@
     padding: 0 $space-4 $space-8;
   }
 
-  // Footer on mobile: hide left hint, coffee link becomes icon-only
+  // Footer on mobile: shortcuts hint already hidden at $bp-nav; simplify to flex row
   .app-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     padding: $space-2 $space-4;
 
-    &__shortcuts-hint { display: none; }
     &__support-text { display: none; }
     &__bmc-text { display: none; }
     &__bmc {
@@ -1294,6 +1309,16 @@
 
   // Hide URL column on mobile — repo name is enough
   .runs-table__url {
+    display: none;
+  }
+
+  // Hide low-priority columns — Author, Branches, Forks to reduce table width
+  .runs-table__author-cell,
+  .runs-table__author-th,
+  .runs-table__branches-cell,
+  .runs-table__branches-th,
+  .runs-table__forks-cell,
+  .runs-table__forks-th {
     display: none;
   }
 }

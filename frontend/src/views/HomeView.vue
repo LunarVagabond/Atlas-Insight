@@ -229,18 +229,19 @@ function langIconUrl(name: string | null): string | null {
       </div>
 
       <template v-else>
+        <div class="home-runs__table-wrap">
         <table class="data-table runs-table">
           <thead>
             <tr>
               <th style="width:2rem"></th>
-              <th>Author</th>
+              <th class="runs-table__author-th">Author</th>
               <th>Repository</th>
               <th>Primary Language(s)</th>
               <th class="runs-table__sortable" @click="setSort('status')">
                 Status {{ sortIcon('status') }}
               </th>
-              <th>Branches</th>
-              <th>Forks</th>
+              <th class="runs-table__branches-th">Branches</th>
+              <th class="runs-table__forks-th">Forks</th>
               <th>Health</th>
             </tr>
           </thead>
@@ -258,7 +259,7 @@ function langIconUrl(name: string | null): string | null {
                   :title="isPinned(run.repo_url) ? 'Unpin' : 'Pin to top'"
                 >{{ isPinned(run.repo_url) ? '★' : '☆' }}</button>
               </td>
-              <td><span class="runs-table__author">{{ run.repo_owner }}</span></td>
+              <td class="runs-table__author-cell"><span class="runs-table__author">{{ run.repo_owner }}</span></td>
               <td>
                 <div class="runs-table__repo">
                   <span class="runs-table__project">{{ run.repo_name }}</span>
@@ -317,6 +318,7 @@ function langIconUrl(name: string | null): string | null {
             </tr>
           </tbody>
         </table>
+        </div>
 
         <div v-if="totalPages > 1" class="runs-pagination">
           <AppButton variant="secondary" :disabled="page <= 1" @click="page--">← Prev</AppButton>
