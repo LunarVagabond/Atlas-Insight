@@ -1,7 +1,10 @@
 import collections
+import re
 from datetime import datetime, timezone
 
 from git import Repo
+
+_BOT_RE = re.compile(r'\[bot\]|dependabot|github-actions|renovate|snyk-bot|codecov', re.IGNORECASE)
 
 
 def get_releases(repo_obj: Repo) -> tuple[int, list[dict]]:
@@ -36,22 +39,30 @@ def get_repo_age(repo_obj: Repo) -> int | None:
 
 
 def compute_bus_factor(repo_obj: Repo) -> tuple[int, list[dict]]:
+    # Keyed by lowercased display name — deduplicates same person with multiple emails
     author_files: dict[str, set] = collections.defaultdict(set)
-    email_to_name: dict[str, str] = {}
+    name_display: dict[str, str] = {}  # canonical display name (first seen)
+    name_email: dict[str, str] = {}    # one email per name (first seen)
     try:
         output = repo_obj.git.log('--format=AUTHOR:%ae|%an', '--name-only', '-300', 'HEAD')
-        current_author: str | None = None
+        current_key: str | None = None
         for line in output.splitlines():
             line = line.strip()
             if not line:
                 continue
             if line.startswith('AUTHOR:'):
                 parts = line[7:].split('|', 1)
-                current_author = parts[0]
-                if current_author and len(parts) > 1 and parts[1]:
-                    email_to_name[current_author] = parts[1]
-            elif current_author:
-                author_files[current_author].add(line)
+                email = parts[0]
+                name = parts[1] if len(parts) > 1 else email
+                if _BOT_RE.search(email) or _BOT_RE.search(name):
+                    current_key = None
+                    continue
+                current_key = name.lower() or email.lower()
+                if current_key not in name_display:
+                    name_display[current_key] = name
+                    name_email[current_key] = email
+            elif current_key:
+                author_files[current_key].add(line)
     except Exception:
         return 1, []
 
@@ -65,11 +76,11 @@ def compute_bus_factor(repo_obj: Repo) -> tuple[int, list[dict]]:
     sorted_authors = sorted(author_files.items(), key=lambda x: -len(x[1]))
     top_contributors = [
         {
-            'author': email_to_name.get(a, a),
-            'email': a,
+            'author': name_display.get(k, k),
+            'email': name_email.get(k, k),
             'files_touched': len(f),
         }
-        for a, f in sorted_authors[:10]
+        for k, f in sorted_authors[:10]
     ]
 
     total_authors = len(author_files)

@@ -71,7 +71,8 @@ def _fetch_contributors(owner: str, name: str, headers: dict) -> list[dict]:
                 'contributions': c.get('contributions', 0),
             }
             for c in r.json()
-            if c.get('type') != 'Anonymous'
+            if c.get('type') not in ('Anonymous', 'Bot')
+            and '[bot]' not in (c.get('login') or '').lower()
         ]
     except Exception:
         return []

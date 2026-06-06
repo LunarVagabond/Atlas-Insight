@@ -18,6 +18,7 @@ _EMOJI_RE = re.compile(r'^[\U0001F300-\U0001FAFF\U00002600-\U000027BF☀-➿]')
 _TICKET_BRACKET_RE = re.compile(r'^[A-Z]+-\d+$|^#?\d+$')
 _JIRA_BRACKET_RE = re.compile(r'^[A-Z]{2,10}-\d+$')
 _MERGE_RE = re.compile(r'^Merge (pull request|branch|remote-tracking)', re.IGNORECASE)
+_BOT_RE = re.compile(r'\[bot\]|dependabot|github-actions|renovate|snyk-bot|codecov', re.IGNORECASE)
 
 
 def _detect_commit_conventions(subjects: list[str]) -> dict:
@@ -153,8 +154,16 @@ def analyze_commits(repo: Repo) -> dict:
         if last_commit_date is None:
             last_commit_date = dt.isoformat()
 
-        author = commit.author.email or commit.author.name
-        contributors.add(author)
+        email = commit.author.email or ''
+        name = commit.author.name or email
+        if _BOT_RE.search(email) or _BOT_RE.search(name):
+            subject = commit.message.split('\n')[0].strip()
+            if subject and len(all_subjects) < 300:
+                all_subjects.append(subject)
+            continue
+        # Deduplicate by name: same display name across different emails = same person
+        identity = name.lower() or email.lower()
+        contributors.add(identity)
 
         subject = commit.message.split('\n')[0].strip()
         if subject and len(all_subjects) < 300:
@@ -165,7 +174,7 @@ def analyze_commits(repo: Repo) -> dict:
             month_key = dt.strftime('%Y-%m')
             weekly[week_key] += 1
             monthly[month_key] += 1
-            contributor_by_period[month_key].add(author)
+            contributor_by_period[month_key].add(identity)
             if len(monthly_commits[month_key]) < 60:
                 subject = commit.message.split('\n')[0][:80]
                 body_lines = commit.message[len(commit.message.split('\n')[0]):].strip()
