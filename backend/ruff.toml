@@ -2,11 +2,9 @@ line-length = 100
 target-version = "py311"
 
 exclude = [
-    "frontend",
     ".venv",
     "venv",
-    "backend/.venv",
-    "backend/apps/*/migrations",
+    "apps/*/migrations",
     "__pycache__",
     "dist",
     "build",

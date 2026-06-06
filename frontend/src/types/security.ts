@@ -6,6 +6,8 @@ export interface VulnFinding {
   summary: string
   severity: string | null
   url: string
+  version_is_range?: boolean
+  note?: string | null
 }
 
 export interface SecurityData {

@@ -86,6 +86,23 @@ def analyze_structure(repo_obj: Repo, repo_dir: str, deps: dict | None = None) -
                 )
             except Exception:
                 pass
+    if not has_lint:
+        # Monorepo: check one level of subdirectories (backend/, frontend/, packages/*, etc.)
+        for sub in base.iterdir():
+            if not sub.is_dir() or sub.name in SKIP_DIRS or sub.name.startswith('.'):
+                continue
+            if any((sub / f).exists() for f in LINT_FILES):
+                has_lint = True
+                break
+            ppt = sub / 'pyproject.toml'
+            if ppt.exists():
+                try:
+                    c = ppt.read_text(errors='ignore')
+                    if any(tag in c for tag in ('[tool.ruff]', '[tool.flake8]', '[tool.pylint]')):
+                        has_lint = True
+                        break
+                except Exception:
+                    pass
 
     has_docker = any(
         (base / f).exists()

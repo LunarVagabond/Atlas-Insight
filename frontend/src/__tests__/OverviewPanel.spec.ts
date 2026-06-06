@@ -15,8 +15,12 @@ function makeResult(overrides: Partial<RunResult> = {}): RunResult {
       total_commits: 120,
       total_contributors: 4,
       abandoned: false,
+      last_commit_date: null,
       days_since_last_commit: 10,
+      activity_decay_ratio: 0,
+      weekly_frequency: [],
       monthly_frequency: [],
+      contributor_churn: [],
     },
     heuristics: [
       { signal: 'burnout', label: 'Burnout', score: 20, confidence: 'high', description: 'Low burnout risk' },
@@ -75,7 +79,7 @@ describe('OverviewPanel — notable findings', () => {
 
   it('flags abandoned repository', () => {
     const result = makeResult({
-      commits: { total_commits: 10, total_contributors: 1, abandoned: true, days_since_last_commit: 400, monthly_frequency: [] },
+      commits: { total_commits: 10, total_contributors: 1, abandoned: true, last_commit_date: null, days_since_last_commit: 400, activity_decay_ratio: 1, weekly_frequency: [], monthly_frequency: [], contributor_churn: [] },
     } as Partial<RunResult>)
     const w = mount(OverviewPanel, { props: { result }, global: { stubs } })
     expect(w.text()).toContain('400 days silent')
@@ -83,7 +87,10 @@ describe('OverviewPanel — notable findings', () => {
 
   it('flags CVEs in dependencies', () => {
     const result = makeResult({
-      security: { issue_count: 0, vulnerabilities: [{ name: 'lodash', severity: 'high' }, { name: 'axios', severity: 'medium' }] },
+      security: { issues: [], issue_count: 0, score: 0, gitignore_exists: true, gitignore_gaps: [], vulnerabilities: [
+        { name: 'lodash', version: '4.17.15', ecosystem: 'npm', vuln_id: 'GHSA-1', summary: '', severity: 'high', url: 'https://osv.dev/vulnerability/GHSA-1' },
+        { name: 'axios', version: '0.21.0', ecosystem: 'npm', vuln_id: 'GHSA-2', summary: '', severity: 'medium', url: 'https://osv.dev/vulnerability/GHSA-2' },
+      ] },
     } as Partial<RunResult>)
     const w = mount(OverviewPanel, { props: { result }, global: { stubs } })
     expect(w.text()).toContain('2 known CVEs')

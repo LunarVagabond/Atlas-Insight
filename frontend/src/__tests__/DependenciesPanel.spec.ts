@@ -21,7 +21,11 @@ function makeDeps(overrides: Partial<DepsData> = {}): DepsData {
 
 function makeSecurity(overrides: Partial<SecurityData> = {}): SecurityData {
   return {
+    issues: [],
     issue_count: 0,
+    score: 0,
+    gitignore_exists: true,
+    gitignore_gaps: [],
     vulnerabilities: [],
     ...overrides,
   }
@@ -72,7 +76,10 @@ describe('DependenciesPanel — CVE banner', () => {
       ],
     })
     const security = makeSecurity({
-      vulnerabilities: [{ name: 'lodash', severity: 'high' }, { name: 'axios', severity: 'medium' }],
+      vulnerabilities: [
+        { name: 'lodash', version: '4.17.15', ecosystem: 'npm', vuln_id: 'GHSA-1', summary: '', severity: 'high', url: 'https://osv.dev/vulnerability/GHSA-1' },
+        { name: 'axios', version: '0.21.0', ecosystem: 'npm', vuln_id: 'GHSA-2', summary: '', severity: 'medium', url: 'https://osv.dev/vulnerability/GHSA-2' },
+      ],
     })
     const w = mount(DependenciesPanel, { props: { deps, security }, global: { stubs } })
     expect(w.text()).toContain('2 CVEs found')
@@ -108,7 +115,7 @@ describe('DependenciesPanel — dependency table', () => {
       dependency_count: 1,
       dependencies: [{ name: 'my-vuln-lib', version_spec: '1.0.0', source: 'npm' }],
     })
-    const security = makeSecurity({ vulnerabilities: [{ name: 'my-vuln-lib', severity: 'high' }] })
+    const security = makeSecurity({ vulnerabilities: [{ name: 'my-vuln-lib', version: '1.0.0', ecosystem: 'npm', vuln_id: 'GHSA-3', summary: '', severity: 'high', url: 'https://osv.dev/vulnerability/GHSA-3' }] })
     const w = mount(DependenciesPanel, { props: { deps, security }, global: { stubs } })
     // findAll — first is the CVE banner, second is the inline row badge
     const failedBadges = w.findAll('[data-variant="failed"]')

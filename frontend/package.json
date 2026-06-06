@@ -2,6 +2,7 @@
   "name": "atlas-insight-frontend",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build",
@@ -9,7 +10,9 @@
     "type-check": "vue-tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "dependencies": {
     "@types/cytoscape": ">=3.21.9",
@@ -28,7 +31,10 @@
   "devDependencies": {
     "@vitejs/plugin-vue": ">=5.2.4",
     "@vitest/coverage-v8": ">=3.0.0",
+    "@vue/eslint-config-typescript": "^14.8.0",
     "@vue/test-utils": ">=2.4.6",
+    "eslint": "^10.4.1",
+    "eslint-plugin-vue": "^10.9.2",
     "jsdom": ">=26.0.0",
     "sass": ">=1.100.0",
     "typescript": ">=5.6.3",

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
+import { useToast } from '../composables/useToast'
 import type {
   AnalysisRun,
   RunResult,
@@ -92,8 +93,14 @@ export const useAnalysisStore = defineStore('analysis', {
         return data.run_id as string
       } catch (err: unknown) {
         this.status = 'error'
-        const axiosErr = err as { response?: { data?: { detail?: string } } }
-        this.error = axiosErr.response?.data?.detail ?? 'Failed to submit URL'
+        const axiosErr = err as { response?: { status?: number; data?: { detail?: string } } }
+        const msg = axiosErr.response?.data?.detail ?? 'Failed to submit URL'
+        this.error = msg
+        if (axiosErr.response?.status === 429) {
+          useToast().warning(msg, 8000)
+        } else {
+          useToast().error(msg)
+        }
         throw err
       }
     },
@@ -167,6 +174,7 @@ export const useAnalysisStore = defineStore('analysis', {
         } else if (this.run?.status === 'failed') {
           this.status = 'error'
           this.error = this.run.result?.error ?? 'Analysis failed'
+          useToast().error(this.error)
           this._stopPolling()
         }
       }, 3000)
@@ -187,10 +195,15 @@ export const useAnalysisStore = defineStore('analysis', {
       } catch (err: unknown) {
         const axiosErr = err as { response?: { status?: number; data?: { detail?: string } } }
         const status = axiosErr.response?.status
-        // 429 = transient rate limit — skip this tick, keep polling, don't blow up the page
-        if (status === 429) return false
+        // 429 = transient rate limit — skip this tick, keep polling
+        if (status === 429) {
+          useToast().warning('Rate limited — retrying shortly…', 4000)
+          return false
+        }
+        const msg = axiosErr.response?.data?.detail ?? 'Failed to fetch run'
         this.status = 'error'
-        this.error = axiosErr.response?.data?.detail ?? 'Failed to fetch run'
+        this.error = msg
+        useToast().error(msg)
         this._stopPolling()
         return false
       }
@@ -236,8 +249,19 @@ export const useAnalysisStore = defineStore('analysis', {
     },
 
     async retryRun(runId: string): Promise<string> {
-      const { data } = await axios.post(`/api/v1/repositories/runs/${runId}/retry`)
-      return data.run_id as string
+      try {
+        const { data } = await axios.post(`/api/v1/repositories/runs/${runId}/retry`)
+        return data.run_id as string
+      } catch (err: unknown) {
+        const axiosErr = err as { response?: { status?: number; data?: { detail?: string } } }
+        const msg = axiosErr.response?.data?.detail ?? 'Failed to start re-analysis'
+        if (axiosErr.response?.status === 429) {
+          useToast().warning(msg, 8000)
+        } else {
+          useToast().error(msg)
+        }
+        throw err
+      }
     },
 
     async deleteRun(runId: string) {

@@ -1,7 +1,7 @@
 from django.contrib import admin, messages
 from django.utils.html import format_html
 
-from .models import AnalysisRun, FeatureFlag, Repository, RepoOfTheWeek, UserFavorite, WebhookDelivery
+from .models import AnalysisRun, Constellation, FeatureFlag, Repository, RepoOfTheWeek, UserFavorite, WebhookDelivery
 
 
 def _trigger(task_path, request, label):
@@ -151,3 +151,15 @@ class FeatureFlagAdmin(admin.ModelAdmin):
     search_fields = ('name', 'description')
     readonly_fields = ('created_at', 'updated_at')
     ordering = ('name',)
+
+
+@admin.register(Constellation)
+class ConstellationAdmin(admin.ModelAdmin):
+    list_display = ('name', 'org', 'repo_count', 'created_at', 'last_updated')
+    search_fields = ('name', 'org')
+    readonly_fields = ('id', 'created_at', 'last_updated')
+    filter_horizontal = ('repos',)
+
+    @admin.display(description='Repos')
+    def repo_count(self, obj):
+        return obj.repos.count()

@@ -61,6 +61,7 @@ const order = ref<'desc' | 'asc'>('desc')
 const page = ref(1)
 const perPage = 10
 const showCompareModal = ref(false)
+const showFavoritesOnly = ref(false)
 const items = ref<RunListItem[]>([])
 const total = ref(0)
 const loading = ref(false)
@@ -68,9 +69,17 @@ const loading = ref(false)
 async function fetchRuns() {
   loading.value = true
   try {
-    const { data } = await axios.get('/api/v1/repositories/runs/', {
-      params: { q: q.value, sort: sort.value, order: order.value, page: page.value, per_page: perPage },
-    })
+    const params: Record<string, unknown> = {
+      q: q.value,
+      sort: sort.value,
+      order: order.value,
+      page: page.value,
+      per_page: perPage,
+    }
+    if (showFavoritesOnly.value && auth.isAuthenticated) {
+      params.favorited_only = true
+    }
+    const { data } = await axios.get('/api/v1/repositories/runs/', { params })
     items.value = data.items
     total.value = data.total
     if (auth.isAuthenticated) {
@@ -84,7 +93,7 @@ async function fetchRuns() {
 }
 
 onMounted(fetchRuns)
-watch([q, sort, order], () => { page.value = 1; fetchRuns() })
+watch([q, sort, order, showFavoritesOnly], () => { page.value = 1; fetchRuns() })
 watch(page, fetchRuns)
 
 const totalPages = computed(() => Math.ceil(total.value / perPage))
@@ -140,11 +149,13 @@ async function togglePin(repoUrl: string) {
   }
 }
 
-// Pinned items float to the top within the current page
-const sortedItems = computed(() => [
-  ...items.value.filter(r => isPinned(r.repo_url)),
-  ...items.value.filter(r => !isPinned(r.repo_url)),
-])
+// For unauthenticated users, filter client-side from localStorage watchlist
+const displayedItems = computed(() => {
+  if (showFavoritesOnly.value && !auth.isAuthenticated) {
+    return items.value.filter(r => isPinned(r.repo_url))
+  }
+  return items.value
+})
 
 const ghostRows = computed(() => Math.max(0, perPage - items.value.length))
 
@@ -198,6 +209,13 @@ function langIconUrl(name: string | null): string | null {
             style="max-width:320px"
           />
           <span class="runs-search__count">{{ total }} repo{{ total !== 1 ? 's' : '' }}</span>
+          <AppButton
+            :variant="showFavoritesOnly ? 'primary' : 'secondary'"
+            @click="showFavoritesOnly = !showFavoritesOnly"
+            title="Toggle favorites filter"
+          >
+            {{ showFavoritesOnly ? '★ Favorites' : '☆ Favorites' }}
+          </AppButton>
           <AppButton variant="secondary" @click="showCompareModal = true">
             Compare
           </AppButton>
@@ -226,7 +244,7 @@ function langIconUrl(name: string | null): string | null {
           </thead>
           <tbody>
             <tr
-              v-for="run in sortedItems"
+              v-for="run in displayedItems"
               :key="run.id"
               :class="['runs-table__row', isPinned(run.repo_url) && 'runs-table__row--pinned']"
               @click="goToRun(run.id)"

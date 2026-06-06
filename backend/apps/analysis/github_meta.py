@@ -8,6 +8,19 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
+def _rate_limited(resp) -> bool:
+    """True if the response indicates GitHub rate limit exhaustion."""
+    if resp.status_code == 429:
+        return True
+    if resp.status_code == 403:
+        remaining = resp.headers.get('X-RateLimit-Remaining', '1')
+        try:
+            return int(remaining) == 0
+        except ValueError:
+            pass
+    return False
+
+
 def fetch_latest_sha(
     owner: str, name: str, token: Optional[str] = None, branch: str = ''
 ) -> Optional[str]:
@@ -25,6 +38,9 @@ def fetch_latest_sha(
             headers=headers,
             timeout=10,
         )
+        if _rate_limited(resp):
+            logger.warning('GitHub rate limit hit fetching SHA for %s/%s', owner, name)
+            return None
         if resp.status_code == 200:
             data = resp.json()
             if data:
@@ -42,6 +58,9 @@ def _fetch_contributors(owner: str, name: str, headers: dict) -> list[dict]:
             headers=headers,
             timeout=15,
         )
+        if _rate_limited(r):
+            logger.warning('GitHub rate limit hit fetching contributors for %s/%s', owner, name)
+            return []
         if r.status_code != 200:
             return []
         return [
@@ -68,6 +87,10 @@ def fetch_github_meta(owner: str, name: str, token: Optional[str] = None) -> dic
 
     try:
         r = requests.get(base_url, headers=headers, timeout=15)
+        if _rate_limited(r):
+            reset = r.headers.get('X-RateLimit-Reset', '?')
+            logger.warning('GitHub rate limit hit for %s/%s (resets %s)', owner, name, reset)
+            return {}
         if r.status_code != 200:
             logger.warning('GitHub API returned %s for %s/%s', r.status_code, owner, name)
             return {}

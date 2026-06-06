@@ -15,6 +15,7 @@ ALLOWED_HOSTS = config(
 )
 
 SITE_NAME = config('SITE_NAME', default='Atlas Insight')
+SITE_DOMAIN = config('SITE_DOMAIN', default='atlas.dsyndicate.dev')
 APP_VERSION = '1.0.0'
 
 # ── CORS / CSRF ──────────────────────────────────────────────────────────────

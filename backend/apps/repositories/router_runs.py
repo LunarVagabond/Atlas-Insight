@@ -335,6 +335,7 @@ def list_runs(
     page: int = 1,
     per_page: int = 25,
     mine: bool = False,
+    favorited_only: bool = False,
 ):
     _assert_not_limited(request)
     per_page = min(per_page, 25)
@@ -377,6 +378,10 @@ def list_runs(
 
     if mine and request.user.is_authenticated:
         qs = qs.filter(user=request.user)
+
+    if favorited_only and request.user.is_authenticated:
+        fav_ids = UserFavorite.objects.filter(user=request.user).values_list('repo_id', flat=True)
+        qs = qs.filter(repo_id__in=fav_ids)
 
     if q:
         qs = qs.filter(

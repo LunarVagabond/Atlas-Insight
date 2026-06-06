@@ -37,9 +37,14 @@ const notableFindings = computed<Finding[]>(() => {
     findings.push({ icon: '💤', text: `No commits in over a year (${r.commits.days_since_last_commit} days silent)`, variant: 'critical' })
   }
 
-  const vulnCount = r.security?.vulnerabilities?.length ?? 0
-  if (vulnCount > 0) {
-    findings.push({ icon: '🔒', text: `${vulnCount} known CVE${vulnCount > 1 ? 's' : ''} in dependencies`, variant: 'critical' })
+  const vulns = r.security?.vulnerabilities ?? []
+  const confirmedVulns = vulns.filter(v => !v.version_is_range)
+  const rangeVulns = vulns.filter(v => v.version_is_range)
+  if (confirmedVulns.length > 0) {
+    findings.push({ icon: '🔒', text: `${confirmedVulns.length} known CVE${confirmedVulns.length > 1 ? 's' : ''} in dependencies`, variant: 'critical' })
+  }
+  if (rangeVulns.length > 0) {
+    findings.push({ icon: '⚠️', text: `${rangeVulns.length} possible CVE${rangeVulns.length > 1 ? 's' : ''} — verify installed versions`, variant: 'warning' })
   }
 
   const secIssues = r.security?.issue_count ?? 0

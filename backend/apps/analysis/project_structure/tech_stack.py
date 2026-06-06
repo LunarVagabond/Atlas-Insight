@@ -213,6 +213,7 @@ CI_PATHS: dict[str, str] = {
 
 LINT_FILES = {
     '.eslintrc', '.eslintrc.js', '.eslintrc.json', '.eslintrc.yml', '.eslintrc.yaml',
+    'eslint.config.js', 'eslint.config.mjs', 'eslint.config.ts', 'eslint.config.cjs',
     'ruff.toml', '.flake8', '.pylintrc', 'golangci.yml', '.golangci.yml',
     '.rubocop.yml', 'checkstyle.xml', '.scalafmt.conf', '.stylelintrc',
     'biome.json', '.prettier.config.js',

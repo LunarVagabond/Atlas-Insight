@@ -27,21 +27,25 @@ GITIGNORE_RECOMMENDED = [
 
 def _gitignore_covers(pattern: str, gi_lines_lower: list[str]) -> bool:
     """Return True if any non-comment gitignore line covers this pattern."""
+    pat = pattern.rstrip('/')
     for raw in gi_lines_lower:
-        # Normalize: strip leading anchor prefixes common in .gitignore entries
-        line = raw
+        # Normalize: strip leading anchor prefixes and trailing slash (dir markers)
+        line = raw.rstrip('/')
         if line.startswith('**/'):
             line = line[3:]
         if line.startswith('/'):
             line = line[1:]
 
-        if line == pattern:
+        if line == pat:
+            return True
+        # path-prefixed entry: "frontend/node_modules" or "backend/.venv" covers the bare pattern
+        if line.endswith(f'/{pat}'):
             return True
         # *.ext pattern: "*.log" or "**/*.log" cover "*.log"
-        if pattern.startswith('*.') and line.endswith(pattern[1:]):
+        if pat.startswith('*.') and line.endswith(pat[1:]):
             return True
         # dot-prefix like ".env": covered by ".env" or ".env.*" but NOT ".envrc"
-        if pattern.startswith('.') and (line == pattern or line.startswith(f'{pattern}.')):
+        if pat.startswith('.') and (line == pat or line.startswith(f'{pat}.')):
             return True
     return False
 

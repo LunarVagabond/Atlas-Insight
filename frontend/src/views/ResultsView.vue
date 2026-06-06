@@ -184,6 +184,8 @@ async function reanalyze() {
   try {
     const newId = await store.retryRun(runId.value)
     router.push(`/results/${newId}`)
+  } catch {
+    // toast already shown by store
   } finally {
     reanalyzing.value = false
   }
@@ -195,6 +197,8 @@ async function forceReanalyze() {
   try {
     const newId = await store.retryRun(runId.value)
     router.push(`/results/${newId}`)
+  } catch {
+    // toast already shown by store
   } finally {
     reanalyzing.value = false
   }
