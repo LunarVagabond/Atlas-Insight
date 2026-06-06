@@ -225,6 +225,7 @@ class RunListItemSchema(Schema):
     oss_badge: Optional[str] = None
     scanned_branch_count: int = 0
     cached_branch_count: Optional[int] = None
+    fork_count: Optional[int] = None
 
 
 class BranchesResponse(Schema):
@@ -436,6 +437,7 @@ def list_runs(
                 oss_badge=r.oss_badge,
                 scanned_branch_count=getattr(r, 'scanned_branch_count', 0) or 0,
                 cached_branch_count=r.repo.cached_branch_count,
+                fork_count=r.result.get('github_meta', {}).get('forks') if r.result else None,
             )
             for r in runs
         ],

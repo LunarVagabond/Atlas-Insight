@@ -1,321 +1,156 @@
 # Adding a New Language to Atlas Insight
 
-This guide covers every place you must touch to add full language support. Work through the steps in order — each section builds on the previous one.
+Language support is a single plugin file. All the old multi-file edits are gone — the registry auto-discovers your plugin at startup and wires it into import parsing, test coverage detection, dependency scanning, vulnerability scanning, and PR impact analysis automatically.
 
 ---
 
-## Quick checklist
+## Four steps
 
-| # | File | What to add |
-|---|------|-------------|
-| 1 | `backend/apps/analysis/todo_scan.py` | File extension(s) in `SCAN_EXTS` |
-| 2 | `backend/apps/analysis/repo_type.py` | Extension → display name in `LANG_EXT_MAP` |
-| 3 | `backend/apps/analysis/repo_type.py` | Manifest filename(s) in `_dep_files_in_dir` |
-| 4 | `backend/apps/analysis/import_parser.py` | Import regex pattern + elif branch + stdlib filter |
-| 5 | `backend/apps/analysis/complexity.py` | Test-import regex + elif in `_extract_import_refs` |
-| 6 | `backend/apps/analysis/test_coverage.py` | Test framework signature in `_FRAMEWORK_SIGNATURES` |
-| 7 | `backend/apps/analysis/dep_report.py` | `_parse_<manifest>()` function + call in `analyze_dependencies` |
-| 8 | `backend/apps/analysis/vuln_scan.py` | Manifest → OSV ecosystem name in `_ECOSYSTEM_MAP` |
-| 9 | `backend/apps/analysis/pr_impact.py` | Manifest filename(s) in `_DEP_FILENAMES` |
-| 10 | `backend/apps/analysis/project_structure/tech_stack.py` | Package names in `FRAMEWORK_SIGNALS` + config files in `_FRAMEWORK_FILE_PATTERNS` (optional but recommended) |
-| 11 | `frontend/src/data/languages.ts` | Entry in `SUPPORTED_LANGUAGES` |
+| # | Where | What |
+|---|-------|------|
+| 1 | Terminal | `make new-language` (or `make new-language LANG=kotlin`) |
+| 2 | Generated plugin files | Fill in `edges.py`, `tests.py`, `manifest.py`, `__init__.py` |
+| 3 | `todo_scan.py` | Add extension(s) to `SCAN_EXTS` |
+| 4 | `frontend/src/data/languages.ts` | Add one entry to the language registry |
 
 ---
 
-## Step 1 — Register file extensions
+## Step 1 — Scaffold
 
-**File:** `backend/apps/analysis/todo_scan.py`, line 4
+```bash
+make new-language
+# prompts: Language name (e.g. Kotlin):
 
-`SCAN_EXTS` controls which files get scanned for TODOs, complexity, and import analysis. Add every source extension for the language.
+# Or bypass the prompt:
+make new-language LANG=Kotlin
+```
+
+This creates `backend/apps/analysis/languages/kotlin/__init__.py` with a documented template and prints the exact snippets you need for steps 3 and 4.
+
+---
+
+## Step 2 — Fill in the plugin files
+
+The scaffold generates four files. Each has a single responsibility:
+
+| File | Purpose |
+|------|---------|
+| `edges.py` | Import graph extraction — regex, stdlib filter, `extract_edges()` |
+| `tests.py` | Test coverage — `extract_test_refs()` (set `= None` if not applicable) |
+| `manifest.py` | Dependency parsing — `parse_manifest()` (set `= None` if not applicable) |
+| `__init__.py` | Plugin assembly — imports from the three above, defines `plugin` |
+
+Fill in `__init__.py` last (after the other three work). Every `TODO` in `__init__.py` maps directly to something you already implemented in one of the other files.
+
+### `LanguagePlugin` field reference
+
+Fields are set in `__init__.py`; the implementations live in the sub-modules shown.
+
+| Field | File | Type | Purpose |
+|-------|------|------|---------|
+| `name` | `__init__.py` | `str` | Display name, e.g. `'Kotlin'` |
+| `extensions` | `__init__.py` | `tuple[str, ...]` | Source file extensions, e.g. `('.kt', '.kts')` |
+| `extract_edges` | `edges.py` | `fn(fpath, content, repo_dir) → list[str]` | Build import graph edges. For simple cases use the regex template; for complex cases (block imports, relative resolution, Vue script stripping) write custom logic. |
+| `lang_label` | `__init__.py` | `str` | Short label on each graph edge, e.g. `'kotlin'` |
+| `extract_test_refs` | `tests.py` | `fn(test_rel, test_dir, content) → set[str]` | Return slash-path stems imported by a test file so the hotspot test-coverage heuristic can match them to source files. Normalize to `'apps/analysis/tasks'` style. Set `None` if not applicable. |
+| `manifest_filenames` | `__init__.py` | `tuple[str, ...]` | Exact filenames of dependency manifests, e.g. `('build.gradle.kts',)` |
+| `parse_manifest` | `manifest.py` | `fn(Path) → list[dict]` | Parse one manifest; return list of `{name, version_spec, dev?}` dicts. Dispatch by `path.name` internally for multiple manifest types. Set `None` if not applicable. |
+| `vuln_ecosystem` | `__init__.py` | `str \| None` | [OSV.dev ecosystem name](https://osv.dev/docs/#tag/vulnerability/operation/OSV_QueryAffected): `'Maven'`, `'PyPI'`, `'npm'`, `'crates.io'`, `'RubyGems'`, `'Go'`, `'NuGet'`, `'Packagist'`, `'Hex'`, `'Pub'`. `None` if OSV doesn't support the ecosystem. |
+| `manifest_dep_files` | `__init__.py` | `tuple[str, ...]` | Subset of `manifest_filenames` used for sub-project detection. Usually the same. |
+| `test_frameworks` | `__init__.py` | `dict[str, set[str]]` | `{'framework_name': {'marker_file', ...}}` — files whose presence identifies the test framework. |
+| `tier` | `__init__.py` | `'full' \| 'dependencies'` | `'full'` = import graph + dep scanning. `'dependencies'` = dep scanning only. No runtime effect; drives scaffold checklist. |
+
+### Example — Kotlin
 
 ```python
-# Before
-SCAN_EXTS = {'.py', '.js', '.ts', ...}
+plugin = LanguagePlugin(
+    name='Kotlin',
+    extensions=('.kt', '.kts'),
+    extract_edges=_extract_edges,
+    lang_label='kotlin',
+    extract_test_refs=_extract_test_refs,
+    manifest_filenames=('build.gradle.kts', 'settings.gradle.kts'),
+    parse_manifest=_parse_manifest,
+    vuln_ecosystem='Maven',
+    manifest_dep_files=('build.gradle.kts',),
+    test_frameworks={'kotest': {'kotest.gradle.kts', 'src/test/kotlin'}},
+    tier='full',
+)
+```
 
-# After (example: adding Kotlin)
+### Complex `extract_edges`
+
+For languages with block imports (Go), relative resolution (JS/TS), or embedded script tags (Vue), `extract_edges` handles everything in one function instead of using `import_re` + `is_external`. See the Go and JavaScript plugins for reference implementations.
+
+### Test ref normalization
+
+`extract_test_refs` must return strings that can be matched against real file paths via a suffix index. Use slash separators and drop the file extension:
+
+```python
+# Good: 'apps/analysis/tasks'
+# Good: 'com/mycompany/model/User'
+# Bad:  'com.mycompany.model.User'  (dots, not slashes)
+# Bad:  'apps/analysis/tasks.py'   (has extension)
+```
+
+For relative imports (JS/TS style), resolve with `os.path.normpath(os.path.join(test_dir, import_str))`.
+
+---
+
+## Step 3 — Add extension(s) to `SCAN_EXTS`
+
+**File:** `backend/apps/analysis/todo_scan.py`
+
+`SCAN_EXTS` controls which files get scanned for TODOs and complexity. The scaffold prints the current line — add your extension(s) to the set.
+
+```python
 SCAN_EXTS = {'.py', '.js', '.ts', ..., '.kt', '.kts'}
 ```
 
----
-
-## Step 2 — Map extensions to display name
-
-**File:** `backend/apps/analysis/repo_type.py`, line 13 (`LANG_EXT_MAP`)
-
-This dict drives language detection in the graph, heuristics, and the "Languages" breakdown shown in the UI.
-
-```python
-LANG_EXT_MAP = {
-    # ... existing ...
-    '.kt':  'Kotlin',
-    '.kts': 'Kotlin',
-}
-```
+This is intentionally manual — SCAN_EXTS scope affects performance and is a deliberate human decision.
 
 ---
 
-## Step 3 — Register dependency manifest files
+## Step 4 — Add frontend entry
 
-**File:** `backend/apps/analysis/repo_type.py`, function `_dep_files_in_dir` (~line 158)
+**File:** `frontend/src/data/languages.ts`
 
-Add every filename that signals a dependency manifest for the language. These are used to detect sub-projects and determine repo type.
-
-```python
-_DEP_FILE_CANDIDATES = [
-    # ... existing ...
-    'build.gradle.kts',   # Kotlin (Gradle)
-    'settings.gradle.kts',
-]
-```
-
----
-
-## Step 4 — Import parser
-
-**File:** `backend/apps/analysis/import_parser.py`
-
-This is the main analysis step. Three sub-steps:
-
-### 4a — Add the import regex pattern
-
-Near the top of the file alongside the other `_*_IMPORT` constants:
-
-```python
-# Kotlin: import com.example.foo.Bar
-KOTLIN_IMPORT = re.compile(r'^import\s+([\w.]+)', re.MULTILINE)
-```
-
-### 4b — Add the stdlib/external filter
-
-Add a frozenset of stdlib prefixes and a helper that returns `True` for non-project imports. This prevents internal module edges from being inflated by standard library usage.
-
-```python
-_KOTLIN_STDLIB_PREFIXES = frozenset({
-    'kotlin.', 'kotlinx.', 'java.', 'javax.', 'android.',
-})
-
-def _is_external_kotlin(module: str) -> bool:
-    return any(module.startswith(p) for p in _KOTLIN_STDLIB_PREFIXES)
-```
-
-If the language has no meaningful stdlib distinction (e.g., Lua), just return `False` always.
-
-### 4c — Add the elif branch in `parse_imports`
-
-Find the main dispatch block in `parse_imports()` and add a branch. Follow the same return shape as existing branches — a list of `{'module': str, 'is_external': bool}` dicts.
-
-```python
-elif ext in ('.kt', '.kts'):
-    for m in KOTLIN_IMPORT.finditer(content):
-        module = m.group(1)
-        imports.append({
-            'module': module,
-            'is_external': _is_external_kotlin(module),
-        })
-```
-
----
-
-## Step 5 — Test coverage detection
-
-**File:** `backend/apps/analysis/complexity.py`
-
-When a large file appears as a hotspot, the system checks whether any test file imports it. Two sub-steps:
-
-### 5a — Add the import regex
-
-Near the top of the file alongside `_RE_PY`, `_RE_GO`, etc.:
-
-```python
-# Kotlin
-_RE_KT = re.compile(r'^import\s+([\w.]+)', re.MULTILINE)
-```
-
-### 5b — Add the elif branch in `_extract_import_refs`
-
-```python
-elif ext in ('.kt', '.kts'):
-    for m in _RE_KT.finditer(content):
-        refs.add(m.group(1).replace('.', '/'))
-```
-
-The refs should be normalized to slash-separated path stems (same as Python's `apps.analysis.tasks` → `apps/analysis/tasks`). The suffix index in `_build_tested_set` will match them against actual source file paths regardless of where in the tree they sit.
-
-For relative imports (JS/TS style), resolve them with `os.path.normpath(os.path.join(test_dir, import_str))`. See the `.js`/`.ts` branch for the pattern.
-
----
-
-## Step 6 — Test framework detection
-
-**File:** `backend/apps/analysis/test_coverage.py`, dict `_FRAMEWORK_SIGNATURES` (~line 11)
-
-Add an entry whose value is a set of filenames or glob patterns that uniquely identify the test framework. The system looks for these files (or patterns like `_test.go`) in the repo to name the testing setup.
-
-```python
-_FRAMEWORK_SIGNATURES = {
-    # ... existing ...
-    'kotest':  {'kotest.gradle.kts', 'src/test/kotlin'},
-    'junit5':  {'junit-platform.properties'},   # also used for Java
-}
-```
-
-If the language uses a convention-based approach (e.g., Go's `_test.go` suffix), the value can be a bare filename pattern — the detection code handles both exact filenames and glob-style `*` patterns.
-
----
-
-## Step 7 — Dependency parsing
-
-**File:** `backend/apps/analysis/dep_report.py`
-
-### 7a — Write a parser function
-
-Follow the shape of `_parse_requirements_txt` or `_parse_package_json`. Return a list of dicts with at minimum `name` and `version` keys. Extras like `dev` (bool) are optional but surfaced in the UI.
-
-```python
-def _parse_build_gradle_kts(path: Path) -> list[dict]:
-    deps = []
-    content = path.read_text(errors='ignore')
-    # implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    pattern = re.compile(
-        r'''(?:implementation|api|testImplementation|runtimeOnly)\s*\(\s*['"]([^'"]+)['"]\s*\)'''
-    )
-    for m in pattern.finditer(content):
-        parts = m.group(1).split(':')
-        if len(parts) >= 2:
-            deps.append({'name': parts[1], 'version': parts[2] if len(parts) > 2 else '', 'dev': False})
-    return deps
-```
-
-### 7b — Call it in `analyze_dependencies`
-
-Inside the `analyze_dependencies` function (~line 185), add the manifest lookup and parser call:
-
-```python
-for grad in repo_path.rglob('build.gradle.kts'):
-    if any(part in SKIP_DIRS for part in grad.parts):
-        continue
-    all_deps.extend(_parse_build_gradle_kts(grad))
-```
-
----
-
-## Step 8 — Vulnerability scanning
-
-**File:** `backend/apps/analysis/vuln_scan.py`, dict `_ECOSYSTEM_MAP` (line 7)
-
-Map every manifest filename to its [OSV.dev ecosystem name](https://osv.dev/docs/#tag/vulnerability/operation/OSV_QueryAffected). If OSV doesn't support the ecosystem yet, omit it rather than guessing.
-
-```python
-_ECOSYSTEM_MAP = {
-    # ... existing ...
-    'build.gradle.kts': 'Maven',
-    'build.gradle':     'Maven',
-}
-```
-
-OSV ecosystem names to use: `PyPI`, `npm`, `crates.io`, `RubyGems`, `Go`, `Maven`, `NuGet`, `Packagist`, `Hex`, `Pub`.
-
----
-
-## Step 9 — PR impact dependency file list
-
-**File:** `backend/apps/analysis/pr_impact.py`, frozenset `_DEP_FILENAMES` (line 6)
-
-Any PR that touches one of these files is flagged as a "dependency change" in the PR impact card. Add the manifest and lockfile names.
-
-```python
-_DEP_FILENAMES = frozenset({
-    # ... existing ...
-    'build.gradle.kts',
-    'settings.gradle.kts',
-    'gradle.lockfile',
-})
-```
-
----
-
-## Step 10 — Tech stack detection (optional but recommended)
-
-**File:** `backend/apps/analysis/project_structure/tech_stack.py`
-
-This is where popular frameworks and libraries for the language get detected and surfaced in the "Tech Stack" section of the report. Two sub-steps:
-
-### 10a — Package name → framework display name (`FRAMEWORK_SIGNALS`)
-
-Add entries under a new key for the language. The key is the dependency name exactly as it appears in the manifest; the value is the display name shown in the UI.
-
-```python
-FRAMEWORK_SIGNALS = {
-    # ... existing Python, JS, etc. ...
-    # Kotlin / JVM
-    'spring-boot-starter-web':  'Spring Boot',
-    'ktor-server-core':         'Ktor',
-    'io.ktor:ktor-server-netty': 'Ktor',
-    'exposed':                  'Jetbrains Exposed',
-}
-```
-
-### 10b — Config file → framework display name (`_FRAMEWORK_FILE_PATTERNS`)
-
-For frameworks detected by config files rather than dep names:
-
-```python
-_FRAMEWORK_FILE_PATTERNS = {
-    # ... existing ...
-    'android/AndroidManifest.xml': 'Android',
-}
-```
-
----
-
-## Step 11 — Frontend language registry
-
-**File:** `frontend/src/data/languages.ts`, array `SUPPORTED_LANGUAGES`
-
-This drives the home page marquee, About page language list, and docs. Add one entry. Choose:
-
-- **tier**: `'full'` if you implemented import graph analysis (Steps 4–5); `'dependencies'` if you only implemented dependency scanning (Steps 7–9).
-- **kind**: `'language'`, `'framework'`, or `'tool'`.
-- **iconUrl**: grab the SVG URL from [devicon.dev](https://devicon.dev). CDN pattern: `https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/<slug>/<slug>-original.svg`. Some need `-plain.svg` — check the site.
+The scaffold prints the exact entry to add. Paste it into the array.
 
 ```typescript
-{ name: 'Kotlin',  iconUrl: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/kotlin/kotlin-original.svg',  tier: 'full', kind: 'language' },
+{ name: 'Kotlin', iconUrl: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/kotlin/kotlin-original.svg', tier: 'full', kind: 'language' },
 ```
+
+- **tier**: `'full'` if you implemented `extract_edges` and `extract_test_refs`; `'dependencies'` if you only implemented `parse_manifest`.
+- **kind**: `'language'`, `'framework'`, or `'tool'`.
+- **iconUrl**: from [devicon.dev](https://devicon.dev). CDN pattern: `https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/<slug>/<slug>-original.svg`. Some icons need `-plain.svg` — verify on the site.
+
+This drives the home page marquee, About page language list, and docs.
 
 ---
 
-## Testing your changes
-
-After completing all steps, run:
+## Step 5 — Run tests
 
 ```bash
-# Backend unit tests
 cd backend
 DJANGO_SETTINGS_MODULE=config.settings.development .venv/bin/pytest apps/analysis/tests/ -v
-
-# Spot-check import parsing against a real repo
-DJANGO_SETTINGS_MODULE=config.settings.development .venv/bin/python - <<'EOF'
-from pathlib import Path
-from apps.analysis.import_parser import parse_imports
-
-# Point at a cloned repo with your new language
-sample = Path('/tmp/my-kotlin-repo/src/main/kotlin/Main.kt')
-print(parse_imports(str(sample), sample.read_text()))
-EOF
-
-# Frontend type check
-cd ../frontend && node_modules/.bin/vue-tsc --noEmit
 ```
 
-Manually submit a GitHub URL for a repo that uses the new language and verify:
+Then manually submit a GitHub URL for a repo that uses the new language and verify:
+
 - Language appears in the "Languages" breakdown
 - Import graph includes edges for the language's files
 - Hotspot files show `Has Test: Yes` when tests exist
 - Dependency tab lists packages
-- Tech stack shows the right framework names
+- Tech stack shows framework names (if you added `test_frameworks`)
 
 ---
 
-## Future direction — plugin architecture
+## What stays manual
 
-Right now, language support is spread across ~10 files. A plugin system (one folder per language, auto-discovered at startup) would let `make new-language LANG=kotlin` scaffold all the boilerplate. That refactor is tracked separately; this doc reflects the current structure and is kept up to date.
+| Item | Where | Why |
+|------|-------|-----|
+| `SCAN_EXTS` | `todo_scan.py` | Scanner scope; deliberate human decision, affects perf |
+| `frontend/src/data/languages.ts` | Frontend | Different runtime; scaffold prints the reminder |
+| `FRAMEWORK_SIGNALS` | `tech_stack.py` | 200+ cross-language entries that grow independently — not per-plugin |
+| Ext→name for Haskell, Zig, Shell, Nim, etc. | `_EXTRA_EXT_MAP` in `repo_type.py` | Display-name-only langs with no import analysis or manifests — no plugin needed |

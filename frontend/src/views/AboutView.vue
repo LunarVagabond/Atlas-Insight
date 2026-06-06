@@ -7,7 +7,6 @@ import axios from 'axios'
 import AppTabs from '../components/ui/AppTabs.vue'
 import AppButton from '../components/ui/AppButton.vue'
 import AppCard from '../components/ui/AppCard.vue'
-import LanguageList from '../components/ui/LanguageList.vue'
 
 const TABS = ['About', 'Why Atlas Insight', 'Guide', 'Contributors']
 const activeTab = ref('About')
@@ -550,10 +549,9 @@ function renderMd(text: string): string {
       </section>
 
       <section class="about-view__section">
-        <h2 class="about-view__section-title">Supported languages</h2>
-        <p>Full import-graph analysis — circular dependencies, god modules, hot files — is available for the following languages. All other languages still get dependency scanning if a supported manifest file is present.</p>
-        <LanguageList mode="list" tier="full" style="margin-top: 0.5rem" />
-        <p class="about-view__note">Language support is community-driven. If your language is missing, <a href="https://github.com/LunarVagabond/Atlas-Insight/issues" target="_blank" rel="noopener noreferrer">open an issue</a> — adding a parser is a great first contribution.</p>
+        <h2 class="about-view__section-title">Supported languages &amp; tooling</h2>
+        <p>Atlas Insight supports 19+ languages and several infrastructure tools, each with a support maturity rating from Experimental to Mature. Full import-graph analysis is available for most languages; infrastructure tools (Docker, Terraform) get dedicated hygiene scores and security issue detection.</p>
+        <p class="about-view__note"><RouterLink to="/supported">Browse the full supported technologies list →</RouterLink></p>
       </section>
 
       <section class="about-view__section">

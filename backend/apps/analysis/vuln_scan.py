@@ -4,19 +4,23 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger(__name__)
 
-_ECOSYSTEM_MAP = {
-    'requirements': 'PyPI',
-    'requirements.txt': 'PyPI',
-    'pyproject.toml': 'PyPI',
-    'Pipfile': 'PyPI',
-    'package.json': 'npm',
-    'package-lock.json': 'npm',
-    'yarn.lock': 'npm',
-    'pnpm-lock.yaml': 'npm',
-    'Cargo.toml': 'crates.io',
-    'Gemfile': 'RubyGems',
-    'go.mod': 'Go',
-}
+def _build_ecosystem_map() -> dict[str, str]:
+    from .languages import all_plugins
+    eco: dict[str, str] = {
+        # Partial-name keys used by _source_ecosystem's substring match
+        'requirements': 'PyPI',
+        'package-lock.json': 'npm',
+        'yarn.lock': 'npm',
+        'pnpm-lock.yaml': 'npm',
+        'Pipfile': 'PyPI',
+    }
+    for p in all_plugins():
+        if p.vuln_ecosystem:
+            for fname in p.manifest_filenames:
+                eco.setdefault(fname, p.vuln_ecosystem)
+    return eco
+
+_ECOSYSTEM_MAP = _build_ecosystem_map()
 
 _OP_RE = re.compile(r'^[^0-9]*')
 _OPEN_RANGE_RE = re.compile(r'^(>=|>|~=|~|\^)')

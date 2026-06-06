@@ -3,16 +3,19 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-_DEP_FILENAMES = frozenset({
-    'package.json', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml',
-    'requirements.txt', 'requirements.in', 'Pipfile', 'Pipfile.lock',
-    'pyproject.toml', 'setup.cfg', 'setup.py',
-    'go.mod', 'go.sum',
-    'Cargo.toml', 'Cargo.lock',
-    'Gemfile', 'Gemfile.lock',
-    'build.gradle', 'pom.xml',
-    'composer.json', 'composer.lock',
-})
+def _build_dep_filenames() -> frozenset[str]:
+    from .languages import all_manifest_filenames
+    # Include lock files and extras not tracked as manifest_filenames
+    extras = frozenset({
+        'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml',
+        'requirements.in', 'Pipfile', 'Pipfile.lock',
+        'setup.cfg', 'setup.py', 'go.sum',
+        'Cargo.lock', 'Gemfile.lock', 'composer.lock',
+        'build.gradle',
+    })
+    return all_manifest_filenames() | extras
+
+_DEP_FILENAMES = _build_dep_filenames()
 
 
 def _file_basename(path: str) -> str:

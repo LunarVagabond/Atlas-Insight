@@ -110,7 +110,9 @@ const tabBadges = computed<Record<string, number | string>>(() => {
   if (complexityHotspots > 0) badges['Code Quality'] = complexityHotspots
 
   const containerIssues = r.containers?.total_issues ?? 0
-  if (containerIssues > 0) badges['DevOps'] = containerIssues
+  const terraformIssues = r.tools?.terraform?.security_issues?.length ?? 0
+  const devopsIssues = containerIssues + terraformIssues
+  if (devopsIssues > 0) badges['DevOps'] = devopsIssues
 
   return badges
 })
@@ -652,6 +654,7 @@ onUnmounted(() => {
           :cicd="result.cicd"
           :containers="result.containers"
           :changelog="result.changelog"
+          :tools="result.tools"
         />
         <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" :structure="result.structure" :todos="result.todos" :arch-tours="result.arch_tours ?? []" :commits="result.commits" :is-docs-only="isDocsOnly" :github-meta="result.github_meta" />
         <ArchitectureToursPanel v-if="activeTab === 'Tours'" :tours="result.arch_tours ?? []" :repo-url="store.run?.repo_url" :run-id="runId" />

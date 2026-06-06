@@ -1,26 +1,12 @@
 import os
-import re
 from pathlib import Path
 
+from .languages import get_plugin
 from .todo_scan import MAX_FILE_BYTES, SCAN_EXTS, SKIP_DIRS
 
 _THRESHOLD = 500
 _COMMENT_PREFIXES = ('#', '//', '*', '/*', '*/', '<!--', '-->')
 _TEST_INDICATORS = {'test_', '_test', 'spec_', '_spec', '.test.', '.spec.', 'tests/', '__tests__/'}
-
-# Import extraction patterns per language group
-_RE_PY = re.compile(r'^\s*(?:from|import)\s+([\w.]+)', re.MULTILINE)
-_RE_JS_FROM = re.compile(r'''from\s+['"](\.[^'"]+)['"]''')
-_RE_JS_REQUIRE = re.compile(r'''require\s*\(\s*['"](\.[^'"]+)['"]\s*\)''')
-_RE_RB_REL = re.compile(r'''require_relative\s+['"]([^'"]+)['"]''')
-_RE_RB_ABS = re.compile(r'''require\s+['"]([^'"]+)['"]''')
-_RE_GO = re.compile(r'"([a-zA-Z0-9_./-]{4,})"')
-_RE_JAVA = re.compile(r'^import\s+([\w.]+)\s*;', re.MULTILINE)
-_RE_CS = re.compile(r'^using\s+([\w.]+)\s*;', re.MULTILINE)
-_RE_PHP_USE = re.compile(r'^use\s+([\w\\]+)\s*;', re.MULTILINE)
-_RE_PHP_INC = re.compile(r'''(?:require|include)(?:_once)?\s+['"]([^'"]+)['"]''')
-_RE_CPP_INC = re.compile(r'^#include\s+"([^"]+)"', re.MULTILINE)
-_RE_RS = re.compile(r'^use\s+(?:crate|super)::([\w:]+)', re.MULTILINE)
 
 
 def _is_test_file(path_str: str) -> bool:
@@ -31,64 +17,14 @@ def _is_test_file(path_str: str) -> bool:
 def _extract_import_refs(test_rel: str, repo_root: Path) -> set[str]:
     """Return normalized path stems referenced by imports in a test file."""
     ext = Path(test_rel).suffix
+    plugin = get_plugin(ext)
+    if plugin is None or plugin.extract_test_refs is None:
+        return set()
     try:
         content = (repo_root / test_rel).read_text(errors='ignore')
     except OSError:
         return set()
-
-    refs: set[str] = set()
-    test_dir = os.path.dirname(test_rel)
-
-    if ext == '.py':
-        for m in _RE_PY.finditer(content):
-            refs.add(m.group(1).replace('.', '/'))
-
-    elif ext in ('.js', '.ts', '.jsx', '.tsx'):
-        for pat in (_RE_JS_FROM, _RE_JS_REQUIRE):
-            for m in pat.finditer(content):
-                imp = m.group(1)
-                resolved = os.path.normpath(os.path.join(test_dir, imp))
-                refs.add(re.sub(r'\.[jt]sx?$', '', resolved))
-
-    elif ext == '.rb':
-        for m in _RE_RB_REL.finditer(content):
-            resolved = os.path.normpath(os.path.join(test_dir, m.group(1)))
-            refs.add(re.sub(r'\.rb$', '', resolved))
-        for m in _RE_RB_ABS.finditer(content):
-            refs.add(re.sub(r'\.rb$', '', m.group(1)))
-
-    elif ext == '.go':
-        for m in _RE_GO.finditer(content):
-            path = m.group(1)
-            if '/' in path:
-                refs.add(path)
-
-    elif ext == '.java':
-        for m in _RE_JAVA.finditer(content):
-            refs.add(m.group(1).replace('.', '/'))
-
-    elif ext == '.cs':
-        for m in _RE_CS.finditer(content):
-            refs.add(m.group(1).replace('.', '/'))
-
-    elif ext == '.php':
-        for m in _RE_PHP_USE.finditer(content):
-            refs.add(m.group(1).replace('\\', '/'))
-        for m in _RE_PHP_INC.finditer(content):
-            imp = m.group(1)
-            if imp.startswith('.'):
-                resolved = os.path.normpath(os.path.join(test_dir, imp))
-                refs.add(re.sub(r'\.php$', '', resolved))
-
-    elif ext in ('.cpp', '.c'):
-        for m in _RE_CPP_INC.finditer(content):
-            refs.add(re.sub(r'\.[ch](pp)?$', '', m.group(1)))
-
-    elif ext == '.rs':
-        for m in _RE_RS.finditer(content):
-            refs.add(m.group(1).replace('::', '/'))
-
-    return refs
+    return plugin.extract_test_refs(test_rel, os.path.dirname(test_rel), content)
 
 
 def _build_tested_set(repo_root: Path, all_source_files: set[str]) -> set[str]:

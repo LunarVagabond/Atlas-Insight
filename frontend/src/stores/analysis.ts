@@ -32,6 +32,7 @@ export type {
   ContainerData, DockerfileResult, ComposeResult, ContainerIssue,
   CicdData, CicdWorkflow,
   ChangelogData, ChangelogIssue,
+  TerraformData, TerraformSecurityIssue, ToolsData,
 } from '../types/run'
 export type { RoadmapMilestone } from '../types/structure'
 export type { ContributionOpportunity, ArchTour, ArchTourFile, ArchTourStep } from '../types/contributions'

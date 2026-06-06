@@ -9547,6 +9547,53 @@ kbd {
   white-space: nowrap;
 }
 
+.devops-tf-providers {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $space-2;
+}
+
+.devops-tf-meta {
+  display: flex;
+  align-items: center;
+  gap: $space-3;
+  font-size: 0.875rem;
+}
+
+.devops-tf-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.devops-infra-hint {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: $radius-md;
+  padding: $space-4 $space-6;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+
+  p { margin: 0 0 $space-2 0; }
+  p:last-child { margin-bottom: 0; }
+
+  &__links {
+    color: var(--color-text-muted);
+    font-size: 0.8125rem;
+
+    a {
+      color: var(--color-primary, #6366f1);
+      text-decoration: none;
+      &:hover { text-decoration: underline; }
+    }
+  }
+}
+
 .mono {
   font-family: var(--font-mono, monospace);
   font-size: 0.8rem;

@@ -2,12 +2,13 @@
 import { computed } from 'vue'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
-import type { CicdData, ContainerData, ChangelogData } from '../../stores/analysis'
+import type { CicdData, ContainerData, ChangelogData, TerraformData, ToolsData } from '../../stores/analysis'
 
 const props = defineProps<{
   cicd?: CicdData
   containers?: ContainerData
   changelog?: ChangelogData
+  tools?: ToolsData
 }>()
 
 function severityVariant(s: string): 'failed' | 'warning' | 'info' {
@@ -43,6 +44,29 @@ const allContainerIssues = computed(() => {
     df.issues.map(i => ({ ...i, path: df.path }))
   )
 })
+
+const terraform = computed<TerraformData | undefined>(() => props.tools?.terraform as TerraformData | undefined)
+
+const topResourceTypes = computed(() => {
+  const types = terraform.value?.resource_types ?? {}
+  return Object.entries(types)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+})
+
+function tfScoreLabel(score: number): string {
+  if (score >= 80) return 'Well-configured'
+  if (score >= 60) return 'Adequate'
+  if (score >= 40) return 'Basic'
+  if (score > 0) return 'Minimal'
+  return 'Unconfigured'
+}
+
+function tfScoreBadge(score: number): 'info' | 'warning' | 'failed' {
+  if (score >= 60) return 'info'
+  if (score >= 40) return 'warning'
+  return 'failed'
+}
 </script>
 
 <template>
@@ -230,6 +254,95 @@ const allContainerIssues = computed(() => {
         </table>
       </div>
       <div v-else-if="changelog?.found" class="panel__hint">Changelog is up to date with no detected issues.</div>
+    </section>
+
+    <!-- ── Infrastructure fallback ───────────────────────────── -->
+    <section v-if="!terraform" class="devops-section">
+      <h3 class="devops-section__title">Infrastructure Analysis</h3>
+      <div class="devops-infra-hint">
+        <p>No supported infrastructure tooling detected in this repository.</p>
+        <p>Atlas Insight analyses <strong>Docker</strong> and <strong>Terraform</strong> configurations — detecting providers, resource counts, hygiene scores, and common security issues. These sections appear automatically when the tool is detected.</p>
+        <p class="devops-infra-hint__links">
+          Supported tooling: <a href="/supported#tools" target="_blank">What's Supported</a>
+          · <a href="/docs/dev/adding-a-tool" target="_blank">Adding a tool</a>
+        </p>
+      </div>
+    </section>
+
+    <!-- ── Terraform ──────────────────────────────────────────── -->
+    <section v-if="terraform" class="devops-section">
+      <h3 class="devops-section__title">Terraform</h3>
+
+      <div class="panel__grid panel__grid--2col" style="margin-bottom: 1rem">
+        <AppCard elevated>
+          <div class="stat">
+            <div class="stat__value">
+              <AppBadge :variant="tfScoreBadge(terraform.score)" style="font-size: 1rem">
+                {{ tfScoreLabel(terraform.score) }}
+              </AppBadge>
+            </div>
+            <div class="stat__label" style="margin-top: 0.5rem">Hygiene · {{ terraform.score }}/100</div>
+          </div>
+        </AppCard>
+        <AppCard elevated>
+          <div class="stat">
+            <div class="stat__value">{{ terraform.file_count }}</div>
+            <div class="stat__label">.tf Files</div>
+          </div>
+        </AppCard>
+        <AppCard elevated>
+          <div class="stat">
+            <div class="stat__value">{{ terraform.resource_count }}</div>
+            <div class="stat__label">Resources</div>
+          </div>
+        </AppCard>
+        <AppCard elevated>
+          <div class="stat">
+            <div class="stat__value">{{ terraform.backend ?? 'local' }}</div>
+            <div class="stat__label">State Backend</div>
+          </div>
+        </AppCard>
+      </div>
+
+      <div v-if="terraform.providers.length > 0" class="devops-tf-providers" style="margin-bottom: 1rem">
+        <span class="devops-tf-label">Providers</span>
+        <AppBadge v-for="p in terraform.providers" :key="p" variant="info" style="margin-right: 0.25rem">{{ p }}</AppBadge>
+      </div>
+
+      <div v-if="terraform.version_constraint" class="devops-tf-meta" style="margin-bottom: 1rem">
+        <span class="devops-tf-label">Required version</span>
+        <code class="mono">{{ terraform.version_constraint }}</code>
+      </div>
+
+      <div v-if="topResourceTypes.length > 0" style="margin-bottom: 1rem">
+        <table class="data-table">
+          <thead>
+            <tr><th>Resource Type</th><th>Count</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="([type, count]) in topResourceTypes" :key="type">
+              <td class="mono">{{ type }}</td>
+              <td>{{ count }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div v-if="terraform.security_issues.length > 0" style="margin-top: 0.75rem">
+        <table class="data-table">
+          <thead>
+            <tr><th>Resource</th><th>Severity</th><th>Issue</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="(issue, i) in terraform.security_issues" :key="i">
+              <td class="mono devops-truncate">{{ issue.resource }}</td>
+              <td><AppBadge :variant="severityVariant(issue.severity)">{{ issue.severity }}</AppBadge></td>
+              <td>{{ issue.issue }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-else class="panel__hint">No Terraform security issues detected.</div>
     </section>
   </div>
 </template>

@@ -61,6 +61,11 @@ const router = createRouter({
       component: () => import('../views/ResourcesView.vue'),
     },
     {
+      path: '/supported',
+      name: 'supported',
+      component: () => import('../views/SupportedView.vue'),
+    },
+    {
       path: '/spotlight',
       name: 'spotlight',
       component: () => import('../views/SpotlightView.vue'),

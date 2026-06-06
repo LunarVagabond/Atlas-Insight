@@ -240,6 +240,7 @@ function langIconUrl(name: string | null): string | null {
                 Status {{ sortIcon('status') }}
               </th>
               <th>Branches</th>
+              <th>Forks</th>
               <th>Health</th>
             </tr>
           </thead>
@@ -292,6 +293,10 @@ function langIconUrl(name: string | null): string | null {
                 </span>
                 <span v-else class="runs-table__branch-count runs-table__branch-count--none">—</span>
               </td>
+              <td class="runs-table__forks-cell">
+                <span v-if="run.fork_count != null" class="runs-table__fork-count">{{ run.fork_count.toLocaleString() }}</span>
+                <span v-else class="runs-table__branch-count runs-table__branch-count--none">—</span>
+              </td>
               <td class="runs-table__health-cell">
                 <span
                   v-if="run.oss_badge"
@@ -308,7 +313,7 @@ function langIconUrl(name: string | null): string | null {
               :key="'ghost-' + i"
               class="runs-table__row runs-table__row--ghost"
             >
-              <td colspan="7">&nbsp;</td>
+              <td colspan="8">&nbsp;</td>
             </tr>
           </tbody>
         </table>

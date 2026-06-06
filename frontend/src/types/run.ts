@@ -162,6 +162,32 @@ export interface ChangelogData {
   issues: ChangelogIssue[]
 }
 
+export interface TerraformSecurityIssue {
+  resource: string
+  severity: 'low' | 'medium' | 'high'
+  issue: string
+}
+
+export interface TerraformData {
+  detected: boolean
+  providers: string[]
+  resource_count: number
+  resource_types: Record<string, number>
+  backend: string | null
+  modules: string[]
+  version_constraint: string | null
+  workspace_config: boolean
+  security_issues: TerraformSecurityIssue[]
+  score: number
+  file_count: number
+}
+
+export interface ToolsData {
+  docker?: ContainerData
+  terraform?: TerraformData
+  [key: string]: unknown
+}
+
 export interface RunResult {
   is_docs_only?: boolean
   commits: CommitData
@@ -186,6 +212,7 @@ export interface RunResult {
   containers?: ContainerData
   cicd?: CicdData
   changelog?: ChangelogData
+  tools?: ToolsData
   // Baked in at scan time — no JIT fetching needed
   issues?: JitIssue[]
   pr_refs?: JitPrData['pr_issue_refs']
@@ -233,6 +260,7 @@ export interface RunListItem {
   oss_badge: 'champion' | 'thriving' | 'growing' | 'seedling' | 'struggling' | 'dormant' | null
   scanned_branch_count: number
   cached_branch_count: number | null
+  fork_count: number | null
 }
 
 export interface FeaturedRepo {

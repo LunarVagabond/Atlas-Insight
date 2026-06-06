@@ -3,20 +3,16 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from apps.analysis.dep_report import (
-    _parse_build_gradle,
-    _parse_cargo_toml,
-    _parse_composer_json,
-    _parse_gemfile,
-    _parse_go_mod,
-    _parse_package_json,
-    _parse_pom_xml,
-    _parse_pyproject_toml,
-    _parse_requirements_txt,
-    _scan_dockerfiles,
-    _should_skip,
-    analyze_dependencies,
-)
+from apps.analysis.dep_report import _scan_dockerfiles, _should_skip, analyze_dependencies
+from apps.analysis.languages.go.manifest import parse_manifest as _parse_go_mod
+from apps.analysis.languages.java.manifest import _parse_gradle as _parse_build_gradle
+from apps.analysis.languages.java.manifest import _parse_pom as _parse_pom_xml
+from apps.analysis.languages.javascript.manifest import parse_manifest as _parse_package_json
+from apps.analysis.languages.php.manifest import parse_manifest as _parse_composer_json
+from apps.analysis.languages.python.manifest import _parse_pyproject as _parse_pyproject_toml
+from apps.analysis.languages.python.manifest import _parse_requirements as _parse_requirements_txt
+from apps.analysis.languages.ruby.manifest import parse_manifest as _parse_gemfile
+from apps.analysis.languages.rust.manifest import parse_manifest as _parse_cargo_toml
 
 
 class TestShouldSkip:

@@ -23,6 +23,8 @@ COMPOSE_BARE := docker compose -f $(ROOT_DIR)/docker-compose.yml
 		logs-django logs-celery logs-beat logs-flower logs-vite \
         docker-up docker-down docker-build release \
         submit-repos \
+        new-language \
+        new-tool \
         _ensure_running_dirs
 
 # ── Help ───────────────────────────────────────────────────────────────────────
@@ -67,6 +69,12 @@ help:
 	@echo "  ── Batch submission ─────────────────────────────────────────────────"
 	@echo "    submit-repos       POST each URL in FILE to the analyze API"
 	@echo "                       FILE=repos.txt (default)  HOST=http://localhost:4500"
+	@echo ""
+	@echo "  ── Plugin development ───────────────────────────────────────────────"
+	@echo "    new-language       Scaffold a new language plugin (interactive prompt)"
+	@echo "                       LANG=kotlin skips prompt"
+	@echo "    new-tool           Scaffold a new infrastructure tool plugin"
+	@echo "                       TOOL=kubernetes skips prompt"
 	@echo ""
 	@echo "  ── Logs ─────────────────────────────────────────────────────────────"
 	@echo "    logs               Tail all logs"
@@ -390,6 +398,24 @@ submit-repos:
 	done < "$(SUBMIT_FILE)"
 	@echo ""
 	@echo "Done."
+
+# ── Language development ───────────────────────────────────────────────────────
+
+new-language:
+	@if [ -z "$(LANG)" ]; then \
+	  read -p "Language name (e.g. Kotlin): " _LANG; \
+	  $(ROOT_DIR)/backend/.venv/bin/python $(ROOT_DIR)/scripts/scaffold_language.py "$$_LANG"; \
+	else \
+	  $(ROOT_DIR)/backend/.venv/bin/python $(ROOT_DIR)/scripts/scaffold_language.py "$(LANG)"; \
+	fi
+
+new-tool:
+	@if [ -z "$(TOOL)" ]; then \
+	  read -p "Tool name (e.g. Kubernetes): " _TOOL; \
+	  $(ROOT_DIR)/backend/.venv/bin/python $(ROOT_DIR)/scripts/scaffold_tool.py "$$_TOOL"; \
+	else \
+	  $(ROOT_DIR)/backend/.venv/bin/python $(ROOT_DIR)/scripts/scaffold_tool.py "$(TOOL)"; \
+	fi
 
 # ── Internal ───────────────────────────────────────────────────────────────────
 

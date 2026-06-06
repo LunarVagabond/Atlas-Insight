@@ -3,19 +3,25 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from apps.analysis.import_parser import (
-    _is_external_cs,
-    _is_external_elixir,
-    _is_external_go,
-    _is_external_java,
-    _is_external_js,
-    _is_external_python,
-    _is_external_ruby,
-    _is_external_scala,
-    _is_external_swift,
-    _read_go_module_path,
-    parse_imports,
-)
+from apps.analysis.import_parser import parse_imports
+from apps.analysis.languages.csharp.edges import _is_external as _is_external_cs
+from apps.analysis.languages.elixir.edges import _is_external as _is_external_elixir
+from apps.analysis.languages.go.edges import _is_external as _go_is_external, _read_module_path
+from apps.analysis.languages.java.edges import _is_external as _is_external_java
+from apps.analysis.languages.javascript.edges import _is_external as _is_external_js
+from apps.analysis.languages.python.edges import _is_external as _is_external_python
+from apps.analysis.languages.ruby.edges import _is_external as _is_external_ruby
+from apps.analysis.languages.scala.edges import _is_external as _is_external_scala
+from apps.analysis.languages.swift.edges import _is_external as _is_external_swift
+
+
+def _is_external_go(dep: str, module_path) -> bool:
+    return _go_is_external(dep, module_path)
+
+
+def _read_go_module_path(repo_dir: str):
+    _read_module_path.cache_clear()
+    return _read_module_path(repo_dir)
 
 
 class TestIsExternalPython:

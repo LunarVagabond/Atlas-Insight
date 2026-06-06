@@ -3,6 +3,8 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .languages import all_manifest_dep_files, ext_to_lang_name
+
 FRONTEND_DIR_NAMES = {'frontend', 'client', 'web', 'ui', 'app'}
 BACKEND_DIR_NAMES = {'backend', 'server', 'api', 'service', 'srv'}
 MONOREPO_DIR_NAMES = {'packages', 'apps', 'services', 'modules', 'libs'}
@@ -10,51 +12,25 @@ WORKSPACE_CONFIG_FILES = {
     'pnpm-workspace.yaml', 'lerna.json', 'nx.json', 'turbo.json',
     'go.work', '.yarnrc.yml', '.yarnrc.yaml',
 }
-LANG_EXT_MAP = {
-    '.py': 'Python',
-    '.ts': 'TypeScript',
-    '.tsx': 'TypeScript',
-    '.js': 'JavaScript',
-    '.jsx': 'JavaScript',
-    '.go': 'Go',
-    '.rs': 'Rust',
-    '.rb': 'Ruby',
-    '.java': 'Java',
-    '.kt': 'Kotlin',
-    '.cs': 'C#',
-    '.php': 'PHP',
-    '.swift': 'Swift',
-    '.vue': 'Vue',
-    '.dart': 'Dart',
-    '.ex': 'Elixir',
-    '.exs': 'Elixir',
-    '.scala': 'Scala',
-    '.lua': 'Lua',
-    '.c': 'C',
-    '.h': 'C',
-    '.cpp': 'C++',
-    '.cc': 'C++',
-    '.cxx': 'C++',
-    '.hpp': 'C++',
-    '.hxx': 'C++',
-    '.hs': 'Haskell',
-    '.zig': 'Zig',
-    '.sh': 'Shell',
-    '.bash': 'Shell',
-    '.nim': 'Nim',
-    '.cr': 'Crystal',
-    '.clj': 'Clojure',
-    '.cljs': 'Clojure',
-    '.erl': 'Erlang',
-    '.hrl': 'Erlang',
+
+# Languages handled by plugins + extra display-name-only entries (no plugin needed)
+_EXTRA_EXT_MAP = {
+    '.ts': 'TypeScript', '.tsx': 'TypeScript',   # JS plugin covers these but under 'JavaScript'
+    '.vue': 'Vue',                                 # JS plugin covers .vue but display name is Vue
+    '.hs': 'Haskell', '.zig': 'Zig',
+    '.sh': 'Shell', '.bash': 'Shell',
+    '.nim': 'Nim', '.cr': 'Crystal',
+    '.clj': 'Clojure', '.cljs': 'Clojure',
+    '.erl': 'Erlang', '.hrl': 'Erlang',
 }
+LANG_EXT_MAP = {**ext_to_lang_name(), **_EXTRA_EXT_MAP}
 
 _DOC_EXTENSIONS = frozenset({
     '.md', '.mdx', '.rst', '.txt', '.html', '.htm', '.adoc', '.asciidoc',
     '.tex', '.org', '.wiki', '.textile', '.pod',
 })
 
-_CODE_EXTENSIONS = frozenset(LANG_EXT_MAP.keys())
+_CODE_EXTENSIONS = frozenset(LANG_EXT_MAP)
 
 
 @dataclass
@@ -156,19 +132,13 @@ def _find_dep_roots(repo_dir: str) -> tuple[list[SubProject], bool]:
 
 
 def _dep_files_in_dir(directory: Path) -> list[str]:
-    candidates = [
-        'requirements.txt', 'pyproject.toml', 'setup.py', 'setup.cfg',
-        'go.mod', 'Cargo.toml', 'Gemfile',
-        'CMakeLists.txt', 'conanfile.txt', 'conanfile.py', 'vcpkg.json',
-        'build.sbt', 'build.gradle', 'build.gradle.kts',
-        'pubspec.yaml',
-        'mix.exs',
-        'stack.yaml', 'cabal.project',
-    ]
-    found = [f for f in candidates if (directory / f).exists()]
+    candidates = all_manifest_dep_files()
+    # Also include Haskell/non-plugin manifest files not registered in any plugin
+    extra = {'stack.yaml', 'cabal.project', 'mix.exs'}
+    found = [f for f in (candidates | extra) if (directory / f).exists()]
 
     pkg_json = directory / 'package.json'
-    if pkg_json.exists() and _is_real_package_json(pkg_json):
+    if pkg_json.exists() and _is_real_package_json(pkg_json) and 'package.json' not in found:
         found.append('package.json')
 
     return found

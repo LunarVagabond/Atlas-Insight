@@ -8,21 +8,14 @@ _TEST_FILE_PATTERNS = (
     'tests/', '__tests__/', 'test/', 'spec/',
     '_spec.lua', 'test_',
 )
-_FRAMEWORK_SIGNATURES = {
-    'pytest':       {'conftest.py', 'pytest.ini', 'pyproject.toml', 'setup.cfg'},
-    'unittest':     {'test_*.py'},
-    'jest':         {'jest.config.js', 'jest.config.ts', 'jest.config.cjs'},
-    'vitest':       {'vitest.config.ts', 'vitest.config.js'},
-    'mocha':        {'.mocharc.js', '.mocharc.yml', '.mocharc.json'},
-    'rspec':        {'.rspec', 'spec/spec_helper.rb'},
-    'minitest':     {'test/test_helper.rb'},
-    'go test':      {'_test.go'},
-    'cargo test':   {'#[cfg(test)]'},
-    'phpunit':      {'phpunit.xml', 'phpunit.xml.dist'},
-    'xunit':        {'xunit.runner.json'},
-    'junit':        {'pom.xml'},
-    'busted':       {'.busted', 'spec/'},
-}
+def _build_framework_signatures() -> dict[str, set[str]]:
+    from .languages import all_plugins
+    sigs: dict[str, set[str]] = {}
+    for p in all_plugins():
+        sigs.update(p.test_frameworks)
+    return sigs
+
+_FRAMEWORK_SIGNATURES = _build_framework_signatures()
 
 
 def _is_test_file(name: str) -> bool:

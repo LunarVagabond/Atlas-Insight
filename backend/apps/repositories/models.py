@@ -106,6 +106,7 @@ class AnalysisRun(models.Model):
     test_coverage_data = models.JSONField(null=True, blank=True)
     containers_data = models.JSONField(null=True, blank=True)
     cicd_data = models.JSONField(null=True, blank=True)
+    tools_data = models.JSONField(null=True, blank=True)
     changelog_data = models.JSONField(null=True, blank=True)
     diff_data = models.JSONField(null=True, blank=True)
     similar_runs_data = models.JSONField(null=True, blank=True)
@@ -138,6 +139,7 @@ class AnalysisRun(models.Model):
             ('test_coverage', self.test_coverage_data),
             ('containers', self.containers_data),
             ('cicd', self.cicd_data),
+            ('tools', self.tools_data),
             ('changelog', self.changelog_data),
             ('diff', self.diff_data),
             ('similar_runs', self.similar_runs_data),
@@ -207,6 +209,7 @@ class AnalysisRun(models.Model):
         self.test_coverage_data = value.get('test_coverage')
         self.containers_data = value.get('containers')
         self.cicd_data = value.get('cicd')
+        self.tools_data = value.get('tools')
         self.changelog_data = value.get('changelog')
         self.diff_data = value.get('diff')
         self.similar_runs_data = value.get('similar_runs')

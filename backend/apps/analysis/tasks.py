@@ -16,9 +16,9 @@ from .arch_tours import generate_arch_tours
 from .changelog_analysis import analyze_changelog
 from .cicd_analysis import analyze_cicd
 from .classifications import classify_repo
+from .tools import detect_tools
 from .commit_analysis import analyze_commits
 from .complexity import analyze_complexity
-from .container_analysis import analyze_containers
 from .contribution_analysis import analyze_contributions
 from .dead_code import analyze_dead_code
 from .dep_report import analyze_dependencies
@@ -52,7 +52,7 @@ _RESULT_UPDATE_FIELDS = [
     'classification_data', 'todos_data', 'arch_tours_data', 'ownership_data',
     'contribution_opportunities_data', 'repo_type_data', 'license_data',
     'complexity_data', 'dead_code_data', 'test_coverage_data', 'containers_data',
-    'cicd_data', 'changelog_data', 'diff_data', 'similar_runs_data',
+    'cicd_data', 'tools_data', 'changelog_data', 'diff_data', 'similar_runs_data',
     'issues_data', 'pr_refs_data',
 ]
 
@@ -114,6 +114,7 @@ def _extract_run_fields(run: 'AnalysisRun', result: dict) -> None:
     run.test_coverage_data = result.get('test_coverage')
     run.containers_data = result.get('containers')
     run.cicd_data = result.get('cicd')
+    run.tools_data = result.get('tools')
     run.changelog_data = result.get('changelog')
     run.diff_data = result.get('diff')
     run.similar_runs_data = result.get('similar_runs')
@@ -367,8 +368,8 @@ def analyze_repository(self, run_id: str):
             def _run_test_coverage():
                 return analyze_test_coverage(repo_dir, structure)
 
-            def _run_containers():
-                return analyze_containers(repo_dir)
+            def _run_tools():
+                return detect_tools(repo_dir)
 
             def _run_cicd():
                 return analyze_cicd(repo_dir, structure)
@@ -381,7 +382,7 @@ def analyze_repository(self, run_id: str):
                 'complexity': _run_complexity,
                 'dead_code': _run_dead_code,
                 'test_coverage': _run_test_coverage,
-                'containers': _run_containers,
+                'tools': _run_tools,
                 'cicd': _run_cicd,
                 'changelog': _run_changelog,
             }
@@ -396,13 +397,14 @@ def analyze_repository(self, run_id: str):
                         logger.warning('Extra analyzer %s failed', _key, exc_info=True)
                         _extra_results[_key] = {}
 
+            _tools = _extra_results.get('tools') or {}
             signals = compute_heuristics(
                 commits, graph, deps, readme, structure, security,
                 license_data=_extra_results.get('license'),
                 complexity_data=_extra_results.get('complexity'),
                 test_coverage_data=_extra_results.get('test_coverage'),
                 cicd_data=_extra_results.get('cicd'),
-                container_data=_extra_results.get('containers'),
+                container_data=_tools.get('docker'),
             )
             oss_score = compute_oss_score(signals)
             classification = classify_repo(
@@ -433,7 +435,8 @@ def analyze_repository(self, run_id: str):
                 'complexity': _extra_results.get('complexity', {}),
                 'dead_code': _extra_results.get('dead_code', {}),
                 'test_coverage': _extra_results.get('test_coverage', {}),
-                'containers': _extra_results.get('containers', {}),
+                'tools': _tools,
+                'containers': _tools.get('docker', {}),
                 'cicd': _extra_results.get('cicd', {}),
                 'changelog': _extra_results.get('changelog', {}),
             }

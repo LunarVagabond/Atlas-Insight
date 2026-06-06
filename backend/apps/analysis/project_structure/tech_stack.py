@@ -249,6 +249,15 @@ _FRAMEWORK_FILE_PATTERNS: dict[str, str] = {
     'docker-compose.yml': None,
 }
 
+# Merge per-language plugin contributions (new languages only; existing entries above stay)
+def _merge_plugin_signals() -> None:
+    from ..languages import all_plugins as _all_plugins
+    for _p in _all_plugins():
+        FRAMEWORK_SIGNALS.update(_p.framework_signals)
+        _FRAMEWORK_FILE_PATTERNS.update(_p.framework_file_patterns)
+
+_merge_plugin_signals()
+
 
 def detect_tech_stack(repo_dir: str, dep_list: list[dict]) -> list[str]:
     detected: set[str] = set()

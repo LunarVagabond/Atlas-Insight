@@ -97,6 +97,7 @@ function onDocClick() {
           <div v-if="moreOpen" class="navbar__dropdown navbar__more-dropdown">
             <RouterLink to="/learn" class="navbar__dropdown-item" @click="moreOpen = false">Learn</RouterLink>
             <RouterLink to="/resources" class="navbar__dropdown-item" @click="moreOpen = false">Resources</RouterLink>
+            <RouterLink to="/supported" class="navbar__dropdown-item" @click="moreOpen = false">What's Supported</RouterLink>
             <RouterLink to="/about" class="navbar__dropdown-item" @click="moreOpen = false">About</RouterLink>
           </div>
         </div>
