@@ -288,9 +288,25 @@ const showEmbed = ref(false)
 const embedCopied = ref(false)
 const cardCopied = ref(false)
 const cardTheme = ref<'dark' | 'light'>('dark')
+function resolvePublicOrigin(raw: string | undefined): string {
+  const fallback = window.location.origin
+  if (!raw) return fallback
+  try {
+    const parsed = new URL(raw)
+    const localHosts = new Set(['localhost', '127.0.0.1', '0.0.0.0'])
+    const fallbackHost = window.location.hostname
+    const fallbackIsLocal = localHosts.has(fallbackHost)
+    const parsedIsLocal = localHosts.has(parsed.hostname)
+    // Avoid leaking localhost into generated embed links when running on a real domain.
+    if (!fallbackIsLocal && parsedIsLocal) return fallback
+    return parsed.origin
+  } catch {
+    return fallback
+  }
+}
 // API origin for badge/card SVGs (backend domain in prod); public origin for clickable links (frontend)
-const _apiOrigin = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/api\/?$/, '') || window.location.origin
-const _publicOrigin = (import.meta.env.VITE_PUBLIC_BASE_URL as string | undefined) || window.location.origin
+const _apiOrigin = resolvePublicOrigin((import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/api\/?$/, ''))
+const _publicOrigin = resolvePublicOrigin(import.meta.env.VITE_PUBLIC_BASE_URL as string | undefined)
 const badgeUrl = computed(() => {
   if (!store.run) return ''
   const { repo_owner: o, repo_name: n } = store.run

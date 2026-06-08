@@ -172,6 +172,73 @@ def _user_can_access_repo(user, owner: str, name: str) -> bool:
     return result
 
 
+def _accessible_private_repo_ids(user) -> set[uuid.UUID]:
+    from django.core.cache import cache
+
+    cache_key = f'private_repo_ids_{user.pk}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return {uuid.UUID(v) for v in cached}
+
+    try:
+        from allauth.socialaccount.models import SocialToken
+        import requests as _requests
+
+        social = SocialToken.objects.filter(
+            account__user=user,
+            account__provider='github',
+        ).first()
+        if not social:
+            cache.set(cache_key, [], 900)
+            return set()
+
+        page = 1
+        accessible_full_names: set[str] = set()
+        while True:
+            resp = _requests.get(
+                'https://api.github.com/user/repos',
+                headers={
+                    'Authorization': f'Bearer {social.token}',
+                    'Accept': 'application/vnd.github+json',
+                },
+                params={
+                    'per_page': 100,
+                    'page': page,
+                    'sort': 'updated',
+                    'affiliation': 'owner,collaborator,organization_member',
+                },
+                timeout=8,
+            )
+            if not resp.ok:
+                break
+            payload = resp.json() if isinstance(resp.json(), list) else []
+            if not payload:
+                break
+            for repo in payload:
+                full_name = repo.get('full_name')
+                if isinstance(full_name, str) and full_name:
+                    accessible_full_names.add(full_name.lower())
+            if len(payload) < 100:
+                break
+            page += 1
+
+        if not accessible_full_names:
+            cache.set(cache_key, [], 900)
+            return set()
+
+        private_repos = Repository.objects.filter(is_private=True).values('id', 'owner', 'name')
+        ids = {
+            row['id']
+            for row in private_repos
+            if f"{row['owner']}/{row['name']}".lower() in accessible_full_names
+        }
+        cache.set(cache_key, [str(v) for v in ids], 900)
+        return ids
+    except Exception:
+        cache.set(cache_key, [], 900)
+        return set()
+
+
 class AnalyzeRequest(Schema):
     url: str
     pat: Optional[str] = None
@@ -378,9 +445,17 @@ def list_runs(
     qs = qs.annotate(has_previous_run=Exists(prev_run_exists))
 
     if request.user.is_authenticated:
+        accessible_private_repo_ids = _accessible_private_repo_ids(request.user)
         qs = qs.filter(
             Q(repo__is_private=False) |
-            Q(repo__is_private=True, user=request.user)
+            Q(
+                repo__is_private=True,
+                user=request.user,
+            ) |
+            Q(
+                repo__is_private=True,
+                repo_id__in=accessible_private_repo_ids,
+            )
         )
     else:
         qs = qs.filter(repo__is_private=False)
@@ -593,5 +668,6 @@ def get_by_slug(request, owner: str, name: str, branch: Optional[str] = None):
     if not run:
         raise HttpError(404, 'No runs found for this repository')
     if repo.is_private and run.user != request.user:
-        raise HttpError(403, 'Access denied')
+        if not _user_can_access_repo(request.user, repo.owner, repo.name):
+            raise HttpError(403, 'Access denied')
     return SlugRunSchema(run_id=run.id, status=run.status)
