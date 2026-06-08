@@ -282,21 +282,39 @@ def my_repos(request):
     ).first()
     if not social:
         raise HttpError(403, 'GitHub not connected')
-    resp = _requests.get(
-        'https://api.github.com/user/repos',
-        headers={
-            'Authorization': f'Bearer {social.token}',
-            'Accept': 'application/vnd.github+json',
-        },
-        params={'per_page': 100, 'sort': 'pushed', 'affiliation': 'owner,collaborator'},
-        timeout=10,
-    )
-    if not resp.ok:
-        raise HttpError(502, 'Failed to fetch repos from GitHub')
+    repos: list[dict] = []
+    page = 1
+    while True:
+        resp = _requests.get(
+            'https://api.github.com/user/repos',
+            headers={
+                'Authorization': f'Bearer {social.token}',
+                'Accept': 'application/vnd.github+json',
+            },
+            params={
+                'per_page': 100,
+                'page': page,
+                'sort': 'pushed',
+                'affiliation': 'owner,collaborator,organization_member',
+            },
+            timeout=10,
+        )
+        if not resp.ok:
+            raise HttpError(502, 'Failed to fetch repos from GitHub')
+        payload = resp.json()
+        if not isinstance(payload, list) or not payload:
+            break
+        repos.extend([r for r in payload if isinstance(r, dict)])
+        if len(payload) < 100:
+            break
+        page += 1
+
     return [
         MyRepoSchema(full_name=r['full_name'], html_url=r['html_url'], private=r['private'])
-        for r in resp.json()
-        if isinstance(r, dict)
+        for r in repos
+        if isinstance(r.get('full_name'), str)
+        and isinstance(r.get('html_url'), str)
+        and isinstance(r.get('private'), bool)
     ]
 
 
