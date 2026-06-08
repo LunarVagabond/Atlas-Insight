@@ -196,7 +196,7 @@ def _fetch_languages(owner: str, name: str, headers: dict) -> list[dict]:
 
 
 def _fetch_releases_meta(owner: str, name: str, headers: dict) -> dict | None:
-    """Fetch release counts using GitHub's prerelease flag. Up to 2 pages (200 releases)."""
+    """Fetch release metadata from REST fallback path. Up to 2 pages (200 releases)."""
     base_url = f'https://api.github.com/repos/{owner}/{name}/releases'
     try:
         all_releases: list[dict] = []
@@ -217,18 +217,14 @@ def _fetch_releases_meta(owner: str, name: str, headers: dict) -> dict | None:
         if not all_releases:
             return None
 
-        stable = [r for r in all_releases if not r.get('prerelease') and not r.get('draft')]
-        prereleases = [r for r in all_releases if r.get('prerelease') and not r.get('draft')]
+        released = [r for r in all_releases if not r.get('draft')]
 
         def _rel(r: dict) -> dict:
             return {'name': r.get('tag_name', ''), 'date': r.get('published_at', '')}
 
         return {
-            'stable_count': len(stable),
-            'prerelease_count': len(prereleases),
-            'total_count': len(stable) + len(prereleases),
-            'latest_stable': _rel(stable[0]) if stable else None,
-            'latest_prerelease': _rel(prereleases[0]) if prereleases else None,
+            'total_count': len(released),
+            'latest_release': _rel(released[0]) if released else None,
         }
     except Exception as exc:
         logger.warning('_fetch_releases_meta failed for %s/%s: %s', owner, name, exc)

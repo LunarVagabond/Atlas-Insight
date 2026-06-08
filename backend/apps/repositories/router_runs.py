@@ -100,6 +100,16 @@ def _cooldown_until(repo, branch: str = '') -> Optional[str]:
     return None
 
 
+def _has_current_release_meta_schema(run: AnalysisRun) -> bool:
+    result = run.result or {}
+    github_meta = result.get('github_meta') or {}
+    releases_meta = github_meta.get('releases_meta')
+    if not isinstance(releases_meta, dict):
+        return True
+    # New schema uses latest_release; older runs used latest_stable/latest_prerelease.
+    return 'latest_release' in releases_meta
+
+
 def _resolve_token(request, pat: Optional[str]) -> Optional[str]:
     if pat:
         return pat
@@ -371,7 +381,8 @@ def analyze(request, payload: AnalyzeRequest):
                     .order_by('-triggered_at').first()
                 )
         if cached_run:
-            return AnalyzeResponse(run_id=cached_run.id, status='completed', cached=True)
+            if _has_current_release_meta_schema(cached_run):
+                return AnalyzeResponse(run_id=cached_run.id, status='completed', cached=True)
 
     user = request.user if request.user.is_authenticated else _resolve_api_token_user(request)
 

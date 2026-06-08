@@ -107,8 +107,6 @@ class TestFetchReleasesMeta:
             {'tag_name': 'v0.9-beta', 'published_at': '2024-12-01', 'prerelease': True, 'draft': False},
         ], headers={})
         result = _fetch_releases_meta('owner', 'repo', {})
-        assert result['stable_count'] == 1
-        assert result['prerelease_count'] == 1
         assert result['total_count'] == 2
 
     @patch('apps.analysis.github_meta.requests.get')
@@ -141,17 +139,16 @@ class TestFetchReleasesMeta:
         ], headers={})
         mock_get.side_effect = [page1, page2]
         result = _fetch_releases_meta('owner', 'repo', {})
-        assert result['stable_count'] == 8
+        assert result['total_count'] == 8
 
     @patch('apps.analysis.github_meta.requests.get')
-    def test_latest_stable_and_prerelease(self, mock_get):
+    def test_latest_release(self, mock_get):
         mock_get.return_value = _mock_response(200, [
             {'tag_name': 'v2.0', 'published_at': '2025-06-01', 'prerelease': False, 'draft': False},
             {'tag_name': 'v2.1-alpha', 'published_at': '2025-07-01', 'prerelease': True, 'draft': False},
         ], headers={})
         result = _fetch_releases_meta('owner', 'repo', {})
-        assert result['latest_stable']['name'] == 'v2.0'
-        assert result['latest_prerelease']['name'] == 'v2.1-alpha'
+        assert result['latest_release']['name'] == 'v2.0'
 
     @patch('apps.analysis.github_meta.requests.get')
     def test_draft_excluded(self, mock_get):
@@ -159,18 +156,17 @@ class TestFetchReleasesMeta:
             {'tag_name': 'v1.0-draft', 'published_at': '2025-01-01', 'prerelease': False, 'draft': True},
         ], headers={})
         result = _fetch_releases_meta('owner', 'repo', {})
-        # draft releases are excluded from stable/prerelease but all_releases is non-empty → dict returned
+        # draft releases are excluded from total_count but all_releases is non-empty → dict returned
         assert result is not None
-        assert result['stable_count'] == 0
-        assert result['prerelease_count'] == 0
+        assert result['total_count'] == 0
 
     @patch('apps.analysis.github_meta.requests.get')
-    def test_no_prereleases(self, mock_get):
+    def test_latest_release_none_when_only_draft(self, mock_get):
         mock_get.return_value = _mock_response(200, [
-            {'tag_name': 'v1.0', 'published_at': '2025-01-01', 'prerelease': False, 'draft': False},
+            {'tag_name': 'v1.0', 'published_at': '2025-01-01', 'prerelease': False, 'draft': True},
         ], headers={})
         result = _fetch_releases_meta('owner', 'repo', {})
-        assert result['latest_prerelease'] is None
+        assert result['latest_release'] is None
 
 
 class TestParseIssues:

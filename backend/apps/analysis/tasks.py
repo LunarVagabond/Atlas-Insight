@@ -264,11 +264,11 @@ def analyze_repository(self, run_id: str):
 
             releases_meta = github_meta.get('releases_meta')
             if releases_meta:
-                structure['release_count'] = releases_meta.get('stable_count', structure['release_count'])
-                if releases_meta.get('latest_stable'):
+                structure['release_count'] = releases_meta.get('total_count', structure['release_count'])
+                if releases_meta.get('latest_release'):
                     structure['last_release'] = {
-                        'name': releases_meta['latest_stable']['name'],
-                        'date': releases_meta['latest_stable']['date'],
+                        'name': releases_meta['latest_release']['name'],
+                        'date': releases_meta['latest_release']['date'],
                     }
 
             created_at = github_meta.get('created_at')
@@ -338,11 +338,11 @@ def analyze_repository(self, run_id: str):
 
             releases_meta = github_meta.get('releases_meta')
             if releases_meta:
-                structure['release_count'] = releases_meta.get('stable_count', structure['release_count'])
-                if releases_meta.get('latest_stable'):
+                structure['release_count'] = releases_meta.get('total_count', structure['release_count'])
+                if releases_meta.get('latest_release'):
                     structure['last_release'] = {
-                        'name': releases_meta['latest_stable']['name'],
-                        'date': releases_meta['latest_stable']['date'],
+                        'name': releases_meta['latest_release']['name'],
+                        'date': releases_meta['latest_release']['date'],
                     }
 
             created_at = github_meta.get('created_at')

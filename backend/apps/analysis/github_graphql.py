@@ -52,7 +52,8 @@ query RepoMeta($owner: String!, $name: String!) {
       totalSize
       edges { size node { name } }
     }
-    releases(first: 100, orderBy: {field: CREATED_AT, direction: DESC}) {
+    releases(first: 1, orderBy: {field: CREATED_AT, direction: DESC}) {
+      totalCount
       nodes { tagName publishedAt isPrerelease isDraft }
     }
   }
@@ -61,21 +62,23 @@ query RepoMeta($owner: String!, $name: String!) {
 """
 
 
-def _build_releases_meta(nodes: list[dict]) -> dict | None:
-    if not nodes:
+def _build_releases_meta(releases: dict) -> dict | None:
+    total_count = releases.get("totalCount")
+    nodes = releases.get("nodes") or []
+    if not total_count and not nodes:
         return None
-    stable = [r for r in nodes if not r.get("isPrerelease") and not r.get("isDraft")]
-    prereleases = [r for r in nodes if r.get("isPrerelease") and not r.get("isDraft")]
 
-    def _rel(r: dict) -> dict:
-        return {"name": r.get("tagName", ""), "date": r.get("publishedAt", "")}
+    latest_release = None
+    if nodes:
+        first = nodes[0]
+        latest_release = {
+            "name": first.get("tagName", ""),
+            "date": first.get("publishedAt", ""),
+        }
 
     return {
-        "stable_count": len(stable),
-        "prerelease_count": len(prereleases),
-        "total_count": len(stable) + len(prereleases),
-        "latest_stable": _rel(stable[0]) if stable else None,
-        "latest_prerelease": _rel(prereleases[0]) if prereleases else None,
+        "total_count": int(total_count or 0),
+        "latest_release": latest_release,
     }
 
 
@@ -102,7 +105,7 @@ def fetch_repo_meta_graphql(owner: str, name: str, token: str | None = None) -> 
         key=lambda x: -x["bytes"],
     )
 
-    releases_meta = _build_releases_meta(repo.get("releases", {}).get("nodes", []))
+    releases_meta = _build_releases_meta(repo.get("releases", {}))
     default_branch = (repo.get("defaultBranchRef") or {}).get("name") or "main"
 
     logger.debug(
