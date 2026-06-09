@@ -3597,11 +3597,19 @@
 
 // ===== COMPARE PANEL =====
 .compare-panel {
+  padding-bottom: $space-4;
+
   &__header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: $space-4;
     margin-bottom: $space-6;
+    padding: $space-2 0 $space-4;
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
   }
 
   &__repo-label {
@@ -4822,6 +4830,10 @@
 }
 
 // ===== COMPARE VIEW =====
+.compare-view__intro {
+  margin-bottom: $space-6;
+}
+
 .compare-view__purpose {
   font-size: 0.9375rem;
   color: var(--color-text-secondary);

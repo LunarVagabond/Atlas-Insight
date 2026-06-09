@@ -36,24 +36,22 @@ onMounted(async () => {
 
 <template>
   <div class="results-layout">
-    <div class="results-layout__header">
-      <div class="results-header">
-        <h1 class="results-header__title">Repository Comparison</h1>
-        <RouterLink to="/runs" class="btn btn--secondary" style="font-size:0.875rem">
-          ← All Runs
-        </RouterLink>
+    <div class="results-layout__scroll">
+      <div class="compare-view__intro">
+        <div class="results-header">
+          <h1 class="results-header__title">Repository Comparison</h1>
+          <RouterLink to="/runs" class="btn btn--secondary" style="font-size:0.875rem">
+            ← All Runs
+          </RouterLink>
+        </div>
+        <p class="compare-view__purpose">
+          Use this tool to decide which project is the better fit for your next open-source contribution —
+          compare activity, health signals, and contribution opportunities side by side.
+        </p>
       </div>
-      <p class="compare-view__purpose">
-        Use this tool to decide which project is the better fit for your next open-source contribution —
-        compare activity, health signals, and contribution opportunities side by side.
-      </p>
-    </div>
-    <div class="results-layout__content">
       <LoadingSpinner v-if="loading" label="Loading runs…" />
       <div v-else-if="error" class="empty-state">{{ error }}</div>
-      <template v-else-if="runA && runB">
-        <ComparePanel :run-a="runA" :run-b="runB" />
-      </template>
+      <ComparePanel v-else-if="runA && runB" :run-a="runA" :run-b="runB" />
     </div>
   </div>
 </template>
