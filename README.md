@@ -18,6 +18,10 @@ Analysis results are archived. Re-running a repository first checks for new comm
 
 ---
 
+**Quick Links:** [Features](#features) • [Quick Start](#quick-start) • [API](#api-reference) • [Deployment](#deployment) • [Contributing](#contributing)
+
+---
+
 <p align="center">
   <img src="docs/image_assets/dashboard.png" alt="Atlas Insight Dashboard" width="48%" />
   <img src="docs/image_assets/architecture.png" alt="Architecture View" width="48%" />
