@@ -1,11 +1,15 @@
+import logging
 import os
 import re
 import shutil
+import subprocess
 from typing import Optional
 
 import git
 from django.conf import settings
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 
 # Override git config via env to disable any system credential helper
 # (VSCode, GNOME keyring, etc.) for every git operation we run.
@@ -43,42 +47,180 @@ def get_cache_path(url: str, branch: str = '') -> str:
     return str(cache_dir)
 
 
-def list_remote_branches(url: str, pat: Optional[str] = None) -> list[str]:
-    """Return sorted list of branch names from GitHub API."""
-    import requests as _requests
-    match = re.match(r'https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$', url)
-    if not match:
+def _inject_pat(url: str, pat: str) -> str:
+    return url.replace('https://', f'https://{pat}@', 1)
+
+
+def _parse_github_next_url(link_header: str | None) -> str | None:
+    if not link_header:
+        return None
+    for segment in link_header.split(','):
+        if 'rel="next"' in segment:
+            m = re.search(r'<([^>]+)>', segment)
+            if m:
+                return m.group(1)
+    return None
+
+
+def _list_branches_via_git(url: str, pat: Optional[str] = None) -> list[str]:
+    clone_url = _inject_pat(url, pat) if pat else url
+    try:
+        proc = subprocess.run(
+            ['git', 'ls-remote', '--heads', clone_url],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env={**os.environ, **_GIT_ENV},
+        )
+    except (subprocess.SubprocessError, OSError) as exc:
+        logger.warning('git ls-remote failed for %s: %s', url, exc)
         return []
-    owner, name = match.group(1), match.group(2)
-    headers = {'Accept': 'application/vnd.github+json'}
+    if proc.returncode != 0:
+        logger.warning(
+            'git ls-remote returned %s for %s: %s',
+            proc.returncode,
+            url,
+            (proc.stderr or '')[:200],
+        )
+        return []
+    branches: list[str] = []
+    for line in proc.stdout.splitlines():
+        if '\t' not in line:
+            continue
+        _, ref = line.split('\t', 1)
+        if ref.startswith('refs/heads/'):
+            branches.append(ref.removeprefix('refs/heads/'))
+    return sorted(branches)
+
+
+def _github_api_branches(
+    owner: str,
+    name: str,
+    pat: Optional[str] = None,
+) -> list[str]:
+    import requests as _requests
     from django.conf import settings as _s
-    token = pat or getattr(_s, 'GITHUB_TOKEN', '')
+
+    headers = {'Accept': 'application/vnd.github+json'}
+    token = pat or getattr(_s, 'GITHUB_TOKEN', '') or None
     if token:
         headers['Authorization'] = f'Bearer {token}'
+
     branches: list[str] = []
-    for page in range(1, 6):
+    api_url = f'https://api.github.com/repos/{owner}/{name}/branches'
+    params: dict | None = {'per_page': 100, 'page': 1}
+
+    for _ in range(100):
         try:
-            resp = _requests.get(
-                f'https://api.github.com/repos/{owner}/{name}/branches',
-                params={'per_page': 100, 'page': page},
-                headers=headers,
-                timeout=10,
-            )
-        except Exception:
+            resp = _requests.get(api_url, params=params, headers=headers, timeout=15)
+        except Exception as exc:
+            logger.warning('GitHub branches API request failed for %s/%s: %s', owner, name, exc)
             break
+
         if resp.status_code != 200:
+            logger.warning(
+                'GitHub branches API returned %s for %s/%s',
+                resp.status_code,
+                owner,
+                name,
+            )
             break
+
         data = resp.json()
         if not data:
             break
         branches.extend(b['name'] for b in data if isinstance(b, dict) and b.get('name'))
-        if len(data) < 100:
+
+        next_url = _parse_github_next_url(resp.headers.get('Link'))
+        if not next_url or len(data) < 100:
             break
-    return sorted(branches)
+        api_url = next_url
+        params = None
+
+    return branches
 
 
-def _inject_pat(url: str, pat: str) -> str:
-    return url.replace('https://', f'https://{pat}@', 1)
+def list_remote_branches(url: str, pat: Optional[str] = None) -> list[str]:
+    """Return sorted branch names via GitHub API, falling back to git ls-remote."""
+    match = re.match(r'https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$', url)
+    if not match:
+        return []
+    owner, name = match.group(1), match.group(2)
+
+    tokens_to_try: list[Optional[str]] = []
+    if pat:
+        tokens_to_try.append(pat)
+    from django.conf import settings as _s
+    gh_token = getattr(_s, 'GITHUB_TOKEN', '') or None
+    if gh_token and gh_token not in tokens_to_try:
+        tokens_to_try.append(gh_token)
+    tokens_to_try.append(None)
+
+    for token in tokens_to_try:
+        branches = _github_api_branches(owner, name, token)
+        if branches:
+            return sorted(branches)
+
+    logger.info('GitHub API returned no branches for %s/%s — trying git ls-remote', owner, name)
+    for token in ([pat] if pat else []) + [None]:
+        git_branches = _list_branches_via_git(url, token)
+        if git_branches:
+            return git_branches
+
+    cached = _list_branches_from_cache(url)
+    if cached:
+        logger.info('Listed %d branches from local cache for %s/%s', len(cached), owner, name)
+        return cached
+    return []
+
+
+def _refs_from_repo_path(cache_path: str) -> list[str]:
+    git_dir = os.path.join(cache_path, '.git')
+    if not os.path.isdir(git_dir):
+        return []
+    try:
+        repo = git.Repo(cache_path)
+        names: set[str] = set()
+        for ref in repo.remote().refs:
+            ref_name = ref.name
+            if not ref_name.startswith('origin/'):
+                continue
+            short = ref_name.removeprefix('origin/')
+            if short == 'HEAD':
+                continue
+            names.add(short)
+        return sorted(names)
+    except Exception as exc:
+        logger.warning('Failed to read branch refs from cache %s: %s', cache_path, exc)
+        return []
+
+
+def _list_branches_from_cache(url: str) -> list[str]:
+    match = re.match(r'https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$', url)
+    if not match:
+        return []
+    owner, name = match.group(1), match.group(2)
+    prefix = f'{owner}_{name}'
+    cache_root = settings.REPO_CACHE_DIR
+    all_names: set[str] = set()
+
+    default_path = get_cache_path(url, '')
+    all_names.update(_refs_from_repo_path(default_path))
+
+    if cache_root.is_dir():
+        for entry in cache_root.iterdir():
+            if not entry.is_dir():
+                continue
+            entry_name = entry.name
+            if entry_name == prefix:
+                all_names.update(_refs_from_repo_path(str(entry)))
+            elif entry_name.startswith(prefix + '__'):
+                branch_suffix = entry_name[len(prefix + '__'):]
+                if branch_suffix:
+                    all_names.add(branch_suffix)
+                all_names.update(_refs_from_repo_path(str(entry)))
+
+    return sorted(all_names)
 
 
 def _scrub(text: str | None, pat: str) -> str:

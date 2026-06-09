@@ -132,6 +132,37 @@ def _resolve_token(request, pat: Optional[str]) -> Optional[str]:
     return None
 
 
+def _resolve_token_soft(request, pat: Optional[str] = None) -> Optional[str]:
+    try:
+        return _resolve_token(request, pat)
+    except HttpError:
+        return None
+
+
+def _resolve_repo_access_token(
+    request,
+    pat: Optional[str] = None,
+    repo: Optional[Repository] = None,
+) -> Optional[str]:
+    explicit = (pat or '').strip() or None
+    if explicit:
+        try:
+            return _resolve_token(request, explicit)
+        except HttpError:
+            return explicit
+    if repo and repo.auth_token:
+        return repo.auth_token
+    return _resolve_token_soft(request, None)
+
+
+def _persist_repo_token(repo: Repository, token: Optional[str], *, explicit: bool) -> None:
+    if not explicit or not token or token == repo.auth_token:
+        return
+    repo.auth_token = token
+    repo.auth_token_warning = ''
+    repo.save(update_fields=['auth_token', 'auth_token_warning'])
+
+
 def _token_has_repo_scope(token: str) -> bool:
     try:
         import requests as _requests
@@ -344,10 +375,9 @@ def analyze(request, payload: AnalyzeRequest):
     if payload.webhook_url:
         _validate_webhook_url(payload.webhook_url)
 
-    token = _resolve_token(request, payload.pat) or repo.auth_token or None
-    if token and token != repo.auth_token:
-        repo.auth_token = token
-        repo.save(update_fields=['auth_token'])
+    explicit_pat = (payload.pat or '').strip() or None
+    token = _resolve_repo_access_token(request, explicit_pat, repo)
+    _persist_repo_token(repo, token, explicit=bool(explicit_pat))
 
     branch = (payload.branch or '').strip()
     # Normalize: if the requested branch is the repo's default branch, store as ''
@@ -600,16 +630,28 @@ def retry_run(request, run_id: uuid.UUID):
 
 @router.get('/runs/{run_id}/branches', response=BranchesResponse)
 @ratelimit(key='user_or_ip', rate='60/m', method='GET', block=False)
-def get_branches(request, run_id: uuid.UUID):
+def get_branches(request, run_id: uuid.UUID, pat: Optional[str] = None):
     _assert_not_limited(request)
     try:
         run = AnalysisRun.objects.select_related('repo').get(id=run_id)
     except AnalysisRun.DoesNotExist:
         raise HttpError(404, 'Run not found')
+    run.repo.refresh_from_db()
     if run.repo.is_private:
         if not request.user.is_authenticated:
             raise HttpError(403, 'Access denied')
-    branches = list_remote_branches(run.repo.url, pat=run.repo.auth_token or None)
+
+    explicit_pat = (pat or '').strip() or None
+    token = _resolve_repo_access_token(request, explicit_pat, run.repo)
+    _persist_repo_token(run.repo, token, explicit=bool(explicit_pat))
+
+    branches = list_remote_branches(run.repo.url, pat=token)
+    if not branches:
+        oauth_token = _resolve_token_soft(request, None)
+        if oauth_token and oauth_token != token:
+            branches = list_remote_branches(run.repo.url, pat=oauth_token)
+    if not branches and run.repo.auth_token and run.repo.auth_token != token:
+        branches = list_remote_branches(run.repo.url, pat=run.repo.auth_token)
     scanned = list(
         AnalysisRun.objects.filter(repo=run.repo, status='completed')
         .values_list('branch', flat=True).distinct()

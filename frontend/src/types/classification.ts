@@ -19,8 +19,11 @@ export interface ClassificationDelta {
   changed: boolean
 }
 
+export type ScoringMode = 'oss' | 'closed_source'
+
 export interface OssScore {
   score: number
   badge: 'champion' | 'thriving' | 'growing' | 'seedling' | 'struggling' | 'dormant'
   label: string
+  mode?: ScoringMode
 }

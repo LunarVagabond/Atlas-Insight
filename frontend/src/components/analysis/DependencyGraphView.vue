@@ -137,6 +137,52 @@ function selectNode(id: string, isGod: boolean) {
   }
 }
 
+function focusNode(id: string) {
+  const godModuleIds = new Set(props.graph.god_modules.map(g => g.module))
+  const isGod = godModuleIds.has(id)
+
+  if (cy) {
+    cy.elements().removeClass('search-match search-current')
+    const node = cy.getElementById(id)
+    if (node.nonempty()) {
+      node.removeClass('area-hidden')
+      cy.elements().removeClass('faded selected impact')
+      const neighborhood = node.closedNeighborhood()
+      cy.elements().not(neighborhood).not('.area-hidden').addClass('faded')
+      neighborhood.addClass('selected')
+      node.removeClass('faded')
+
+      const idx = edgeIndex.value
+      const visited = new Set<string>()
+      const queue = [id]
+      while (queue.length) {
+        const cur = queue.shift()!
+        for (const dep of (idx.importedBy[cur] ?? [])) {
+          if (!visited.has(dep)) {
+            visited.add(dep)
+            queue.push(dep)
+          }
+        }
+      }
+      visited.forEach(impId => {
+        cy!.getElementById(impId).removeClass('faded').addClass('impact')
+      })
+
+      cy.animate({
+        center: { eles: node },
+        zoom: Math.max(cy.zoom(), 1.2),
+        duration: 350,
+        easing: 'ease-in-out-quad',
+      } as Parameters<typeof cy.animate>[0])
+    } else {
+      cy.elements().removeClass('faded selected impact')
+    }
+  }
+
+  selectNode(id, isGod)
+  showAllImpact.value = false
+}
+
 function closeDrawer() {
   selectedNode.value = null
   showAllImpact.value = false
@@ -336,35 +382,7 @@ function initGraph() {
 
   cy.on('tap', 'node', (evt) => {
     const node = evt.target as cytoscape.NodeSingular
-    const id = node.id()
-    const isGod = node.data('isGod') as boolean
-
-    cy!.elements().removeClass('faded selected impact')
-
-    const neighborhood = node.closedNeighborhood()
-    cy!.elements().not(neighborhood).not('.area-hidden').addClass('faded')
-    neighborhood.addClass('selected')
-    node.removeClass('faded')
-
-    selectNode(id, isGod)
-    showAllImpact.value = false
-
-    // Highlight impact radius (files that depend on this one)
-    const idx = edgeIndex.value
-    const visited = new Set<string>()
-    const queue = [id]
-    while (queue.length) {
-      const cur = queue.shift()!
-      for (const dep of (idx.importedBy[cur] ?? [])) {
-        if (!visited.has(dep)) {
-          visited.add(dep)
-          queue.push(dep)
-        }
-      }
-    }
-    visited.forEach(impId => {
-      cy!.getElementById(impId).removeClass('faded').addClass('impact')
-    })
+    focusNode(node.id())
   })
 
   cy.on('tap', (evt) => {
@@ -489,15 +507,17 @@ watch(() => props.graph, initGraph)
                 <span class="dep-graph__drawer-count">{{ selectedNode.imports.length }}</span>
               </h4>
               <div v-if="selectedNode.imports.length" class="dep-graph__drawer-list">
-                <div
+                <button
                   v-for="m in selectedNode.imports"
                   :key="m"
+                  type="button"
                   class="dep-graph__drawer-item dep-graph__drawer-item--out"
                   :title="m"
+                  @click="focusNode(m)"
                 >
                   <span class="dep-graph__drawer-arrow">→</span>
                   <span class="dep-graph__drawer-item-label">{{ m.split('/').pop() }}</span>
-                </div>
+                </button>
               </div>
               <p v-else class="dep-graph__drawer-empty">This file doesn't import anything tracked</p>
             </div>
@@ -508,15 +528,17 @@ watch(() => props.graph, initGraph)
                 <span class="dep-graph__drawer-count">{{ selectedNode.importedBy.length }}</span>
               </h4>
               <div v-if="selectedNode.importedBy.length" class="dep-graph__drawer-list">
-                <div
+                <button
                   v-for="m in selectedNode.importedBy"
                   :key="m"
+                  type="button"
                   class="dep-graph__drawer-item dep-graph__drawer-item--in"
                   :title="m"
+                  @click="focusNode(m)"
                 >
                   <span class="dep-graph__drawer-arrow">←</span>
                   <span class="dep-graph__drawer-item-label">{{ m.split('/').pop() }}</span>
-                </div>
+                </button>
               </div>
               <p v-else class="dep-graph__drawer-empty">No other files import this one</p>
             </div>
@@ -530,15 +552,17 @@ watch(() => props.graph, initGraph)
                 If you edit this file, {{ impactRadius.length }} other file{{ impactRadius.length !== 1 ? 's' : '' }} could break or need updating (shown in orange on the graph).
               </p>
               <div class="dep-graph__drawer-list">
-                <div
+                <button
                   v-for="m in (showAllImpact ? impactRadius : impactRadius.slice(0, 5))"
                   :key="m"
+                  type="button"
                   class="dep-graph__drawer-item dep-graph__drawer-item--impact"
                   :title="m"
+                  @click="focusNode(m)"
                 >
                   <span class="dep-graph__drawer-arrow">↗</span>
                   <span class="dep-graph__drawer-item-label">{{ m.split('/').pop() }}</span>
-                </div>
+                </button>
               </div>
               <button v-if="impactRadius.length > 5" class="dep-graph__show-more" @click="showAllImpact = !showAllImpact">
                 {{ showAllImpact ? 'Show less' : `Show all ${impactRadius.length}` }}

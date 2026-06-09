@@ -1,6 +1,8 @@
 import math
 from datetime import datetime, timezone
 
+from .scoring_mode import ScoringMode
+
 
 def compute_heuristics(
     commits: dict,
@@ -14,6 +16,7 @@ def compute_heuristics(
     test_coverage_data: dict | None = None,
     cicd_data: dict | None = None,
     container_data: dict | None = None,
+    scoring_mode: ScoringMode = 'oss',
 ) -> list[dict]:
     signals = []
 
@@ -155,12 +158,13 @@ def compute_heuristics(
                 doc_issues.append('no installation instructions')
             if not readme.get('has_usage'):
                 doc_issues.append('no usage section')
-            if not readme.get('has_changelog'):
-                doc_issues.append('no changelog')
-            if not readme.get('has_contributing'):
-                doc_issues.append('no contributing guide')
-            if structure and not structure.get('has_contributing'):
-                doc_issues.append('no CONTRIBUTING file')
+            if scoring_mode == 'oss':
+                if not readme.get('has_changelog'):
+                    doc_issues.append('no changelog')
+                if not readme.get('has_contributing'):
+                    doc_issues.append('no contributing guide')
+                if structure and not structure.get('has_contributing'):
+                    doc_issues.append('no CONTRIBUTING file')
             # Shallow sections carry half weight of a full missing section
             if len(shallow) >= 3:
                 doc_issues.append(f'{len(shallow)} sections too brief to be useful')
@@ -225,7 +229,16 @@ def compute_heuristics(
         elif bus_factor == 1:
             if total_contributors >= 10:
                 bf_score = min(bf_score, 45)
-                bf_desc = f'1 contributor touches 80%+ of files, but {total_contributors} contributors have participated — typical of a founder-led open source project'
+                if scoring_mode == 'closed_source':
+                    bf_desc = (
+                        f'1 contributor touches 80%+ of files across {total_contributors} '
+                        'contributors — concentrated ownership'
+                    )
+                else:
+                    bf_desc = (
+                        f'1 contributor touches 80%+ of files, but {total_contributors} '
+                        'contributors have participated — typical of a founder-led open source project'
+                    )
             elif total_contributors >= 5:
                 bf_score = min(bf_score, 60)
                 bf_desc = f'1 contributor accounts for 80%+ of file changes across {total_contributors} contributors — may reflect project founder ownership'
@@ -346,32 +359,43 @@ def compute_heuristics(
     if structure is not None:
         community_issues: list[str] = []
         comm_score = 0
-        if not structure.get('license_type') and not structure.get('license_file'):
-            comm_score += 30
-            community_issues.append('no license')
-        if not structure.get('has_contributing'):
-            comm_score += 20
-            community_issues.append('no CONTRIBUTING guide')
-        if not structure.get('has_security_policy'):
-            comm_score += 15
-            community_issues.append('no SECURITY policy')
-        if not structure.get('has_coc'):
-            comm_score += 10
-            community_issues.append('no code of conduct')
-        if not structure.get('has_changelog'):
-            comm_score += 10
-            community_issues.append('no CHANGELOG')
+        if scoring_mode == 'oss':
+            if not structure.get('license_type') and not structure.get('license_file'):
+                comm_score += 30
+                community_issues.append('no license')
+            if not structure.get('has_contributing'):
+                comm_score += 20
+                community_issues.append('no CONTRIBUTING guide')
+            if not structure.get('has_security_policy'):
+                comm_score += 15
+                community_issues.append('no SECURITY policy')
+            if not structure.get('has_coc'):
+                comm_score += 10
+                community_issues.append('no code of conduct')
+            if not structure.get('has_changelog'):
+                comm_score += 10
+                community_issues.append('no CHANGELOG')
+            comm_desc = (
+                'Missing: ' + ', '.join(community_issues)
+                if community_issues
+                else 'License, contributing guide, and community files all present'
+            )
+        else:
+            if not structure.get('has_security_policy'):
+                comm_score += 15
+                community_issues.append('no SECURITY policy')
+            comm_desc = (
+                'Missing: ' + ', '.join(community_issues)
+                if community_issues
+                else 'Security policy present — OSS community files not expected for closed-source repos'
+            )
 
         signals.append({
             'signal': 'community_health',
             'label': 'Community Health',
             'score': min(100, comm_score),
             'confidence': 'high',
-            'description': (
-                'Missing: ' + ', '.join(community_issues)
-                if community_issues
-                else 'License, contributing guide, and community files all present'
-            ),
+            'description': comm_desc,
         })
 
     # ── Commit velocity trend ─────────────────────────────────────────────────
@@ -412,7 +436,10 @@ def compute_heuristics(
         lic_score = license_data.get('score', 0)
         lic_issues = license_data.get('issues', [])
         spdx = license_data.get('spdx_id')
-        if lic_score == 0 and spdx:
+        if scoring_mode == 'closed_source' and not spdx:
+            lic_score = 0
+            lic_desc = 'Closed-source context — license not required for internal use'
+        elif lic_score == 0 and spdx:
             lic_desc = f'Licensed under {spdx} — no compatibility issues detected'
         elif not spdx:
             lic_desc = 'No license detected — repository is implicitly all-rights-reserved'
@@ -538,14 +565,10 @@ def compute_heuristics(
     return signals
 
 
-def compute_oss_score(signals: list[dict]) -> dict:
-    """Compute a 0–10 OSS health score from heuristic signals. 10 = perfect."""
+def compute_oss_score(signals: list[dict], scoring_mode: ScoringMode = 'oss') -> dict:
+    """Compute a 0–10 health score from heuristic signals. 10 = perfect."""
     signal_map = {s['signal']: s['score'] for s in signals}
 
-    # 16 signals. Weights sum to 1.0.
-    # Community/docs/CI highest — directly affect contributor experience.
-    # New signals (license, complexity, test_coverage, cicd_maturity, container_hygiene)
-    # added at modest weights so they enrich without drowning the existing score.
     weights = {
         'community_health': 0.13,
         'documentation_quality': 0.11,
@@ -564,6 +587,18 @@ def compute_oss_score(signals: list[dict]) -> dict:
         'commit_velocity': 0.01,
         'burnout': 0.01,
     }
+    if scoring_mode == 'closed_source':
+        weights = {
+            **weights,
+            'community_health': 0.0,
+            'license_risk': 0.0,
+            'documentation_quality': 0.13,
+            'ci_health': 0.16,
+            'security_hygiene': 0.13,
+            'test_coverage': 0.10,
+            'abandonment_risk': 0.11,
+            'dependency_health': 0.09,
+        }
 
     weighted = 0.0
     total_weight = 0.0
@@ -595,4 +630,4 @@ def compute_oss_score(signals: list[dict]) -> dict:
         badge = 'dormant'
         label = 'Dormant'
 
-    return {'score': score, 'badge': badge, 'label': label}
+    return {'score': score, 'badge': badge, 'label': label, 'mode': scoring_mode}

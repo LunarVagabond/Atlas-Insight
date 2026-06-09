@@ -534,3 +534,63 @@ class TestComputeOssScore:
         signals = [{'signal': 'community_health', 'score': 0}]
         result = compute_oss_score(signals)
         assert result['score'] == 10.0
+
+
+class TestScoringModeFairness:
+    def _closed_source_structure(self):
+        return _base_structure(
+            license_type=None,
+            license_file=None,
+            has_contributing=False,
+            has_coc=False,
+            has_changelog=False,
+            has_security_policy=True,
+        )
+
+    def _closed_source_readme(self):
+        return _base_readme(
+            has_changelog=False,
+            has_contributing=False,
+        )
+
+    def test_closed_source_scores_higher_without_oss_files(self):
+        structure = self._closed_source_structure()
+        readme = self._closed_source_readme()
+        license_data = {'score': 60, 'spdx_id': None, 'issues': []}
+        oss_signals = compute_heuristics(
+            _base_commits(), _base_graph(), _base_deps(),
+            readme=readme, structure=structure, license_data=license_data,
+            scoring_mode='oss',
+        )
+        closed_signals = compute_heuristics(
+            _base_commits(), _base_graph(), _base_deps(),
+            readme=readme, structure=structure, license_data=license_data,
+            scoring_mode='closed_source',
+        )
+        oss_score = compute_oss_score(oss_signals, scoring_mode='oss')['score']
+        closed_score = compute_oss_score(closed_signals, scoring_mode='closed_source')['score']
+        assert closed_score > oss_score
+
+    def test_closed_source_community_health_ignores_license(self):
+        structure = self._closed_source_structure()
+        signals = compute_heuristics(
+            _base_commits(), _base_graph(), _base_deps(),
+            structure=structure, scoring_mode='closed_source',
+        )
+        comm = next(s for s in signals if s['signal'] == 'community_health')
+        assert comm['score'] == 0
+
+    def test_closed_source_weights_sum_to_one(self):
+        from apps.analysis.heuristics import compute_oss_score as cos
+        signals = [
+            {'signal': k, 'score': 50}
+            for k in (
+                'community_health', 'documentation_quality', 'ci_health',
+                'security_hygiene', 'release_cadence', 'abandonment_risk',
+                'license_risk', 'test_coverage', 'dependency_health',
+                'cicd_maturity', 'bus_factor_risk', 'complexity_debt',
+                'container_hygiene', 'monolith_growth', 'commit_velocity', 'burnout',
+            )
+        ]
+        result = cos(signals, scoring_mode='closed_source')
+        assert result['mode'] == 'closed_source'

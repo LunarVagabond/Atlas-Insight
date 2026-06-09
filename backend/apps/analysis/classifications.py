@@ -43,11 +43,14 @@ def classify_repo(
     structure: dict | None,
     security: dict | None,
     github_meta: dict | None,
+    scoring_mode: str = 'oss',
 ) -> dict:
-    contrib_score = _contribution_difficulty_score(commits, readme, structure, graph)
+    contrib_score = _contribution_difficulty_score(
+        commits, readme, structure, graph, scoring_mode=scoring_mode,
+    )
     health_score = _health_score(commits, github_meta)
     complexity_score = _complexity_score(graph, structure)
-    doc_score = _documentation_score(readme, structure)
+    doc_score = _documentation_score(readme, structure, scoring_mode=scoring_mode)
 
     tags = _compute_tags(
         commits, graph, deps, readme, structure, security, github_meta,
@@ -68,7 +71,11 @@ def classify_repo(
 
 
 def _contribution_difficulty_score(
-    commits: dict, readme: dict | None, structure: dict | None, graph: dict
+    commits: dict,
+    readme: dict | None,
+    structure: dict | None,
+    graph: dict,
+    scoring_mode: str = 'oss',
 ) -> int:
     score = 0
 
@@ -86,7 +93,7 @@ def _contribution_difficulty_score(
                 score += 5
             if not readme.get('has_usage'):
                 score += 3
-    if structure:
+    if structure and scoring_mode == 'oss':
         if not structure.get('has_contributing'):
             score += 7
 
@@ -175,7 +182,11 @@ def _complexity_score(graph: dict, structure: dict | None) -> int:
     return min(100, score)
 
 
-def _documentation_score(readme: dict | None, structure: dict | None) -> int:
+def _documentation_score(
+    readme: dict | None,
+    structure: dict | None,
+    scoring_mode: str = 'oss',
+) -> int:
     score = 0
     if not readme or not readme.get('found'):
         return 100
@@ -192,14 +203,15 @@ def _documentation_score(readme: dict | None, structure: dict | None) -> int:
         score += 10
     if not readme.get('has_usage'):
         score += 8
-    if not readme.get('has_contributing'):
-        score += 8
-    if not readme.get('has_changelog'):
-        score += 5
-    if not readme.get('has_license'):
-        score += 5
+    if scoring_mode == 'oss':
+        if not readme.get('has_contributing'):
+            score += 8
+        if not readme.get('has_changelog'):
+            score += 5
+        if not readme.get('has_license'):
+            score += 5
 
-    if structure:
+    if structure and scoring_mode == 'oss':
         if not structure.get('has_contributing'):
             score += 10
         if not structure.get('has_changelog'):

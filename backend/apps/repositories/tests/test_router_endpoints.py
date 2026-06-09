@@ -481,3 +481,55 @@ class TestFavorites:
         client, _ = auth_client
         resp = client.post(f'/api/v1/repositories/repos/{uuid.uuid4()}/favorite')
         assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# get_branches
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class TestGetBranches:
+    @patch('apps.repositories.router_runs.list_remote_branches')
+    def test_prefers_stored_repo_token(self, mock_list, completed_run):
+        completed_run.repo.auth_token = 'stored-token'
+        completed_run.repo.save(update_fields=['auth_token'])
+        mock_list.return_value = ['main', 'development']
+        client = Client()
+        resp = client.get(f'/api/v1/repositories/runs/{completed_run.id}/branches')
+        assert resp.status_code == 200
+        data = resp.json()
+        assert 'development' in data['branches']
+        mock_list.assert_called_with(completed_run.repo.url, pat='stored-token')
+
+    @patch('apps.repositories.router_runs.list_remote_branches')
+    def test_explicit_pat_query_param(self, mock_list, completed_run):
+        mock_list.return_value = ['main', 'development']
+        client = Client()
+        resp = client.get(
+            f'/api/v1/repositories/runs/{completed_run.id}/branches',
+            {'pat': 'ghp_org_pat'},
+        )
+        assert resp.status_code == 200
+        mock_list.assert_called_with(completed_run.repo.url, pat='ghp_org_pat')
+        completed_run.repo.refresh_from_db()
+        assert completed_run.repo.auth_token == 'ghp_org_pat'
+
+    @patch('apps.repositories.router_runs.list_remote_branches')
+    @patch('apps.repositories.router_runs._resolve_token_soft')
+    def test_retries_oauth_when_stored_token_fails(self, mock_soft, mock_list, completed_run):
+        completed_run.repo.auth_token = 'expired-token'
+        completed_run.repo.save(update_fields=['auth_token'])
+        mock_soft.return_value = 'oauth-token'
+        mock_list.side_effect = [[], ['main', 'development']]
+        client = Client()
+        resp = client.get(f'/api/v1/repositories/runs/{completed_run.id}/branches')
+        assert resp.status_code == 200
+        assert resp.json()['branches'] == ['main', 'development']
+        assert mock_list.call_count == 2
+        mock_list.assert_any_call(completed_run.repo.url, pat='expired-token')
+        mock_list.assert_any_call(completed_run.repo.url, pat='oauth-token')
+
+    def test_unknown_run_returns_404(self):
+        client = Client()
+        resp = client.get(f'/api/v1/repositories/runs/{uuid.uuid4()}/branches')
+        assert resp.status_code == 404

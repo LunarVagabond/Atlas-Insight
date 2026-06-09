@@ -92,7 +92,12 @@ def _is_compatible(dep_spdx: str, project_spdx: str | None) -> bool | None:
     return True
 
 
-def analyze_license(repo_dir: str, deps: dict, github_meta: dict) -> dict:
+def analyze_license(
+    repo_dir: str,
+    deps: dict,
+    github_meta: dict,
+    scoring_mode: str = 'oss',
+) -> dict:
     spdx_id, human_name, source_file = _detect_spdx_from_file(repo_dir)
 
     if spdx_id:
@@ -125,11 +130,12 @@ def analyze_license(repo_dir: str, deps: dict, github_meta: dict) -> dict:
     score = 0
 
     if source == 'none':
-        issues.append({
-            'severity': 'high',
-            'message': 'No license file found — repository is implicitly all-rights-reserved',
-        })
-        score += 60
+        if scoring_mode != 'closed_source':
+            issues.append({
+                'severity': 'high',
+                'message': 'No license file found — repository is implicitly all-rights-reserved',
+            })
+            score += 60
 
     incompatible = [d for d in dep_licenses if d['compatible'] is False]
     if incompatible and spdx_id:

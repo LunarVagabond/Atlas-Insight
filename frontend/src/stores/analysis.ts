@@ -54,6 +54,19 @@ export type { ConstellationData, ConstellationRelated } from '../types/constella
 // Per-repo branch list cache (keyed by "owner/name")
 type BranchEntry = { branches: string[]; scanned: string[] }
 
+function repoPatKey(owner: string, name: string): string {
+  return `atlas:pat:${owner}/${name}`
+}
+
+function getStoredPat(owner: string, name: string): string | undefined {
+  return sessionStorage.getItem(repoPatKey(owner, name)) || undefined
+}
+
+function storePatForUrl(url: string, pat: string): void {
+  const match = url.match(/github\.com\/([^/]+)\/([^/?#]+)/i)
+  if (match) sessionStorage.setItem(repoPatKey(match[1], match[2].replace(/\.git$/, '')), pat)
+}
+
 export const useAnalysisStore = defineStore('analysis', {
   state: () => ({
     url: '' as string,
@@ -71,6 +84,7 @@ export const useAnalysisStore = defineStore('analysis', {
     branches: null as string[] | null,
     scannedBranches: null as string[] | null,
     branchesLoading: false,
+    branchesError: null as string | null,
     // Branch list cache keyed by "owner/name" — survives branch navigation, cleared on clearRun()
     _branchCache: {} as Record<string, BranchEntry>,
   }),
@@ -82,13 +96,30 @@ export const useAnalysisStore = defineStore('analysis', {
       this.error = null
       this.run = null
       this.staleRun = null
+      const repoKeyMatch = url.match(/github\.com\/([^/]+)\/([^/?#]+)/i)
+      const repoKey = repoKeyMatch
+        ? `${repoKeyMatch[1]}/${repoKeyMatch[2].replace(/\.git$/, '')}`
+        : ''
       try {
         const { data } = await axios.post('/api/v1/repositories/analyze', {
           url,
           pat: pat || undefined,
           branch: branch || undefined,
         })
+        if (pat) storePatForUrl(url, pat)
+        if (repoKey) {
+          delete this._branchCache[repoKey]
+          this.branches = null
+          this.scannedBranches = null
+          this.branchesError = null
+        }
         this.currentRunId = data.run_id
+        if (data.status === 'completed') {
+          await this._fetchRun(data.run_id)
+          this.status = 'done'
+          await this.fetchBranches(data.run_id)
+          return data.run_id as string
+        }
         this.status = 'polling'
         this._startPolling(data.run_id)
         return data.run_id as string
@@ -158,7 +189,9 @@ export const useAnalysisStore = defineStore('analysis', {
         this._startPolling(runId)
       } else {
         this.status = run.status === 'completed' ? 'done' : 'error'
-        if (run.status === 'failed') {
+        if (run.status === 'completed') {
+          await this.fetchBranches(runId)
+        } else if (run.status === 'failed') {
           this.error = run.result?.error ?? 'Analysis failed'
         }
       }
@@ -172,6 +205,7 @@ export const useAnalysisStore = defineStore('analysis', {
           this.status = 'done'
           this.staleRun = null
           this._stopPolling()
+          await this.fetchBranches(runId)
         } else if (this.run?.status === 'failed') {
           this.status = 'error'
           this.error = this.run.result?.error ?? 'Analysis failed'
@@ -212,31 +246,54 @@ export const useAnalysisStore = defineStore('analysis', {
 
     async fetchBranches(runId: string): Promise<void> {
       const repoKey = this.run ? `${this.run.repo_owner}/${this.run.repo_name}` : ''
-      if (repoKey && this._branchCache[repoKey]) {
-        // Populate active state from cache, then refresh scanned list in background
+      const pat = this.run
+        ? getStoredPat(this.run.repo_owner, this.run.repo_name)
+        : undefined
+      const branchParams = pat ? { pat } : undefined
+
+      if (repoKey && this._branchCache[repoKey]?.branches.length) {
         const c = this._branchCache[repoKey]
         this.branches = c.branches
         this.scannedBranches = c.scanned
-        // Refresh scanned (branch scan state changes) but not the full list (rarely changes)
+        this.branchesError = null
         try {
-          const { data } = await axios.get(`/api/v1/repositories/runs/${runId}/branches`)
+          const { data } = await axios.get(
+            `/api/v1/repositories/runs/${runId}/branches`,
+            { params: branchParams },
+          )
           const refreshed = { branches: data.branches as string[], scanned: data.scanned as string[] }
-          this._branchCache[repoKey] = refreshed
-          this.branches = refreshed.branches
-          this.scannedBranches = refreshed.scanned
-        } catch { /* keep cached data on failure */ }
+          if (refreshed.branches.length) {
+            this._branchCache[repoKey] = refreshed
+            this.branches = refreshed.branches
+            this.scannedBranches = refreshed.scanned
+          }
+        } catch {
+          /* keep cached data on background refresh failure */
+        }
         return
       }
       if (this.branchesLoading) return
       this.branchesLoading = true
+      this.branchesError = null
       try {
-        const { data } = await axios.get(`/api/v1/repositories/runs/${runId}/branches`)
+        const { data } = await axios.get(
+          `/api/v1/repositories/runs/${runId}/branches`,
+          { params: branchParams },
+        )
         this.branches = data.branches as string[]
         this.scannedBranches = data.scanned as string[]
-        if (repoKey) this._branchCache[repoKey] = { branches: this.branches, scanned: this.scannedBranches }
-      } catch {
+        if (repoKey && this.branches.length) {
+          this._branchCache[repoKey] = { branches: this.branches, scanned: this.scannedBranches }
+        } else if (repoKey) {
+          delete this._branchCache[repoKey]
+        }
+      } catch (err: unknown) {
         this.branches = []
         this.scannedBranches = []
+        if (repoKey) delete this._branchCache[repoKey]
+        const axiosErr = err as { response?: { data?: { detail?: string } } }
+        this.branchesError = axiosErr.response?.data?.detail ?? 'Failed to load branches'
+        useToast().warning(this.branchesError, 6000)
       } finally {
         this.branchesLoading = false
       }
@@ -245,7 +302,7 @@ export const useAnalysisStore = defineStore('analysis', {
     async submitBranch(branch: string): Promise<string> {
       if (!this.run) throw new Error('No active run')
       const url = this.run.repo_url
-      const pat = this.run.result ? undefined : undefined
+      const pat = getStoredPat(this.run.repo_owner, this.run.repo_name)
       return this.submitUrl(url, pat, branch)
     },
 
@@ -285,6 +342,7 @@ export const useAnalysisStore = defineStore('analysis', {
       this.branches = null
       this.scannedBranches = null
       this.branchesLoading = false
+      this.branchesError = null
       this._branchCache = {}
     },
   },

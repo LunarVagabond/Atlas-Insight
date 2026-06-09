@@ -74,6 +74,25 @@ const CHAPTER_GROUPS = [
 ]
 const DOCS_ONLY_TABS = new Set(['Overview', 'Project', 'History', 'Ownership', 'Security', 'Contributing'])
 const isDocsOnly = computed(() => result.value?.is_docs_only === true)
+
+const scoringMode = computed(
+  () => result.value?.scoring_mode ?? result.value?.oss_score?.mode ?? null,
+)
+
+const scoringModeTag = computed(() => {
+  if (scoringMode.value === 'closed_source') return 'Closed source'
+  if (scoringMode.value === 'oss') return 'Open source'
+  return null
+})
+
+const scoringModeTooltip = computed(() => {
+  const reason = result.value?.scoring_mode_reason
+  if (!scoringMode.value) return undefined
+  if (reason) return `Scoring mode: ${reason}`
+  return scoringMode.value === 'closed_source'
+    ? 'Scored with closed-source expectations (community OSS files not required)'
+    : 'Scored with open-source expectations'
+})
 const GROUPS = computed(() =>
   CHAPTER_GROUPS
     .map(g => ({
@@ -462,7 +481,21 @@ onUnmounted(() => {
           @update:model-value="onBranchSelect"
         />
         <span v-else class="branch-select__loading">Loading branches…</span>
-        <span v-if="store.branches !== null" class="branch-total-count">({{ store.branches.length }} total branches)</span>
+        <span v-if="store.branchesError" class="branch-total-count branch-total-count--error">
+          Branch list unavailable
+        </span>
+        <span v-else-if="store.branches !== null && store.branches.length === 0" class="branch-total-count branch-total-count--error">
+          No branches found — org repos may need a PAT (re-submit from home with PAT)
+        </span>
+        <span v-else-if="store.branches !== null" class="branch-total-count">
+          ({{ store.branches.length }} total branches)
+        </span>
+        <span
+          v-if="scoringModeTag"
+          class="scoring-mode-badge"
+          :class="scoringMode === 'closed_source' ? 'scoring-mode-badge--closed' : 'scoring-mode-badge--oss'"
+          :title="scoringModeTooltip"
+        >{{ scoringModeTag }}</span>
         <span v-if="isDocsOnly" class="docs-only-header-note">📄 Documentation repository — code analysis tabs hidden</span>
         <span v-if="result.commits?.abandoned" class="branch-stale-badge" title="No commits in the last year — this branch is inactive">
           Stale branch

@@ -356,8 +356,18 @@ def analyze_repository(self, run_id: str):
             run.progress_step = 'heuristics'
             run.save(update_fields=['progress_step'])
 
+            from .scoring_mode import infer_scoring_mode
+
+            scoring_mode, scoring_mode_reason = infer_scoring_mode(
+                is_private=run.repo.is_private,
+                github_meta=github_meta,
+                structure=structure,
+            )
+
             def _run_license():
-                return analyze_license(repo_dir, deps, github_meta)
+                return analyze_license(
+                    repo_dir, deps, github_meta, scoring_mode=scoring_mode,
+                )
 
             def _run_complexity():
                 return analyze_complexity(repo_dir, structure)
@@ -405,10 +415,12 @@ def analyze_repository(self, run_id: str):
                 test_coverage_data=_extra_results.get('test_coverage'),
                 cicd_data=_extra_results.get('cicd'),
                 container_data=_tools.get('docker'),
+                scoring_mode=scoring_mode,
             )
-            oss_score = compute_oss_score(signals)
+            oss_score = compute_oss_score(signals, scoring_mode=scoring_mode)
             classification = classify_repo(
-                commits, graph, deps, readme, structure, security, github_meta
+                commits, graph, deps, readme, structure, security, github_meta,
+                scoring_mode=scoring_mode,
             )
 
             run.progress_step = 'finalizing'
@@ -420,6 +432,8 @@ def analyze_repository(self, run_id: str):
                 'dependencies': deps,
                 'heuristics': signals,
                 'oss_score': oss_score,
+                'scoring_mode': scoring_mode,
+                'scoring_mode_reason': scoring_mode_reason,
                 'readme': readme,
                 'structure': structure,
                 'security': security,

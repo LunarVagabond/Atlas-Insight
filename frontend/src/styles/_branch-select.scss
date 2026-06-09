@@ -189,6 +189,33 @@
   font-size: 0.75rem;
   color: var(--color-text-muted);
   white-space: nowrap;
+
+  &--error {
+    color: var(--color-warning, #ca8a04);
+  }
+}
+
+.scoring-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: default;
+
+  &--closed {
+    background: rgba(99, 102, 241, 0.12);
+    color: #6366f1;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+  }
+
+  &--oss {
+    background: rgba(34, 197, 94, 0.12);
+    color: #16a34a;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+  }
 }
 
 .docs-only-header-note {

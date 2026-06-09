@@ -102,6 +102,7 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
           :class="{ 'branch-select__item--active': b === modelValue || (!modelValue && b === (defaultBranch ?? branches[0])) }"
           role="option"
           :aria-selected="b === modelValue"
+          :title="!modelValue && b === defaultBranch ? 'Already analyzing this branch' : undefined"
           @click="select(b)"
         >
           <span class="branch-select__item-name">{{ b }}</span>

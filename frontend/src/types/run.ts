@@ -1,7 +1,7 @@
 import type { CommitData } from './commits'
 import type { GraphData, DepsData } from './graph'
 import type { HeuristicSignal } from './heuristics'
-import type { OssScore, Classification } from './classification'
+import type { OssScore, Classification, ScoringMode } from './classification'
 import type { ReadmeData } from './readme'
 import type { StructureData } from './structure'
 import type { SecurityData } from './security'
@@ -195,6 +195,8 @@ export interface RunResult {
   dependencies: DepsData
   heuristics: HeuristicSignal[]
   oss_score?: OssScore
+  scoring_mode?: ScoringMode
+  scoring_mode_reason?: string
   readme?: ReadmeData
   structure?: StructureData
   security?: SecurityData

@@ -5,6 +5,10 @@ import type { HeuristicSignal, HeuristicSignalKey, RunResult } from '../../store
 const props = defineProps<{ signal: HeuristicSignal | null; result?: RunResult }>()
 const emit = defineEmits<{ close: [] }>()
 
+const isClosedSource = computed(
+  () => (props.result?.scoring_mode ?? props.result?.oss_score?.mode) === 'closed_source',
+)
+
 interface SignalInfo {
   overview: string
   raises: string[]
@@ -336,13 +340,17 @@ const repoInsight = computed<RepoInsightItem[] | null>(() => {
   if (sig === 'community_health') {
     const s = r.structure
     if (s) {
-      const checks = [
-        { label: 'License', present: !!(s.license_type || s.license_file), file: s.license_file ?? (s.license_type ? `(${s.license_type})` : null), critical: true },
-        { label: 'CONTRIBUTING', present: s.has_contributing, file: s.contributing_file, critical: false },
-        { label: 'SECURITY policy', present: s.has_security_policy, file: s.security_policy_file, critical: false },
-        { label: 'Code of Conduct', present: s.has_coc, file: s.coc_file, critical: false },
-        { label: 'CHANGELOG', present: s.has_changelog, file: s.changelog_file, critical: false },
-      ]
+      const checks = isClosedSource.value
+        ? [
+            { label: 'SECURITY policy', present: s.has_security_policy, file: s.security_policy_file, critical: false },
+          ]
+        : [
+            { label: 'License', present: !!(s.license_type || s.license_file), file: s.license_file ?? (s.license_type ? `(${s.license_type})` : null), critical: true },
+            { label: 'CONTRIBUTING', present: s.has_contributing, file: s.contributing_file, critical: false },
+            { label: 'SECURITY policy', present: s.has_security_policy, file: s.security_policy_file, critical: false },
+            { label: 'Code of Conduct', present: s.has_coc, file: s.coc_file, critical: false },
+            { label: 'CHANGELOG', present: s.has_changelog, file: s.changelog_file, critical: false },
+          ]
       for (const c of checks) {
         items.push({
           text: c.present ? `✓ ${c.label}${c.file ? ` — ${c.file}` : ''}` : `✗ ${c.label}`,
@@ -394,7 +402,11 @@ const repoInsight = computed<RepoInsightItem[] | null>(() => {
   if (sig === 'license_risk') {
     const lic = r.structure?.license_type ?? r.structure?.license_file
     if (!lic) {
-      items.push({ text: 'No license file detected', highlight: true, sub: 'legally all-rights-reserved without one' })
+      if (isClosedSource.value) {
+        items.push({ text: 'No license file — not required for closed-source context' })
+      } else {
+        items.push({ text: 'No license file detected', highlight: true, sub: 'legally all-rights-reserved without one' })
+      }
     } else {
       items.push({ text: lic, sub: 'detected license' })
     }

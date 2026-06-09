@@ -91,6 +91,18 @@ const overallScore = computed(() => {
 
 const ossLabel = computed(() => props.result?.oss_score?.label ?? null)
 
+const isClosedSource = computed(
+  () => (props.result?.scoring_mode ?? props.result?.oss_score?.mode) === 'closed_source',
+)
+
+const scoringModeBanner = computed(() => {
+  if (!isClosedSource.value) return null
+  const reason = props.result?.scoring_mode_reason
+  return reason
+    ? `Scored for closed-source context (${reason}) — community file expectations adjusted`
+    : 'Scored for closed-source context — community file expectations adjusted'
+})
+
 function compositeLevel(score: number): 'low' | 'medium' | 'high' {
   if (score >= 70) return 'low'
   if (score >= 40) return 'medium'
@@ -134,12 +146,13 @@ const improvementHints = computed<string[]>(() => {
     if (s.score < 40) continue
     switch (s.signal) {
       case 'community_health':
+        if (isClosedSource.value) break
         if (s.items?.some(i => i.toLowerCase().includes('license'))) hints.push('Add a LICENSE file — without one the code is all-rights-reserved')
         else if (s.items?.some(i => i.toLowerCase().includes('contributing'))) hints.push('Add a CONTRIBUTING.md to help new contributors')
         else hints.push('Add missing community health files (LICENSE, CONTRIBUTING, SECURITY)')
         break
       case 'license_risk':
-        hints.push('Add or clarify the repository license to enable legal reuse')
+        if (!isClosedSource.value) hints.push('Add or clarify the repository license to enable legal reuse')
         break
       case 'ci_health':
         hints.push('Set up CI automation (e.g. GitHub Actions) with automated tests on every push')
@@ -179,6 +192,8 @@ const improvementHints = computed<string[]>(() => {
   <div class="panel">
     <h2 class="panel__title">Health Signals</h2>
     <p class="panel__subtitle">Automated signals about this project's activity, health, and contributor patterns — click any card for details.</p>
+
+    <p v-if="scoringModeBanner" class="panel__hint">{{ scoringModeBanner }}</p>
 
     <SubProjectSelector
       v-if="subProjects?.length"
