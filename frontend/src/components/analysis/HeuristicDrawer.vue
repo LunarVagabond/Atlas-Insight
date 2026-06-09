@@ -197,9 +197,38 @@ const SIGNAL_INFO: Record<HeuristicSignalKey, SignalInfo> = {
   },
 }
 
-const info = computed(() =>
-  props.signal ? SIGNAL_INFO[props.signal.signal] : null
-)
+const info = computed(() => {
+  if (!props.signal) return null
+  const base = SIGNAL_INFO[props.signal.signal]
+  if (!base) return null
+  if (!isClosedSource.value) return base
+  if (props.signal.signal === 'documentation_quality') {
+    return {
+      ...base,
+      overview:
+        'Assesses how well the project documents itself for users and internal teams. In closed-source mode, OSS community files (CONTRIBUTING, changelog) are not expected.',
+      raises: [
+        'No README, or README is very short',
+        'Missing installation or usage sections',
+      ],
+      guidance:
+        'Focus on README clarity: what the project does, how to install it, and how to use it. Internal repos benefit from setup docs and architecture notes more than contributor guides.',
+    }
+  }
+  if (props.signal.signal === 'community_health') {
+    return {
+      ...base,
+      overview:
+        'Checks for security disclosure policy in closed-source context. OSS community files (license, CONTRIBUTING, CoC, changelog) are not scored.',
+      raises: [
+        'No SECURITY policy — no clear path to report vulnerabilities',
+      ],
+      guidance:
+        'A SECURITY.md helps internal teams and external researchers report vulnerabilities through a defined channel, even when the repo is private.',
+    }
+  }
+  return base
+})
 
 function level(score: number) {
   if (score < 30) return 'low'
@@ -273,9 +302,11 @@ const repoInsight = computed<RepoInsightItem[] | null>(() => {
       items.push({ text: `README: ${readme.word_count.toLocaleString()} words`, highlight: readme.word_count < 100 })
       if (!readme.has_installation) items.push({ text: 'Missing installation instructions', highlight: true })
       if (!readme.has_usage) items.push({ text: 'Missing usage section', highlight: true })
-      if (!readme.has_changelog) items.push({ text: 'Changelog not referenced in README' })
-      if (!readme.has_contributing) items.push({ text: 'Contributing guide not in README' })
-      if (!r.structure?.has_contributing) items.push({ text: 'No CONTRIBUTING.md file', highlight: true })
+      if (!isClosedSource.value) {
+        if (!readme.has_changelog) items.push({ text: 'Changelog not referenced in README' })
+        if (!readme.has_contributing) items.push({ text: 'Contributing guide not in README' })
+        if (!r.structure?.has_contributing) items.push({ text: 'No CONTRIBUTING.md file', highlight: true })
+      }
     }
   }
 

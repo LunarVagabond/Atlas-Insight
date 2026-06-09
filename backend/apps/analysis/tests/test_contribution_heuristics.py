@@ -41,6 +41,23 @@ class TestBeginnerOpportunities:
         ids = [o['id'] for o in opps]
         assert 'add_license' not in ids
 
+    def test_closed_source_skips_oss_community_opps(self):
+        opps = generate_heuristic_opportunities(
+            {}, _g(), {}, None,
+            _s(
+                license_file=None, license_type=None,
+                has_contributing=False, has_changelog=False, has_coc=False,
+                has_security_policy=True,
+            ),
+            None,
+            scoring_mode='closed_source',
+        )
+        ids = [o['id'] for o in opps]
+        assert 'add_license' not in ids
+        assert 'add_contributing' not in ids
+        assert 'add_changelog' not in ids
+        assert 'add_coc' not in ids
+
     def test_add_contributing_when_missing(self):
         opps = generate_heuristic_opportunities(
             {}, _g(), {}, None, _s(has_contributing=False), None

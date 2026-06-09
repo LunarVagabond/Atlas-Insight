@@ -1074,9 +1074,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-wrap: wrap;
     gap: $space-2;
     text-align: center;
-    white-space: nowrap;
   }
 
   &__version-badge {
@@ -1124,6 +1124,14 @@
   &__license-link {
     color: var(--color-text-muted);
     text-decoration: none;
+
+    &:hover { color: var(--color-accent); text-decoration: underline; }
+  }
+
+  &__bug-link {
+    color: var(--color-text-muted);
+    text-decoration: none;
+    white-space: nowrap;
 
     &:hover { color: var(--color-accent); text-decoration: underline; }
   }
@@ -1226,6 +1234,7 @@
     padding: $space-2 $space-4;
 
     &__support-text { display: none; }
+    &__bug-link { font-size: 0.75rem; }
     &__bmc-text { display: none; }
     &__bmc {
       padding: 0.25rem 0.5rem;

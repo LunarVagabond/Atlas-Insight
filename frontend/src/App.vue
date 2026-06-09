@@ -187,6 +187,13 @@ function onDocClick() {
         <span v-if="isDev" class="app-footer__version-badge app-footer__version-badge--dev">{{ gitSha }}</span>
         <span v-else class="app-footer__version-badge">v{{ appVersion }}</span>
         © {{ new Date().getFullYear() }} Lunar Vagabond · <a href="https://github.com/LunarVagabond/Atlas-Insight/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" class="app-footer__license-link">MIT License</a>
+        ·
+        <a
+          href="https://github.com/LunarVagabond/Atlas-Insight/issues/new?template=bug_report.md"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="app-footer__bug-link"
+        >Found a bug? Report it</a>
       </span>
       <span class="app-footer__support">
         <span class="app-footer__support-text">If you enjoy Atlas Insight, consider</span>

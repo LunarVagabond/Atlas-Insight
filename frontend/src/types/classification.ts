@@ -26,4 +26,5 @@ export interface OssScore {
   badge: 'champion' | 'thriving' | 'growing' | 'seedling' | 'struggling' | 'dormant'
   label: string
   mode?: ScoringMode
+  mode_reason?: string
 }

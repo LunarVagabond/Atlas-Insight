@@ -15,8 +15,11 @@ def analyze_contributions(
     security: dict | None,
     contribution_data: dict | None = None,
     todos: dict | None = None,
+    scoring_mode: str = 'oss',
 ) -> list[dict]:
-    opps = generate_heuristic_opportunities(commits, graph, deps, readme, structure, security)
+    opps = generate_heuristic_opportunities(
+        commits, graph, deps, readme, structure, security, scoring_mode=scoring_mode,
+    )
     if todos:
         opps.extend(generate_todo_opportunities(todos))
     opps.extend(generate_revert_opportunities(commits))

@@ -149,6 +149,13 @@ class AnalysisRun(models.Model):
         data = {k: v for k, v in _pairs if v is not None}
         if not data:
             return None
+        if self.oss_score_data:
+            mode = self.oss_score_data.get('mode')
+            if mode:
+                data['scoring_mode'] = mode
+            mode_reason = self.oss_score_data.get('mode_reason')
+            if mode_reason:
+                data['scoring_mode_reason'] = mode_reason
         if self.is_docs_only:
             data['is_docs_only'] = True
         return data
@@ -163,6 +170,10 @@ class AnalysisRun(models.Model):
             return
         oss_raw = value.get('oss_score')
         if isinstance(oss_raw, dict):
+            oss_raw = dict(oss_raw)
+            mode_reason = value.get('scoring_mode_reason')
+            if mode_reason:
+                oss_raw['mode_reason'] = mode_reason
             self.oss_score = oss_raw.get('score')
             self.oss_badge = oss_raw.get('badge') or ''
             self.oss_score_data = oss_raw

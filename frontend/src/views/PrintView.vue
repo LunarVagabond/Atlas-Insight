@@ -952,7 +952,7 @@ function exportCvesCsv() {
           <div class="print-stat-grid print-stat-grid--sm" style="margin-bottom:0.75rem">
             <div v-if="sp.oss_score" class="print-stat">
               <div class="print-stat__value">{{ sp.oss_score.score }}</div>
-              <div class="print-stat__label">OSS Score ({{ sp.oss_score.label }})</div>
+              <div class="print-stat__label">Health Score ({{ sp.oss_score.label }})</div>
             </div>
             <div class="print-stat">
               <div class="print-stat__value">{{ sp.languages.join(', ') || '—' }}</div>

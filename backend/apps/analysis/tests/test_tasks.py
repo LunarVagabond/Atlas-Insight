@@ -189,6 +189,55 @@ class TestSelectRepoOfWeek:
         select_repo_of_week()
         assert RepoOfTheWeek.objects.count() == 0
 
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+    def test_watches_new_spotlight_repo(self, public_repo, completed_run_for_repo):
+        from apps.analysis.tasks import select_repo_of_week
+
+        select_repo_of_week()
+        public_repo.refresh_from_db()
+        assert public_repo.is_watched is True
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+    def test_unwatches_previous_week_spotlight(self, public_repo, completed_run_for_repo, db):
+        from datetime import date, timedelta
+
+        from apps.analysis.tasks import select_repo_of_week
+        from apps.repositories.models import AnalysisRun, RepoOfTheWeek, Repository
+
+        other = Repository.objects.create(
+            url='https://github.com/other/prev',
+            owner='other',
+            name='prev',
+            is_watched=True,
+        )
+        AnalysisRun.objects.create(repo=other, status='completed')
+        today = date.today()
+        week_start = today - timedelta(days=today.weekday())
+        prev_week = week_start - timedelta(days=7)
+        RepoOfTheWeek.objects.create(repo=other, week_start=prev_week, pick_number=1)
+
+        select_repo_of_week()
+        other.refresh_from_db()
+        public_repo.refresh_from_db()
+        assert other.is_watched is False
+        assert public_repo.is_watched is True
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+    def test_preserves_manual_watch_on_unrelated_repo(self, public_repo, completed_run_for_repo, db):
+        from apps.analysis.tasks import select_repo_of_week
+        from apps.repositories.models import Repository
+
+        manual = Repository.objects.create(
+            url='https://github.com/manual/other',
+            owner='manual',
+            name='other',
+            is_watched=True,
+        )
+
+        select_repo_of_week()
+        manual.refresh_from_db()
+        assert manual.is_watched is True
+
 
 # ---------------------------------------------------------------------------
 # reanalyze_watched_repos

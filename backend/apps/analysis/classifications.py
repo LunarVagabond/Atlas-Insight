@@ -55,6 +55,7 @@ def classify_repo(
     tags = _compute_tags(
         commits, graph, deps, readme, structure, security, github_meta,
         health_score, complexity_score, doc_score,
+        scoring_mode=scoring_mode,
     )
 
     return {
@@ -225,6 +226,7 @@ def _documentation_score(
 def _compute_tags(
     commits, graph, deps, readme, structure, security, github_meta,
     health_score, complexity_score, doc_score,
+    scoring_mode: str = 'oss',
 ) -> list[str]:
     tags: list[str] = []
 
@@ -274,11 +276,12 @@ def _compute_tags(
             tags.append('no-ci')
         if structure.get('release_count', 0) >= 10:
             tags.append('frequent-releases')
-        license_type = structure.get('license_type')
-        if license_type:
-            tags.append(f'license:{license_type}')
-        if structure.get('has_contributing'):
-            tags.append('welcoming')
+        if scoring_mode == 'oss':
+            license_type = structure.get('license_type')
+            if license_type:
+                tags.append(f'license:{license_type}')
+            if structure.get('has_contributing'):
+                tags.append('welcoming')
 
     # Security
     if security:

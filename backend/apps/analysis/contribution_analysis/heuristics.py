@@ -8,59 +8,61 @@ def generate_heuristic_opportunities(
     readme: dict | None,
     structure: dict | None,
     security: dict | None,
+    scoring_mode: str = 'oss',
 ) -> list[dict]:
     opps: list[dict] = []
 
     # ── Beginner / Low risk ───────────────────────────────────────────────────
     if structure:
-        if not structure.get('license_file') and not structure.get('license_type'):
-            opps.append({
-                'id': 'add_license',
-                'title': 'Add a LICENSE file',
-                'description': 'No license detected. Without one the code is legally "all rights reserved" — contributors and users cannot safely rely on it.',
-                'difficulty': 'beginner', 'risk': 'low', 'category': 'community',
-                'hints': [
-                    'Create a file named `LICENSE` in the root directory of the project',
-                    'Visit choosealicense.com to pick one — MIT is a popular permissive choice for open-source',
-                    'Paste the full license text into the file and update any placeholder year or name',
-                ],
-            })
-        if not structure.get('has_contributing'):
-            opps.append({
-                'id': 'add_contributing',
-                'title': 'Add CONTRIBUTING.md',
-                'description': 'No contributing guide. New contributors need to know how to set up the project, run tests, and open a PR.',
-                'difficulty': 'beginner', 'risk': 'low', 'category': 'documentation',
-                'hints': [
-                    'Create a file named `CONTRIBUTING.md` in the root directory',
-                    'Include: how to fork and clone the repo, how to install dependencies, how to run tests, and how to open a pull request',
-                    'Look at github.com/firstcontributions/first-contributions for a great example',
-                ],
-            })
-        if not structure.get('has_changelog'):
-            opps.append({
-                'id': 'add_changelog',
-                'title': 'Create a CHANGELOG',
-                'description': 'No changelog exists. Maintainers and users have no structured way to track what changed between releases.',
-                'difficulty': 'beginner', 'risk': 'low', 'category': 'documentation',
-                'hints': [
-                    'Create a file named `CHANGELOG.md` in the root directory',
-                    'Use the "Keep a Changelog" format: group changes under Added, Changed, Fixed, Removed per version',
-                    'Start with an `[Unreleased]` section at the top for changes not yet in a release',
-                ],
-            })
-        if not structure.get('has_coc'):
-            opps.append({
-                'id': 'add_coc',
-                'title': 'Add a Code of Conduct',
-                'description': 'No Code of Conduct. Signals community standards and protects contributors from harassment.',
-                'difficulty': 'beginner', 'risk': 'low', 'category': 'community',
-                'hints': [
-                    'Create a file named `CODE_OF_CONDUCT.md` in the root directory',
-                    'The Contributor Covenant (contributor-covenant.org) provides a ready-to-use template trusted by thousands of projects',
-                    'Update the contact email placeholder in the template before committing',
-                ],
-            })
+        if scoring_mode == 'oss':
+            if not structure.get('license_file') and not structure.get('license_type'):
+                opps.append({
+                    'id': 'add_license',
+                    'title': 'Add a LICENSE file',
+                    'description': 'No license detected. Without one the code is legally "all rights reserved" — contributors and users cannot safely rely on it.',
+                    'difficulty': 'beginner', 'risk': 'low', 'category': 'community',
+                    'hints': [
+                        'Create a file named `LICENSE` in the root directory of the project',
+                        'Visit choosealicense.com to pick one — MIT is a popular permissive choice for open-source',
+                        'Paste the full license text into the file and update any placeholder year or name',
+                    ],
+                })
+            if not structure.get('has_contributing'):
+                opps.append({
+                    'id': 'add_contributing',
+                    'title': 'Add CONTRIBUTING.md',
+                    'description': 'No contributing guide. New contributors need to know how to set up the project, run tests, and open a PR.',
+                    'difficulty': 'beginner', 'risk': 'low', 'category': 'documentation',
+                    'hints': [
+                        'Create a file named `CONTRIBUTING.md` in the root directory',
+                        'Include: how to fork and clone the repo, how to install dependencies, how to run tests, and how to open a pull request',
+                        'Look at github.com/firstcontributions/first-contributions for a great example',
+                    ],
+                })
+            if not structure.get('has_changelog'):
+                opps.append({
+                    'id': 'add_changelog',
+                    'title': 'Create a CHANGELOG',
+                    'description': 'No changelog exists. Maintainers and users have no structured way to track what changed between releases.',
+                    'difficulty': 'beginner', 'risk': 'low', 'category': 'documentation',
+                    'hints': [
+                        'Create a file named `CHANGELOG.md` in the root directory',
+                        'Use the "Keep a Changelog" format: group changes under Added, Changed, Fixed, Removed per version',
+                        'Start with an `[Unreleased]` section at the top for changes not yet in a release',
+                    ],
+                })
+            if not structure.get('has_coc'):
+                opps.append({
+                    'id': 'add_coc',
+                    'title': 'Add a Code of Conduct',
+                    'description': 'No Code of Conduct. Signals community standards and protects contributors from harassment.',
+                    'difficulty': 'beginner', 'risk': 'low', 'category': 'community',
+                    'hints': [
+                        'Create a file named `CODE_OF_CONDUCT.md` in the root directory',
+                        'The Contributor Covenant (contributor-covenant.org) provides a ready-to-use template trusted by thousands of projects',
+                        'Update the contact email placeholder in the template before committing',
+                    ],
+                })
         if not structure.get('has_security_policy'):
             opps.append({
                 'id': 'add_security_policy',

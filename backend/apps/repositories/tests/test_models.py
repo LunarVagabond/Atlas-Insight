@@ -73,6 +73,30 @@ class TestAnalysisRun:
             run = AnalysisRun.objects.create(repo=repo, status=status)
             assert run.status == status
 
+    def test_scoring_mode_round_trip(self):
+        repo = Repository.objects.create(
+            url='https://github.com/testorg/scoring',
+            owner='testorg',
+            name='scoring',
+        )
+        run = AnalysisRun.objects.create(repo=repo, status='completed')
+        run.result = {
+            'commits': {'total_commits': 1},
+            'oss_score': {
+                'score': 7.5,
+                'badge': 'thriving',
+                'label': 'Thriving',
+                'mode': 'closed_source',
+            },
+            'scoring_mode': 'closed_source',
+            'scoring_mode_reason': 'private repository',
+        }
+        run.save()
+        run.refresh_from_db()
+        assert run.result['scoring_mode'] == 'closed_source'
+        assert run.result['scoring_mode_reason'] == 'private repository'
+        assert run.oss_score_data['mode_reason'] == 'private repository'
+
 
 @pytest.mark.django_db
 class TestWebhookDelivery:

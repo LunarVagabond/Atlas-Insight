@@ -254,21 +254,62 @@ async function onBranchSelect(branch: string) {
 // Export JSON
 function exportJson() {
   if (!result.value || !store.run) return
-  const branch = store.run.branch || ''
+  const r = result.value
+  const run = store.run
+  const branch = run.branch || ''
   const payload = {
-    ...result.value,
-    branch,
-    tab_exports: {
-      code_quality: {
-        complexity: result.value.complexity ?? null,
-        dead_code: result.value.dead_code ?? null,
-        test_coverage: result.value.test_coverage ?? null,
-      },
-      devops: {
-        cicd: result.value.cicd ?? null,
-        containers: result.value.containers ?? null,
-        changelog: result.value.changelog ?? null,
-      },
+    export_version: '2' as const,
+    exported_at: new Date().toISOString(),
+    run: {
+      id: run.id,
+      repo_owner: run.repo_owner,
+      repo_name: run.repo_name,
+      branch,
+      url: run.repo_url,
+      triggered_at: run.triggered_at,
+      completed_at: run.completed_at,
+    },
+    scoring: {
+      mode: r.scoring_mode ?? r.oss_score?.mode ?? null,
+      mode_reason: r.scoring_mode_reason ?? r.oss_score?.mode_reason ?? null,
+      oss_score: r.oss_score ?? null,
+      heuristics: r.heuristics ?? [],
+      classification: r.classification ?? null,
+    },
+    repository: {
+      readme: r.readme ?? null,
+      structure: r.structure ?? null,
+      github_meta: r.github_meta ?? null,
+      commits: r.commits ?? null,
+      ownership: r.ownership ?? null,
+    },
+    analysis: {
+      graph: r.graph ?? null,
+      dependencies: r.dependencies ?? null,
+      security: r.security ?? null,
+      todos: r.todos ?? null,
+      contribution_opportunities: r.contribution_opportunities ?? [],
+      arch_tours: r.arch_tours ?? [],
+      repo_type: r.repo_type ?? null,
+    },
+    quality: {
+      complexity: r.complexity ?? null,
+      dead_code: r.dead_code ?? null,
+      test_coverage: r.test_coverage ?? null,
+      license: r.license ?? null,
+    },
+    devops: {
+      cicd: r.cicd ?? null,
+      containers: r.containers ?? null,
+      tools: r.tools ?? null,
+      changelog: r.changelog ?? null,
+    },
+    context: {
+      diff: r.diff ?? null,
+      similar_runs: r.similar_runs ?? null,
+      issues: r.issues ?? null,
+      pr_refs: r.pr_refs ?? null,
+      is_docs_only: r.is_docs_only ?? false,
     },
   }
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })

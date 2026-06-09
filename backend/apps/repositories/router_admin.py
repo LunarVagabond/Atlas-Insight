@@ -116,6 +116,11 @@ def admin_pick_spotlight(request):
     today = date.today()
     week_start = today - timedelta(days=today.weekday())
 
+    old_pick = (
+        RepoOfTheWeek.objects.filter(week_start=week_start).select_related('repo').first()
+    )
+    replaced_repo = old_pick.repo if old_pick else None
+
     RepoOfTheWeek.objects.filter(week_start=week_start).delete()
 
     eligible = list(
@@ -141,6 +146,9 @@ def admin_pick_spotlight(request):
         week_start=week_start,
         pick_number=current_picks + 1,
     )
+    from apps.repositories.spotlight import apply_spotlight_watch_rollover
+
+    apply_spotlight_watch_rollover(chosen, week_start, replaced_repo=replaced_repo)
     logger.info('Admin manually picked Repo of Week: %s/%s', chosen.owner, chosen.name)
     return {
         'owner': chosen.owner,

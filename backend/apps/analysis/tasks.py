@@ -60,6 +60,10 @@ _RESULT_UPDATE_FIELDS = [
 def _extract_run_fields(run: 'AnalysisRun', result: dict) -> None:
     oss_raw = result.get('oss_score')
     if isinstance(oss_raw, dict):
+        oss_raw = dict(oss_raw)
+        mode_reason = result.get('scoring_mode_reason')
+        if mode_reason:
+            oss_raw['mode_reason'] = mode_reason
         run.oss_score = oss_raw.get('score')
         run.oss_badge = oss_raw.get('badge', '') or ''
         run.oss_score_data = oss_raw
@@ -127,6 +131,7 @@ def _analyze_sub_projects(
     all_edges: list[dict],
     repo_obj,
     commits: dict,
+    scoring_mode: str = 'oss',
 ) -> dict:
     sub_project_results = []
     for sp in repo_type_info['sub_projects']:
@@ -145,8 +150,9 @@ def _analyze_sub_projects(
         sub_signals = compute_heuristics(
             commits, sub_graph, sub_deps,
             readme=None, structure=None, security=sub_security,
+            scoring_mode=scoring_mode,
         )
-        sub_oss_score = compute_oss_score(sub_signals)
+        sub_oss_score = compute_oss_score(sub_signals, scoring_mode=scoring_mode)
         sub_tech_stack = detect_tech_stack(sp_abs, sub_deps.get('dependencies', []))
 
         sub_project_results.append({
@@ -166,6 +172,107 @@ def _analyze_sub_projects(
         'detected_by': repo_type_info['detected_by'],
         'sub_projects': sub_project_results,
     }
+
+
+def _compute_run_diff(run: AnalysisRun, result: dict) -> dict:
+    try:
+        prev_run = (
+            AnalysisRun.objects
+            .filter(
+                repo=run.repo, status='completed', branch=run.branch,
+                triggered_at__lt=run.triggered_at,
+            )
+            .exclude(id=run.id)
+            .order_by('-triggered_at')
+            .first()
+        )
+        if prev_run and prev_run.result:
+            return compute_run_diff(result, prev_run.result, prev_run.id, prev_run.triggered_at)
+    except Exception:
+        pass
+    return {'available': False}
+
+
+def _compute_similar_runs(run: AnalysisRun, result: dict) -> list[dict]:
+    try:
+        lang = (result.get('github_meta') or {}).get('primary_language')
+        oss_raw = result.get('oss_score')
+        score = oss_raw.get('score', 5) if isinstance(oss_raw, dict) else 5
+        sim_qs = (
+            AnalysisRun.objects.select_related('repo')
+            .filter(status='completed', repo__is_private=False)
+            .exclude(repo=run.repo)
+            .order_by('-completed_at')
+        )
+        if lang:
+            sim_qs = sim_qs.filter(primary_language=lang)
+        similar: list[dict] = []
+        for c in sim_qs[:50]:
+            if c.oss_score is None:
+                continue
+            cand_score = c.oss_score
+            if abs(cand_score - score) > 2:
+                continue
+            similar.append({
+                'run_id': str(c.id),
+                'owner': c.repo.owner,
+                'name': c.repo.name,
+                'repo_url': c.repo.url,
+                'oss_score': round(float(cand_score), 1),
+                'health_key': ((c.classification_data or {}).get('project_health') or {}).get('key', ''),
+                'primary_language': lang,
+                'stars': c.github_stars or 0,
+            })
+            if len(similar) >= 5:
+                break
+        return similar
+    except Exception:
+        return []
+
+
+@shared_task
+def notify_run_complete(run_id: str):
+    try:
+        run = AnalysisRun.objects.select_related('repo').get(id=run_id)
+    except AnalysisRun.DoesNotExist:
+        return
+
+    if run.webhook_url:
+        try:
+            import requests as _requests
+            _requests.post(
+                run.webhook_url,
+                json={
+                    'run_id': str(run.id),
+                    'status': run.status,
+                    'repo_url': run.repo.url,
+                    'repo_owner': run.repo.owner,
+                    'repo_name': run.repo.name,
+                    'completed_at': run.completed_at.isoformat() if run.completed_at else None,
+                    'error': run.error_message or None,
+                },
+                timeout=10,
+                headers={'Content-Type': 'application/json', 'User-Agent': 'AtlasInsight/1.0'},
+            )
+        except Exception:
+            logger.warning('Webhook POST failed for run %s → %s', run.id, run.webhook_url)
+
+    if run.notification_email:
+        try:
+            from django.conf import settings as _s
+            from django.core.mail import send_mail
+            result_url = f'{_s.FRONTEND_URL}/results/{run.id}'
+            subject = f'[Atlas Insight] Analysis {run.status}: {run.repo.owner}/{run.repo.name}'
+            body = (
+                f'Your analysis of {run.repo.url} is complete.\n'
+                f'Status: {run.status}\n\n'
+                f'View results: {result_url}\n'
+            )
+            if run.error_message:
+                body += f'\nError: {run.error_message}\n'
+            send_mail(subject, body, None, [run.notification_email], fail_silently=True)
+        except Exception:
+            logger.warning('Email notification failed for run %s', run.id)
 
 
 analysis_runs_total = Counter(
@@ -282,9 +389,20 @@ def analyze_repository(self, run_id: str):
             run.progress_step = 'heuristics'
             run.save(update_fields=['progress_step'])
 
-            classification = classify_repo(
-                commits, _empty_graph, _empty_deps, readme, structure, security, github_meta
+            from .scoring_mode import infer_scoring_mode
+
+            scoring_mode, scoring_mode_reason = infer_scoring_mode(
+                is_private=run.repo.is_private,
+                github_meta=github_meta,
+                structure=structure,
             )
+
+            classification = classify_repo(
+                commits, _empty_graph, _empty_deps, readme, structure, security, github_meta,
+                scoring_mode=scoring_mode,
+            )
+            oss_score = compute_oss_score([], scoring_mode=scoring_mode)
+            oss_score['mode_reason'] = scoring_mode_reason
 
             run.progress_step = 'finalizing'
             run.save(update_fields=['progress_step'])
@@ -295,7 +413,9 @@ def analyze_repository(self, run_id: str):
                 'graph': _empty_graph,
                 'dependencies': _empty_deps,
                 'heuristics': [],
-                'oss_score': 0,
+                'oss_score': oss_score,
+                'scoring_mode': scoring_mode,
+                'scoring_mode_reason': scoring_mode_reason,
                 'readme': readme,
                 'structure': structure,
                 'security': security,
@@ -310,21 +430,23 @@ def analyze_repository(self, run_id: str):
             edges = parse_imports(repo_dir)
 
             repo_type_info = detect_repo_type(repo_dir)
-            if repo_type_info['type'] != 'single':
-                try:
-                    repo_type_result = _analyze_sub_projects(repo_type_info, edges, repo_obj, commits)
-                except Exception:
-                    logger.warning('Sub-project analysis failed — continuing without repo_type', exc_info=True)
-                    repo_type_result = None
-            else:
-                repo_type_result = None
+            repo_type_result = None
 
-            graph = analyze_graph(edges)
+            with ThreadPoolExecutor(max_workers=2) as _parse_pool:
+                _graph_f = _parse_pool.submit(analyze_graph, edges)
+                _todos_f = _parse_pool.submit(scan_todos, repo_dir)
+                graph = _graph_f.result()
+                todos = _todos_f.result()
+
             deps = analyze_dependencies(repo_dir)
-            structure = analyze_structure(repo_obj, repo_dir, deps=deps)
-            security = scan_security(repo_obj, repo_dir)
-            security['vulnerabilities'] = scan_vulnerabilities(deps)
-            todos = scan_todos(repo_dir)
+
+            with ThreadPoolExecutor(max_workers=3) as _struct_pool:
+                _sec_f = _struct_pool.submit(scan_security, repo_obj, repo_dir)
+                _struct_f = _struct_pool.submit(analyze_structure, repo_obj, repo_dir, deps)
+                _vuln_f = _struct_pool.submit(scan_vulnerabilities, deps)
+                security = _sec_f.result()
+                structure = _struct_f.result()
+                security['vulnerabilities'] = _vuln_f.result()
 
             run.progress_step = 'metadata'
             run.save(update_fields=['progress_step'])
@@ -364,6 +486,15 @@ def analyze_repository(self, run_id: str):
                 structure=structure,
             )
 
+            if repo_type_info['type'] != 'single':
+                try:
+                    repo_type_result = _analyze_sub_projects(
+                        repo_type_info, edges, repo_obj, commits, scoring_mode=scoring_mode,
+                    )
+                except Exception:
+                    logger.warning('Sub-project analysis failed — continuing without repo_type', exc_info=True)
+                    repo_type_result = None
+
             def _run_license():
                 return analyze_license(
                     repo_dir, deps, github_meta, scoring_mode=scoring_mode,
@@ -397,7 +528,7 @@ def analyze_repository(self, run_id: str):
                 'changelog': _run_changelog,
             }
             _extra_results: dict = {}
-            with ThreadPoolExecutor(max_workers=4) as _pool:
+            with ThreadPoolExecutor(max_workers=7) as _pool:
                 _futures = {_pool.submit(fn): key for key, fn in _extra_tasks.items()}
                 for _future in as_completed(_futures):
                     _key = _futures[_future]
@@ -418,6 +549,7 @@ def analyze_repository(self, run_id: str):
                 scoring_mode=scoring_mode,
             )
             oss_score = compute_oss_score(signals, scoring_mode=scoring_mode)
+            oss_score['mode_reason'] = scoring_mode_reason
             classification = classify_repo(
                 commits, graph, deps, readme, structure, security, github_meta,
                 scoring_mode=scoring_mode,
@@ -425,6 +557,34 @@ def analyze_repository(self, run_id: str):
 
             run.progress_step = 'finalizing'
             run.save(update_fields=['progress_step'])
+
+            def _run_arch_tours():
+                return generate_arch_tours(structure, graph, commits)
+
+            def _run_ownership():
+                return analyze_ownership(structure, commits, graph)
+
+            def _run_contributions():
+                return analyze_contributions(
+                    commits, graph, deps, readme, structure, security, contribution_data,
+                    todos=todos, scoring_mode=scoring_mode,
+                )
+
+            _finalize: dict = {}
+            with ThreadPoolExecutor(max_workers=3) as _fin_pool:
+                _fin_tasks = {
+                    'arch_tours': _run_arch_tours,
+                    'ownership': _run_ownership,
+                    'contribution_opportunities': _run_contributions,
+                }
+                _fin_futures = {_fin_pool.submit(fn): key for key, fn in _fin_tasks.items()}
+                for _future in as_completed(_fin_futures):
+                    _key = _fin_futures[_future]
+                    try:
+                        _finalize[_key] = _future.result()
+                    except Exception:
+                        logger.warning('Finalizing step %s failed', _key, exc_info=True)
+                        _finalize[_key] = [] if _key == 'contribution_opportunities' else []
 
             result = {
                 'commits': commits,
@@ -440,11 +600,9 @@ def analyze_repository(self, run_id: str):
                 'github_meta': github_meta,
                 'classification': classification,
                 'todos': todos,
-                'arch_tours': generate_arch_tours(structure, graph, commits),
-                'ownership': analyze_ownership(structure, commits, graph),
-                'contribution_opportunities': analyze_contributions(
-                    commits, graph, deps, readme, structure, security, contribution_data, todos=todos
-                ),
+                'arch_tours': _finalize.get('arch_tours', []),
+                'ownership': _finalize.get('ownership', {}),
+                'contribution_opportunities': _finalize.get('contribution_opportunities', []),
                 'license': _extra_results.get('license', {}),
                 'complexity': _extra_results.get('complexity', {}),
                 'dead_code': _extra_results.get('dead_code', {}),
@@ -461,58 +619,12 @@ def analyze_repository(self, run_id: str):
             result['issues'] = (contribution_data or {}).get('issues', [])
             result['pr_refs'] = (contribution_data or {}).get('pr_issue_refs', [])
 
-        # Compute diff vs previous run on same branch — baked in so frontend needs no extra call
-        try:
-            prev_run = (
-                AnalysisRun.objects
-                .filter(repo=run.repo, status='completed', branch=run.branch,
-                        triggered_at__lt=run.triggered_at)
-                .exclude(id=run.id)
-                .order_by('-triggered_at')
-                .first()
-            )
-            result['diff'] = (
-                compute_run_diff(result, prev_run.result, prev_run.id, prev_run.triggered_at)
-                if prev_run and prev_run.result
-                else {'available': False}
-            )
-        except Exception:
-            result['diff'] = {'available': False}
-
-        # Compute similar repos — baked in so frontend needs no extra call
-        try:
-            lang = (result.get('github_meta') or {}).get('primary_language')
-            score = (result.get('oss_score') or {}).get('score', 5)
-            sim_qs = (
-                AnalysisRun.objects.select_related('repo')
-                .filter(status='completed', repo__is_private=False)
-                .exclude(repo=run.repo)
-                .order_by('-completed_at')
-            )
-            if lang:
-                sim_qs = sim_qs.filter(primary_language=lang)
-            similar: list[dict] = []
-            for c in sim_qs[:50]:
-                if c.oss_score is None:
-                    continue
-                cand_score = c.oss_score
-                if abs(cand_score - score) > 2:
-                    continue
-                similar.append({
-                    'run_id': str(c.id),
-                    'owner': c.repo.owner,
-                    'name': c.repo.name,
-                    'repo_url': c.repo.url,
-                    'oss_score': round(float(cand_score), 1),
-                    'health_key': ((c.classification_data or {}).get('project_health') or {}).get('key', ''),
-                    'primary_language': lang,
-                    'stars': c.github_stars or 0,
-                })
-                if len(similar) >= 5:
-                    break
-            result['similar_runs'] = similar
-        except Exception:
-            result['similar_runs'] = []
+        # Compute diff + similar repos in parallel — baked in so frontend needs no extra call
+        with ThreadPoolExecutor(max_workers=2) as _tail_pool:
+            _diff_f = _tail_pool.submit(_compute_run_diff, run, result)
+            _sim_f = _tail_pool.submit(_compute_similar_runs, run, result)
+            result['diff'] = _diff_f.result()
+            result['similar_runs'] = _sim_f.result()
 
         _extract_run_fields(run, result)
         run.status = 'completed'
@@ -582,44 +694,8 @@ def analyze_repository(self, run_id: str):
         except Exception:
             logger.warning('Constellation detection failed for run %s', run_id, exc_info=True)
 
-    # Fire webhook if configured
-    if run.webhook_url:
-        try:
-            import requests as _requests
-            _requests.post(
-                run.webhook_url,
-                json={
-                    'run_id': str(run.id),
-                    'status': run.status,
-                    'repo_url': run.repo.url,
-                    'repo_owner': run.repo.owner,
-                    'repo_name': run.repo.name,
-                    'completed_at': run.completed_at.isoformat() if run.completed_at else None,
-                    'error': run.error_message or None,
-                },
-                timeout=10,
-                headers={'Content-Type': 'application/json', 'User-Agent': 'AtlasInsight/1.0'},
-            )
-        except Exception:
-            logger.warning('Webhook POST failed for run %s → %s', run.id, run.webhook_url)
-
-    # Send email notification if configured
-    if run.notification_email:
-        try:
-            from django.conf import settings as _s
-            from django.core.mail import send_mail
-            result_url = f'{_s.FRONTEND_URL}/results/{run.id}'
-            subject = f'[Atlas Insight] Analysis {run.status}: {run.repo.owner}/{run.repo.name}'
-            body = (
-                f'Your analysis of {run.repo.url} is complete.\n'
-                f'Status: {run.status}\n\n'
-                f'View results: {result_url}\n'
-            )
-            if run.error_message:
-                body += f'\nError: {run.error_message}\n'
-            send_mail(subject, body, None, [run.notification_email], fail_silently=True)
-        except Exception:
-            logger.warning('Email notification failed for run %s', run.id)
+    if run.webhook_url or run.notification_email:
+        notify_run_complete.delay(str(run.id))
 
 
 @shared_task
@@ -837,6 +913,9 @@ def select_repo_of_week():
         week_start=week_start,
         pick_number=current_picks + 1,
     )
+    from apps.repositories.spotlight import apply_spotlight_watch_rollover
+
+    apply_spotlight_watch_rollover(chosen, week_start)
     logger.info(
         'Repo of the Week selected: %s/%s (pick #%d)',
         chosen.owner, chosen.name, current_picks + 1,
