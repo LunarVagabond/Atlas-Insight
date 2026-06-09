@@ -18,7 +18,7 @@ Analysis results are archived. Re-running a repository first checks for new comm
 
 ---
 
-**Quick Links:** [Features](#features) • [Quick Start](#quick-start) • [API](#api-reference) • [Deployment](#deployment) • [Contributing](#contributing)
+**Quick Links:** [Features](#features) • [Quick Start](#quick-start) • [API](#api-reference) • [Deployment](#deployment) • [Roadmap](docs/roadmap.md) • [Contributing](#contributing)
 
 ---
 
@@ -217,6 +217,10 @@ The deployment guide includes:
 * Redis configuration
 * Reverse proxy configuration
 * Operational guidance
+
+## Roadmap
+
+See [docs/roadmap.md](docs/roadmap.md) for the post-FOSS path and the longer-term product ideas we want to keep revisiting.
 
 ---
 

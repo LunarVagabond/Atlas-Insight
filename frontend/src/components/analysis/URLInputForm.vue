@@ -127,13 +127,14 @@ function togglePat() {
     <!-- Options strip — visually attached to input -->
     <div class="url-form__options-strip">
       <p v-if="auth.isAuthenticated && auth.user?.github_connected" class="url-form__auth-note">
-        <strong>{{ auth.displayName }}</strong> — private repos supported.
+        <strong>{{ auth.displayName }}</strong>'s private repos are supported.
       </p>
       <p v-else-if="auth.isAuthenticated && !auth.user?.github_connected" class="url-form__auth-note url-form__auth-note--warn">
         GitHub not connected.
         <button type="button" class="url-form__text-btn" @click="auth.connectGithub()">Connect →</button>
       </p>
       <div class="url-form__options-btns">
+        <span class="url-form__pat-hint">Access repos outside your login scope:</span>
         <button
           type="button"
           class="url-form__opt-btn"
@@ -148,7 +149,7 @@ function togglePat() {
 
     <div v-if="showPat" class="url-form__pat-panel">
       <p class="url-form__pat-why">
-        Required for private repositories or when OAuth access is insufficient.
+        <strong>PAT is optional, but it unlocks private repositories and higher GitHub API limits.</strong>
         Your token is encrypted and stored to enable future re-analyses of this repository.
         <a
           href="https://github.com/settings/tokens/new?scopes=repo&description=Atlas+Insight"

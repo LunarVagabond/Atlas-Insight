@@ -11,6 +11,7 @@ Repository archaeology and static analysis platform. Paste a GitHub URL; get arc
 | **Use Atlas Insight** to analyze a repo | [users/getting-started.md](users/getting-started.md) |
 | **Run Atlas Insight locally** for development | [dev/setup.md](dev/setup.md) |
 | **Deploy Atlas Insight** to a server | [ops/deploy.md](ops/deploy.md) |
+| **Review the product roadmap** | [roadmap.md](roadmap.md) |
 | **Integrate via API** | [api/reference.md](api/reference.md) |
 | **Set up webhooks** | [api/webhooks.md](api/webhooks.md) |
 

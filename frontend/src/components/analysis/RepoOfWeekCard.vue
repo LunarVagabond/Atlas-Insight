@@ -22,6 +22,14 @@ interface SpotlightData {
 const props = defineProps<{ spotlight: SpotlightData }>()
 const router = useRouter()
 
+const SPOTLIGHT_NOTES = [
+  'Worth a look if you want the fastest read on a project this week.',
+  'Picked for being active enough to tell a useful story.',
+  'Good reminder that a repo can be interesting even before it is perfect.',
+  'High signal, low noise, and worth a deeper pass.',
+  'A good place to start if you want to understand the project shape quickly.',
+]
+
 type BadgeVariant = 'pending' | 'running' | 'completed' | 'failed' | 'warning' | 'info'
 
 const HEALTH_COLORS: Record<string, BadgeVariant> = {
@@ -45,6 +53,12 @@ const pickLabel = computed(() => {
     ? suffixes[n % 10]
     : 'th'
   return `${n}${s} time in the spotlight`
+})
+
+const spotlightNote = computed(() => {
+  const seed = `${props.spotlight.repo_owner}/${props.spotlight.repo_name}:${props.spotlight.pick_number}`
+  const index = Array.from(seed).reduce((sum, char) => sum + char.charCodeAt(0), 0) % SPOTLIGHT_NOTES.length
+  return SPOTLIGHT_NOTES[index]
 })
 </script>
 
@@ -90,6 +104,12 @@ const pickLabel = computed(() => {
             {{ t }}
           </span>
         </div>
+
+        <p
+          style="margin:0.75rem 0 0;padding:0.75rem 1rem;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text-secondary);font-size:0.875rem;line-height:1.5"
+        >
+          {{ spotlightNote }}
+        </p>
       </div>
       <div class="rotw-card__action">
         <AppButton variant="primary" @click="router.push(`/results/${spotlight.run_id}`)">
