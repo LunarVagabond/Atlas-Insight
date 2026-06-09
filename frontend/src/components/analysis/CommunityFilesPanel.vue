@@ -55,17 +55,29 @@ const communityImproveRecs = computed(
 const communityFiles = computed(() => {
   const st = structure.value
   return [
-    { key: 'readme', label: 'README', present: readme.value?.found ?? false, icon: '📄', score: readmeQuality.value?.score },
-    { key: 'license', label: st?.license_type ? `License (${st.license_type})` : 'License', present: !!st?.license_file || !!st?.license_type, icon: '⚖️', score: fileScore('license') },
-    { key: 'contributing', label: 'Contributing Guide', present: !!st?.has_contributing, icon: '🤝', score: fileScore('contributing') },
-    { key: 'changelog', label: 'Changelog', present: !!st?.has_changelog, icon: '📋', score: fileScore('changelog') },
-    { key: 'coc', label: 'Code of Conduct', present: !!st?.has_coc, icon: '🌐', score: fileScore('coc') },
-    { key: 'security', label: 'Security Policy', present: !!st?.has_security_policy, icon: '🔒', score: fileScore('security') },
+    { key: 'readme', label: 'README', present: readme.value?.found ?? false, icon: '📄', score: fileEntry('readme')?.score ?? readmeQuality.value?.score },
+    { key: 'license', label: st?.license_type ? `License (${st.license_type})` : 'License', present: !!st?.license_file || !!st?.license_type, icon: '⚖️', score: fileEntry('license')?.score },
+    { key: 'contributing', label: 'Contributing Guide', present: !!st?.has_contributing, icon: '🤝', score: fileEntry('contributing')?.score },
+    { key: 'changelog', label: 'Changelog', present: !!st?.has_changelog, icon: '📋', score: fileEntry('changelog')?.score },
+    { key: 'coc', label: 'Code of Conduct', present: !!st?.has_coc, icon: '🌐', score: fileEntry('coc')?.score },
+    { key: 'security', label: 'Security Policy', present: !!st?.has_security_policy, icon: '🔒', score: fileEntry('security')?.score },
   ]
 })
 
-function fileScore(key: string): number | undefined {
-  return communityHealth.value?.files.find(f => f.key === key)?.score
+function fileEntry(key: string) {
+  return communityHealth.value?.files.find(f => f.key === key)
+}
+
+const scoreBreakdown = computed(() => communityHealth.value?.breakdown ?? [])
+
+const README_CATEGORY_LABELS: Record<string, string> = {
+  presence: 'Overview & length',
+  getting_started: 'Install & usage',
+  examples: 'Code examples',
+  visuals: 'Images & badges',
+  discoverability: 'Docs links',
+  community: 'Community refs',
+  engagement: 'Social links',
 }
 
 const scoringModeLabel = computed(() => {
@@ -133,6 +145,32 @@ const scoringModeLabel = computed(() => {
             </li>
           </ul>
         </div>
+        <div v-if="scoreBreakdown.length" class="community-files-panel__breakdown">
+          <h4 class="readme-quality__group-title">Score breakdown</h4>
+          <p class="community-files-panel__breakdown-note">
+            Each row shows how much a file drags the overall score below a perfect 100.
+          </p>
+          <table class="community-files-panel__breakdown-table">
+            <thead>
+              <tr>
+                <th>File</th>
+                <th>Score</th>
+                <th>Weight</th>
+                <th>Contributes</th>
+                <th>Gap</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in scoreBreakdown" :key="row.key">
+                <td>{{ row.label }}</td>
+                <td>{{ Math.round(row.score) }}</td>
+                <td>{{ Math.round(row.weight * 100) }}%</td>
+                <td>{{ row.weighted_score }}</td>
+                <td class="community-files-panel__gap">−{{ row.gap }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
     <section v-else class="community-files-panel__section">
@@ -167,6 +205,27 @@ const scoringModeLabel = computed(() => {
               <p class="readme-quality__item-desc">{{ rec.description }}</p>
             </li>
           </ul>
+        </div>
+        <div v-if="readmeQuality.categories.length" class="community-files-panel__breakdown">
+          <h4 class="readme-quality__group-title">Category breakdown</h4>
+          <table class="community-files-panel__breakdown-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Score</th>
+                <th>Weight</th>
+                <th>Weighted</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="cat in readmeQuality.categories" :key="cat.key">
+                <td>{{ README_CATEGORY_LABELS[cat.key] ?? cat.key }}</td>
+                <td>{{ Math.round(cat.score) }}</td>
+                <td>{{ Math.round(cat.weight * 100) }}%</td>
+                <td>{{ cat.weighted_score }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
       <p v-else class="empty-state">Re-run analysis to generate README quality scores.</p>

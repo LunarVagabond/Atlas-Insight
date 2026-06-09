@@ -410,6 +410,7 @@ def analyze_repository(self, run_id: str):
             )
             structure['community_health'] = score_community_files(
                 readme, structure, scoring_mode=scoring_mode,
+                readme_quality_score=readme['quality']['score'],
             )
 
             run.progress_step = 'finalizing'
@@ -563,6 +564,7 @@ def analyze_repository(self, run_id: str):
             )
             structure['community_health'] = score_community_files(
                 readme, structure, scoring_mode=scoring_mode,
+                readme_quality_score=readme['quality']['score'],
             )
             classification = classify_repo(
                 commits, graph, deps, readme, structure, security, github_meta,

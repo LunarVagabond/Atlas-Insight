@@ -39,12 +39,16 @@ export interface CommunityFileHealth {
   label: string
   present: boolean
   score: number
+  weight: number
+  weighted_score: number
+  gap: number
 }
 
 export interface CommunityHealth {
   score: number
   potential_score: number
   files: CommunityFileHealth[]
+  breakdown: CommunityFileHealth[]
   recommendations: CommunityHealthRecommendation[]
 }
 

@@ -5,8 +5,27 @@ class TestScoreCommunityFiles:
     def test_oss_penalizes_missing_files(self):
         result = score_community_files({}, {}, scoring_mode='oss')
         assert result['score'] == 0.0
-        assert len(result['recommendations']) == 5
+        assert len(result['recommendations']) == 6
         assert all(r['status'] == 'missing' for r in result['recommendations'])
+        assert len(result['breakdown']) == 6
+
+    def test_breakdown_sorted_by_gap(self):
+        readme = {'found': True, 'word_count': 500}
+        structure = {
+            'license_type': 'MIT',
+            'has_contributing': True,
+            'community_files_content': {
+                'contributing': ' '.join(['word'] * 100),
+            },
+        }
+        result = score_community_files(
+            readme, structure, scoring_mode='oss', readme_quality_score=80.0,
+        )
+        gaps = [f['gap'] for f in result['breakdown']]
+        assert gaps == sorted(gaps, reverse=True)
+        readme_entry = next(f for f in result['files'] if f['key'] == 'readme')
+        assert readme_entry['weight'] == 0.25
+        assert readme_entry['weighted_score'] == 20.0
 
     def test_closed_source_skips_missing_penalty(self):
         result = score_community_files({}, {}, scoring_mode='closed_source')

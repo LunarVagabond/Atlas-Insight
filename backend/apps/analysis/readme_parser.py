@@ -48,6 +48,8 @@ def parse_readme(repo_dir: str) -> dict:
             'description': None,
             'sections': [],
             'badge_count': 0,
+            'image_count': 0,
+            'has_header_image': False,
             'word_count': 0,
             'has_installation': False,
             'has_usage': False,
@@ -70,6 +72,9 @@ def parse_readme(repo_dir: str) -> dict:
         for m in re.finditer(r'^#{1,3}\s+(.+)$', content, re.MULTILINE)
     ]
     badge_count = len(re.findall(r'\[!\[', content))
+    image_count = len(re.findall(r'!\[[^\]]*\]\([^)]+\)', content))
+    image_count += len(re.findall(r'<img\s', content, re.IGNORECASE))
+    has_header_image = _has_header_image(content)
     lower = content.lower()
     links = _extract_links(content)
 
@@ -90,6 +95,8 @@ def parse_readme(repo_dir: str) -> dict:
         'description': description,
         'sections': sections[:30],
         'badge_count': badge_count,
+        'image_count': image_count,
+        'has_header_image': has_header_image,
         'word_count': len(content.split()),
         'code_block_count': code_block_count,
         'has_external_links': has_external_links,
@@ -103,6 +110,16 @@ def parse_readme(repo_dir: str) -> dict:
         'docs_links': _detect_docs_links(links),
         'social_links': _detect_social_links(links),
     }
+
+
+def _has_header_image(content: str) -> bool:
+    for line in content.splitlines()[:25]:
+        stripped = line.strip()
+        if stripped.startswith('#'):
+            continue
+        if re.search(r'!\[[^\]]*\]\([^)]+\)|<img\s', stripped, re.IGNORECASE):
+            return True
+    return False
 
 
 def _extract_description(content: str) -> str | None:

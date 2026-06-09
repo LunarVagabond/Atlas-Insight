@@ -8072,6 +8072,42 @@
     font-weight: 600;
     margin: 0 0 $space-3;
   }
+
+  &__breakdown {
+    margin-top: $space-4;
+  }
+
+  &__breakdown-note {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    margin: 0 0 $space-3;
+  }
+
+  &__breakdown-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+
+    th,
+    td {
+      padding: $space-2 $space-3;
+      text-align: left;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    th {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--color-text-muted);
+    }
+  }
+
+  &__gap {
+    color: #cf222e;
+    font-weight: 600;
+  }
 }
 
 // ===== CONTRIBUTOR LEADERBOARD =====

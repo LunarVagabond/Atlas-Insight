@@ -30,6 +30,8 @@ export interface ReadmeData {
   description: string | null
   sections: string[]
   badge_count: number
+  image_count?: number
+  has_header_image?: boolean
   word_count: number
   code_block_count?: number
   has_external_links?: boolean

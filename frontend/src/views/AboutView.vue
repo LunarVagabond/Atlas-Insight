@@ -182,21 +182,39 @@ const GUIDE_ENTRIES: GuideEntry[] = [
   // ── Project Health ───────────────────────────────────────────────────────
   {
     id: 'community-health-files',
-    term: 'Community Health Files',
-    section: 'Project Health',
-    defHtml: `Standard files that signal a project is set up to welcome contributors: <span class="guide-kw">LICENSE</span> (legal terms of use), <span class="guide-kw">CONTRIBUTING</span> (how to make your first PR), <span class="guide-kw">CODE_OF_CONDUCT</span> (community norms), <span class="guide-kw">SECURITY</span> (how to report vulnerabilities), <span class="guide-kw">CHANGELOG</span> (what changed between versions).`,
+    term: 'Community Files Score',
+    section: 'Community',
+    defHtml: `Weighted score for <span class="guide-kw">README</span> plus standard OSS community files: <span class="guide-kw">LICENSE</span>, <span class="guide-kw">CONTRIBUTING</span>, <span class="guide-kw">SECURITY</span>, <span class="guide-kw">CODE_OF_CONDUCT</span>, and <span class="guide-kw">CHANGELOG</span>. Shown on the <span class="guide-kw">Community → Community Files</span> tab with a per-file breakdown of what drags the overall score down.`,
     methodLabel: 'How we compute it',
-    method: 'We scan the file tree for common filenames and locations for each community file (root, docs/, .github/). Score: no license +30, no CONTRIBUTING +20, no SECURITY +15, no CoC +10, no CHANGELOG +10.',
-    searchText: 'community health files license contributing code of conduct security changelog readme welcome contributors',
+    method: 'OSS weights: README 25%, License 20%, Contributing 18%, Security 15%, CoC 10%, Changelog 12%. Each file scores 0–100 (README uses the README Quality score; other files score on presence and content depth). Overall = weighted average. The breakdown table shows each file’s gap from a perfect 100 (weight × (100 − score)). Closed-source mode only scores files that exist.',
+    searchText: 'community files score license contributing code of conduct security changelog readme breakdown weight gap community tab',
+  },
+  {
+    id: 'readme-quality',
+    term: 'README Quality',
+    section: 'Community',
+    defHtml: `Rule-based README score (0–100) on the <span class="guide-kw">Community Files</span> tab. Categories: overview length, install/usage sections, code examples, <span class="guide-kw">images and badges</span>, documentation links, community references, and social links.`,
+    methodLabel: 'How we compute it',
+    method: 'Weighted categories: presence 18%, getting started 22%, examples 13%, visuals 10%, discoverability 13%, community 14%, engagement 10%. Visuals checks for shields/badges, screenshots or diagrams (penalizes long READMEs with zero images), and hero images near the top. Recommendations list missing sections and estimated score gains.',
+    searchText: 'readme quality score images badges screenshots shields installation usage examples category breakdown community files',
   },
   {
     id: 'documentation-quality',
-    term: 'Documentation Quality',
+    term: 'Documentation Quality (heuristic)',
     section: 'Project Health',
-    defHtml: `How complete and useful the project documentation is for a newcomer. Scores low when there is no README, when the README is <span class="guide-kw">too short to be useful</span> (under 100 words), or when key sections are missing — how to install it, how to use it, how to contribute.`,
+    defHtml: `Heuristic risk signal for the <span class="guide-kw">Heuristics</span> tab — separate from the README Quality score on Community Files. Measures whether newcomers can orient from the README and linked docs.`,
     methodLabel: 'How we compute it',
-    method: 'We parse the README and scan for section headings matching installation, usage, contributing, and changelog patterns. Each missing section adds 15 points. A missing README entirely scores 90. A short README (under 100 words) with no code examples adds the full 15 pts; one that is short but has ≥2 code blocks adds only 8 pts. Sections with under 20 words are considered shallow — three or more shallow sections add an additional 15 pts. Score capped at 100.',
-    searchText: 'documentation quality readme short word count installation usage contributing changelog sections missing newcomer code blocks shallow sections',
+    method: 'Risk score (higher = worse) from README presence, word count, install/usage/changelog section detection, shallow headings, and code-block density. See README Quality on Community Files for the actionable 0–100 score with recommendations.',
+    searchText: 'documentation quality heuristic readme risk newcomer sections shallow',
+  },
+  {
+    id: 'contributor-leaderboard',
+    term: 'Contributor Leaderboards',
+    section: 'Community',
+    defHtml: `Ranked contributor table on <span class="guide-kw">Community → Leaderboards</span> with commit counts and optional <span class="guide-kw">lines added / removed / net</span> when per-author stats are available from the latest analysis.`,
+    methodLabel: 'How we compute it',
+    method: 'Commits aggregated from git history with optional time-range filters from the History tab. Line stats computed per author during analysis. Re-run analysis to refresh line metrics on older runs.',
+    searchText: 'leaderboard contributor commits lines added removed net community tab',
   },
   {
     id: 'ci-health',
@@ -480,12 +498,15 @@ function renderMd(text: string): string {
           <li><strong>Dependencies</strong> — all declared dependencies, Docker base image warnings, missing lockfiles.</li>
           <li><strong>Architecture</strong> — import graph, god modules, circular dependencies, hot files.</li>
           <li><strong>Code Quality</strong> — file complexity hotspots (LOC distribution), unreferenced files, per-directory test coverage mapping.</li>
-          <li><strong>Project</strong> — README content, community files, links, and release history.</li>
+          <li><strong>Project</strong> — tech stack, links, releases, and pointers to deeper community docs.</li>
           <li><strong>History</strong> — commit timeline, contributor churn, monthly breakdown, roadmap milestones.</li>
           <li><strong>Ownership</strong> — file ownership map, bus factor, subsystem breakdown, and <strong>PR Impact Preview</strong>.</li>
-          <li><strong>Contributing</strong> — actionable contribution opportunities with difficulty ratings.</li>
-          <li><strong>DevOps</strong> — CI/CD pipeline depth, Dockerfile hygiene, changelog discipline.</li>
-          <li><strong>Tours</strong> — guided reading paths through major subsystems.</li>
+          <li><strong>Community → Contributing</strong> — actionable contribution opportunities with difficulty ratings.</li>
+          <li><strong>Community → Contribution Path</strong> — guided first-contribution walkthrough from arch tours.</li>
+          <li><strong>Community → Community Files</strong> — README quality score, community file health, per-file breakdown.</li>
+          <li><strong>Community → Leaderboards</strong> — contributor rankings with commit and line stats.</li>
+          <li><strong>Community → DevOps</strong> — CI/CD pipeline depth, Dockerfile hygiene, changelog discipline.</li>
+          <li><strong>Community → Tours</strong> — guided reading paths through major subsystems.</li>
         </ul>
       </section>
 

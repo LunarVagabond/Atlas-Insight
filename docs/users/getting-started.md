@@ -69,11 +69,37 @@ Each signal is **deterministic and data-driven** — no AI models are used for s
 - Docker base image warnings (outdated or deprecated images)
 - Missing lockfiles that leave dependency versions unpinned
 
-### Contributing path
+### Community tab
 
-If you're looking to contribute to a project, this section surfaces:
-- Open GitHub issues tagged as good first issues or help wanted
-- Structural gaps where contributions would have the most impact (missing tests, undocumented modules, stale dependencies)
+The **Community** chapter groups contributor-facing analysis:
+
+| Sub-tab | What it shows |
+|---|---|
+| **Contributing** | Open issues, TODOs, and ranked contribution opportunities |
+| **Contribution Path** | Guided first-contribution walkthrough built from arch tours |
+| **Community Files** | README quality score (with category breakdown), community file health, per-file score breakdown |
+| **Leaderboards** | Contributor rankings — commits plus lines added/removed/net when available |
+| **DevOps** | CI/CD workflows, containers, changelog discipline |
+| **Tours** | Guided reading paths through major subsystems |
+
+#### Community Files scoring
+
+Two related scores live on **Community → Community Files**:
+
+**README Quality (0–100)** — weighted categories:
+- Overview & length
+- Install & usage sections
+- Code examples
+- **Images & badges** (screenshots, diagrams, shields.io badges)
+- Documentation links
+- Community references (contributing, license, changelog)
+- Social / chat links
+
+**Community Files Score (0–100)** — weighted average across README + LICENSE, CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, and CHANGELOG. The breakdown table shows each file's weight, contribution to the total, and **gap** (how much that file drags the score below 100).
+
+OSS projects are scored against all expected files. Closed-source projects only score files that are present.
+
+Re-run analysis after upgrading Atlas Insight to populate these scores on existing runs.
 
 ### Architecture tour
 

@@ -19,6 +19,9 @@ class TestScoreReadmeQuality:
             'has_license': True,
             'has_api_docs': True,
             'code_block_count': 3,
+            'badge_count': 2,
+            'image_count': 2,
+            'has_header_image': True,
             'shallow_sections': [],
             'docs_links': [{'label': 'Docs', 'url': 'https://example.com/docs'}],
             'social_links': [{'platform': 'Discord', 'label': 'Chat', 'url': 'https://discord.gg/x'}],
@@ -48,3 +51,22 @@ class TestScoreReadmeQuality:
         result = score_readme_quality(readme, {}, scoring_mode='oss')
         gain = sum(r['score_gain'] for r in result['recommendations'])
         assert result['potential_score'] == round(min(100.0, result['score'] + gain), 1)
+
+    def test_visuals_penalizes_long_readme_without_images(self):
+        readme = {
+            'found': True,
+            'word_count': 400,
+            'description': 'A project.',
+            'has_installation': True,
+            'has_usage': True,
+            'code_block_count': 2,
+            'badge_count': 0,
+            'image_count': 0,
+            'has_header_image': False,
+            'shallow_sections': [],
+            'has_external_links': True,
+        }
+        result = score_readme_quality(readme, {}, scoring_mode='closed_source')
+        ids = [r['id'] for r in result['recommendations']]
+        assert 'readme_no_images' in ids
+        assert any(c['key'] == 'visuals' for c in result['categories'])

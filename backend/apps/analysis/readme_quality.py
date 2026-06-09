@@ -1,19 +1,21 @@
 from __future__ import annotations
 
 _CATEGORY_WEIGHTS_OSS = {
-    'presence': 0.20,
-    'getting_started': 0.25,
-    'examples': 0.15,
-    'discoverability': 0.15,
-    'community': 0.15,
+    'presence': 0.18,
+    'getting_started': 0.22,
+    'examples': 0.13,
+    'visuals': 0.10,
+    'discoverability': 0.13,
+    'community': 0.14,
     'engagement': 0.10,
 }
 
 _CATEGORY_WEIGHTS_CLOSED = {
-    'presence': 0.25,
-    'getting_started': 0.30,
-    'examples': 0.20,
-    'discoverability': 0.15,
+    'presence': 0.22,
+    'getting_started': 0.28,
+    'examples': 0.18,
+    'visuals': 0.12,
+    'discoverability': 0.12,
     'community': 0.0,
     'engagement': 0.10,
 }
@@ -35,6 +37,7 @@ def score_readme_quality(
         'presence': _score_presence(readme, recommendations),
         'getting_started': _score_getting_started(readme, recommendations),
         'examples': _score_examples(readme, recommendations),
+        'visuals': _score_visuals(readme, recommendations),
         'discoverability': _score_discoverability(readme, recommendations),
         'community': _score_community(readme, structure, recommendations, scoring_mode),
         'engagement': _score_engagement(readme, recommendations),
@@ -244,6 +247,66 @@ def _score_examples(readme: dict, recs: list[dict]) -> float:
     return max(0.0, score)
 
 
+def _score_visuals(readme: dict, recs: list[dict]) -> float:
+    if not readme.get('found'):
+        return 0.0
+
+    score = 100.0
+    images = readme.get('image_count', 0)
+    badges = readme.get('badge_count', 0)
+    wc = readme.get('word_count', 0)
+
+    if badges == 0:
+        _add_rec(
+            recs,
+            rec_id='readme_no_badges',
+            category='visuals',
+            status='needs_improvement',
+            title='Add status badges',
+            description='No CI, license, or version shields detected in the README.',
+            score_gain=3.0,
+            hints=['Add shields.io badges for build status, license, and package version'],
+        )
+        score -= 15
+
+    if wc > 200 and images == 0:
+        _add_rec(
+            recs,
+            rec_id='readme_no_images',
+            category='visuals',
+            status='missing',
+            title='Add screenshots or diagrams',
+            description=f'README is {wc} words but has no images — visuals help newcomers grasp the project.',
+            score_gain=6.0,
+            hints=['Add a screenshot, architecture diagram, or demo GIF near the top'],
+        )
+        score -= 30
+    elif wc > 100 and images == 0:
+        _add_rec(
+            recs,
+            rec_id='readme_few_images',
+            category='visuals',
+            status='needs_improvement',
+            title='Consider adding visuals',
+            description='Screenshots or diagrams make longer READMEs easier to scan.',
+            score_gain=4.0,
+        )
+        score -= 12
+    elif images > 0 and not readme.get('has_header_image'):
+        _add_rec(
+            recs,
+            rec_id='readme_images_buried',
+            category='visuals',
+            status='needs_improvement',
+            title='Move a hero image higher',
+            description='Images exist but none appear near the top of the README.',
+            score_gain=2.0,
+        )
+        score -= 8
+
+    return max(0.0, score)
+
+
 def _score_discoverability(readme: dict, recs: list[dict]) -> float:
     if not readme.get('found'):
         return 0.0
@@ -329,7 +392,7 @@ def _score_community(
 
 def _score_engagement(readme: dict, recs: list[dict]) -> float:
     if not readme.get('found'):
-        return 50.0
+        return 0.0
 
     if readme.get('social_links'):
         return 100.0

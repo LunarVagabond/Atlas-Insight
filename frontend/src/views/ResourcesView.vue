@@ -24,6 +24,16 @@ const TYPE_LABELS: Record<Resource['type'], string> = {
 
 const SECTIONS: ResourceSection[] = [
   {
+    heading: 'Atlas Insight — Product Guide',
+    intro: 'How to read analysis results, community scoring, and the in-app reference.',
+    items: [
+      { title: 'About & Signal Guide', url: '/about', desc: 'Full glossary of heuristics, OSS score bands, README quality categories, community file weights, PR impact, and how each tab maps to the analysis pipeline.', free: true, type: 'docs' },
+      { title: 'Getting Started', url: '/docs/getting-started', desc: 'Walkthrough of analyzing a repo, reading health signals, Community Files scoring, leaderboards, spotlight/trending, and embedding badges.', free: true, type: 'docs' },
+      { title: 'What\'s Supported', url: '/supported', desc: 'Languages, frameworks, and tools with full vs dependency-only analysis tiers — the same registry that drives the home page marquee.', free: true, type: 'docs' },
+      { title: 'Learn', url: '/learn', desc: 'Open-source contribution primer and how Atlas Insight fits into evaluating a project before your first PR.', free: true, type: 'docs' },
+    ],
+  },
+  {
     heading: 'Atlas Insight API',
     intro: 'Machine-readable docs, schema references, and integration guides for building on top of Atlas Insight.',
     items: [
