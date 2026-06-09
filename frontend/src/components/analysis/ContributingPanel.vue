@@ -5,7 +5,6 @@ import DOMPurify from 'dompurify'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
 import ContributionDrawer from './ContributionDrawer.vue'
-import ContributionPathPanel from './ContributionPathPanel.vue'
 import type { ArchTour, ContributionOpportunity, StructureData, TodoData } from '../../stores/analysis'
 import type { CommitData } from '../../types/commits'
 import type { GitHubMeta } from '../../types/github'
@@ -373,16 +372,6 @@ const docsHomepage = computed(() => props.githubMeta?.homepage ?? null)
     <div v-if="!filtered.length" class="empty-state">
       No opportunities found for this filter.
     </div>
-
-    <!-- Contribution Path Generator -->
-    <ContributionPathPanel
-      v-if="archTours?.length"
-      :tours="archTours"
-      :opportunities="opportunities"
-      :repo-url="repoUrl"
-      :all-files="structure?.all_files"
-      style="margin-top: 2rem"
-    />
 
     <ContributionDrawer :opportunity="activeOpp" :arch-tours="archTours" :repo-url="repoUrl" @close="activeOpp = null" />
 

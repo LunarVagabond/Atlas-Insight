@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 import type { AnalysisRun, RunResult } from '../stores/analysis'
+import logoUrl from '../assets/logo.png'
 
 const route = useRoute()
 const runId = route.params.runId as string
@@ -195,7 +196,10 @@ function exportCvesCsv() {
     <!-- ── Controls (screen only) ── -->
     <div class="print-controls">
       <div class="print-controls__inner">
-        <span class="print-controls__brand">Atlas Insight</span>
+        <div class="print-controls__brand-block">
+          <img :src="logoUrl" alt="" class="print-controls__logo" />
+          <span class="print-controls__brand">Atlas <span>Insight</span></span>
+        </div>
         <span class="print-controls__sep" />
         <span class="print-controls__label">Analysis Report</span>
         <div class="print-controls__actions">
@@ -225,17 +229,24 @@ function exportCvesCsv() {
 
       <!-- ══ COVER ══ -->
       <section class="print-cover">
-        <div class="print-cover__eyebrow">
-          <span class="print-cover__brand-text">Atlas Insight</span>
-          <span class="print-cover__eyebrow-sep" />
-          <span class="print-cover__report-type">Repository Analysis Report</span>
-        </div>
+        <header class="print-cover__header">
+          <div class="print-cover__brand-block">
+            <img :src="logoUrl" alt="" class="print-cover__logo" />
+            <span class="print-cover__wordmark">Atlas <span>Insight</span></span>
+          </div>
+          <p class="print-cover__report-type">Repository Analysis Report</p>
+        </header>
 
         <h1 class="print-cover__repo">
           {{ run.repo_owner }} / {{ run.repo_name }}
           <span v-if="run.branch" class="print-cover__branch">@ {{ run.branch }}</span>
         </h1>
-        <div class="print-cover__repo-url">{{ run.repo_url }}</div>
+        <p class="print-cover__meta">
+          Analyzed {{ formatDate(run.completed_at) }}
+          <template v-if="result.github_meta?.primary_language">
+            · {{ result.github_meta.primary_language }}
+          </template>
+        </p>
 
         <!-- Key stats summary row -->
         <div class="print-cover__summary-row">

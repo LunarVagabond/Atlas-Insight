@@ -30,6 +30,22 @@ export interface CommitData {
   monthly_commits?: Record<string, MonthlyCommit[]>
   reverted_commits?: { sha: string; message: string; date: string; files: string[] }[]
   commit_conventions?: CommitConventions
+  contributor_stats?: ContributorStat[]
+}
+
+export interface ContributorMonthStat {
+  commits: number
+  lines_added: number
+  lines_removed: number
+}
+
+export interface ContributorStat {
+  author: string
+  email: string
+  commits: number
+  lines_added: number
+  lines_removed: number
+  monthly: Record<string, ContributorMonthStat>
 }
 
 export interface FileHistoryCommit {

@@ -130,6 +130,52 @@ def _detect_commit_conventions(subjects: list[str]) -> dict:
     return result
 
 
+def _build_contributor_stats(commits, cutoff: datetime) -> list[dict]:
+    contributor_stats_map: dict[str, dict] = {}
+    for commit in commits:
+        dt = datetime.fromtimestamp(commit.committed_date, tz=timezone.utc)
+        if dt < cutoff:
+            continue
+        email = commit.author.email or ''
+        name = commit.author.name or email
+        if _BOT_RE.search(email) or _BOT_RE.search(name):
+            continue
+        identity = name.lower() or email.lower()
+        month_key = dt.strftime('%Y-%m')
+        if identity not in contributor_stats_map:
+            contributor_stats_map[identity] = {
+                'author': name,
+                'email': email,
+                'commits': 0,
+                'lines_added': 0,
+                'lines_removed': 0,
+                'monthly': {},
+            }
+        entry = contributor_stats_map[identity]
+        entry['commits'] += 1
+        try:
+            total = commit.stats.total
+            added = int(total.get('insertions', 0) or 0)
+            deleted = int(total.get('deletions', 0) or 0)
+        except Exception:
+            added = deleted = 0
+        entry['lines_added'] += added
+        entry['lines_removed'] += deleted
+        month_bucket = entry['monthly'].setdefault(
+            month_key,
+            {'commits': 0, 'lines_added': 0, 'lines_removed': 0},
+        )
+        month_bucket['commits'] += 1
+        month_bucket['lines_added'] += added
+        month_bucket['lines_removed'] += deleted
+
+    return sorted(
+        contributor_stats_map.values(),
+        key=lambda x: x['commits'],
+        reverse=True,
+    )
+
+
 def analyze_commits(repo: Repo) -> dict:
     now = datetime.now(timezone.utc)
     commits = list(repo.iter_commits('HEAD'))
@@ -228,6 +274,8 @@ def analyze_commits(repo: Repo) -> dict:
             }
         )
 
+    contributor_stats = _build_contributor_stats(commits, cutoff)
+
     return {
         'total_commits': len(commits),
         'total_contributors': len(contributors),
@@ -241,4 +289,5 @@ def analyze_commits(repo: Repo) -> dict:
         'monthly_commits': dict(monthly_commits),
         'reverted_commits': reverted_commits,
         'commit_conventions': _detect_commit_conventions(all_subjects),
+        'contributor_stats': contributor_stats,
     }

@@ -16,6 +16,7 @@ import type { CommitData, GitHubContributor, MonthlyCommit } from '../../stores/
 import TimelineFilter, { type FilterSelection } from './TimelineFilter.vue'
 import CommitMonthDrawer from './CommitMonthDrawer.vue'
 import GitGraphSvg, { type GraphRow, type GraphCommit, type MonthSep } from './GitGraphSvg.vue'
+import { commitInDayFilter, monthInFilter } from '../../composables/timelineFilterUtils'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 
@@ -131,67 +132,13 @@ const authorColorMap = computed<Map<string, string>>(() => {
 })
 
 // ── Filter months from selection ──────────────────────────────────────────────
-function monthInFilter(month: string): boolean {
-  if (selection.value.year !== 'All' && !month.startsWith(selection.value.year)) return false
-  if (selection.value.months.size > 0 && !selection.value.months.has(parseInt(month.slice(5, 7)))) return false
-  return true
+function monthMatches(month: string): boolean {
+  return monthInFilter(month, selection.value)
 }
 
-function commitInDayFilter(isoDate: string): boolean {
-  if (!selection.value.days.size) return true
-  const day = parseInt(isoDate.slice(8, 10))
-  const minDay = Math.min(...selection.value.days)
-  const maxDay = Math.max(...selection.value.days)
-  return day >= minDay && day <= maxDay
+function dayMatches(isoDate: string): boolean {
+  return commitInDayFilter(isoDate, selection.value)
 }
-
-// ── Contributors (filtered by active date range) ───────────────────────────────
-interface ContribEntry {
-  name: string
-  initials: string
-  color: string
-  commitCount: number
-  avatarUrl?: string
-  profileUrl?: string
-}
-
-function authorInitials(name: string): string {
-  const clean = name.replace(/\[bot\]/, '').trim()
-  const parts = clean.split(/[\s._-]+/).filter(Boolean)
-  return parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : clean.slice(0, 2).toUpperCase()
-}
-
-const contributors = computed<ContribEntry[]>(() => {
-  const mc = props.commits.monthly_commits ?? {}
-  const counts = new Map<string, number>()
-  const filteredActive = selection.value.year !== 'All' || selection.value.months.size > 0 || selection.value.days.size > 0
-
-  for (const [month, commits] of Object.entries(mc)) {
-    if (filteredActive && !monthInFilter(month)) continue
-    for (const c of commits) {
-      if (!commitInDayFilter(c.date)) continue
-      counts.set(c.author, (counts.get(c.author) ?? 0) + 1)
-    }
-  }
-
-  const ghMap = new Map<string, GitHubContributor>()
-  for (const g of props.githubContributors ?? []) ghMap.set(g.login, g)
-
-  return Array.from(counts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([name, count]) => {
-      const gh = ghMap.get(name) ?? ghMap.get(name.replace(/\[bot\]/, ''))
-      return {
-        name,
-        initials: authorInitials(name),
-        color: authorColorMap.value.get(name) ?? '#888',
-        commitCount: count,
-        avatarUrl: gh?.avatar_url,
-        profileUrl: gh?.html_url,
-      }
-    })
-})
 
 // ── Git graph rows (commits + month separators, newest first) ─────────────────
 function relativeDate(iso: string): string {
@@ -227,12 +174,12 @@ const graphRows = computed<GraphRow[]>(() => {
   const sortedMonths = Object.keys(mc).sort().reverse().slice(0, 36)
 
   for (const month of sortedMonths) {
-    if (!monthInFilter(month)) continue
+    if (!monthMatches(month)) continue
     const raw = mc[month]
     if (!raw?.length) continue
 
     const commits = raw
-      .filter(c => commitInDayFilter(c.date))
+      .filter(c => dayMatches(c.date))
       .filter(c => !q || c.message.toLowerCase().includes(q) || c.author.toLowerCase().includes(q) || c.sha.startsWith(q))
       .map(c => ({
         sha: c.sha,
@@ -263,19 +210,11 @@ const graphRows = computed<GraphRow[]>(() => {
 
 const totalCommits = computed(() => graphRows.value.filter(r => !(r as MonthSep).isMonth).length)
 
-const contributorsTotal = computed(() => {
-  const mc = props.commits.monthly_commits ?? {}
-  const filteredActive = selection.value.year !== 'All' || selection.value.months.size > 0 || selection.value.days.size > 0
-  const seen = new Set<string>()
-  for (const [month, commits] of Object.entries(mc)) {
-    if (filteredActive && !monthInFilter(month)) continue
-    for (const c of commits) {
-      if (!commitInDayFilter(c.date)) continue
-      seen.add(c.author)
-    }
-  }
-  return seen.size
-})
+function authorInitials(name: string): string {
+  const clean = name.replace(/\[bot\]/, '').trim()
+  const parts = clean.split(/[\s._-]+/).filter(Boolean)
+  return parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : clean.slice(0, 2).toUpperCase()
+}
 
 const commitDateRange = computed<string>(() => {
   const dates = graphRows.value
@@ -310,44 +249,6 @@ const commitDateRange = computed<string>(() => {
         <div class="git-history-chart-row__chart">
           <Line v-if="dayChartData ? dayChartData.length : filteredMonthly.length" :data="chartData" :options="chartOptions" />
           <div v-else class="empty-state">No data for selected range</div>
-        </div>
-
-        <div v-if="contributors.length" class="git-contribs git-contribs--sidebar">
-          <div class="git-contribs__label">
-            Contributors
-            <span v-if="selection.year !== 'All' || selection.months.size > 0 || selection.days.size > 0" class="git-contribs__filter-note">
-              (filtered)
-            </span>
-          </div>
-          <div class="git-contribs__list">
-            <a
-              v-for="c in contributors"
-              :key="c.name"
-              :href="c.profileUrl ?? undefined"
-              :target="c.profileUrl ? '_blank' : undefined"
-              rel="noopener noreferrer"
-              :class="['git-contrib', 'git-contrib--row', c.profileUrl && 'git-contrib--link']"
-              :title="`${c.name} — ${c.commitCount} commits`"
-            >
-              <img
-                v-if="c.avatarUrl"
-                :src="c.avatarUrl"
-                :alt="c.name"
-                class="git-contrib__avatar"
-                :style="{ borderColor: c.color }"
-              />
-              <span
-                v-else
-                class="git-contrib__initials"
-                :style="{ background: c.color + '22', color: c.color, borderColor: c.color }"
-              >{{ c.initials }}</span>
-              <span class="git-contrib__name">{{ c.name.replace(/\[bot\]/, '').split(' ')[0] }}</span>
-              <span class="git-contrib__count">{{ c.commitCount }}</span>
-            </a>
-            <div v-if="contributorsTotal > contributors.length" class="git-contribs__more">
-              … and {{ contributorsTotal - contributors.length }} more
-            </div>
-          </div>
         </div>
       </div>
     </div>

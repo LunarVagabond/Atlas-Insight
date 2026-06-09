@@ -81,6 +81,15 @@ A guided reading path through the repository's subsystems. Instead of staring at
 
 ---
 
+## Spotlight and Trending
+
+- **Spotlight** — a weekly featured public repository with a full analysis report
+- **Trending** — repositories ranked by recent scans and views across the instance
+
+Browse both from the top navigation after signing in is optional; public instances show them on the home page.
+
+---
+
 ## Private repositories
 
 Private repositories require you to connect your GitHub account and grant Atlas Insight access. Look for the **Connect GitHub** button in your account settings.
@@ -113,4 +122,4 @@ Atlas Insight clones the repository temporarily for analysis, then stores the re
 Yes. Submit the URL again — Atlas Insight checks for new commits. If the repo has new activity, a fresh analysis runs. If nothing has changed, the existing results are returned.
 
 **What languages are supported?**
-Dependency analysis and import graph generation cover Python, JavaScript/TypeScript, and Go most deeply. Commit history and heuristic scoring work on any repository regardless of language.
+Atlas Insight supports 15+ languages and frameworks for import parsing, dependency detection, and structure analysis. See the in-app **What's Supported** page (`/supported`) or `frontend/src/data/languages.ts` for the full registry. Commit history and heuristic scoring work on any repository regardless of language.

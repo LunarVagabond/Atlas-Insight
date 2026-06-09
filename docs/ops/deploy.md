@@ -8,7 +8,7 @@ Self-hosted deployment on a Linux server with Nginx, Postgres, Redis, and system
 
 - Python 3.12+
 - Node.js 20+
-- Docker + Docker Compose (runs Postgres, Redis, GlitchTip)
+- Docker + Docker Compose (runs Postgres and Redis)
 - Nginx (production only — for TLS termination)
 
 ---
@@ -30,14 +30,12 @@ make init
 # 4. Start full stack
 make start
 
-# 5. Create GlitchTip admin + promote Atlas user
-make glitchtip-create-admin EMAIL=you@example.com PASSWORD=yourpassword
+# 5. Promote admin user (optional)
 make promote-user EMAIL=you@example.com
 ```
 
 `make start` handles service ordering automatically:
 - Starts Postgres + Redis
-- Starts GlitchTip, waits for health, provisions org/projects, writes `SENTRY_DSN` to `backend/.env`
 - Starts Django, Celery worker, Celery beat, Flower, Vite (dev) or serves static build (prod)
 - Starts Cloudflare tunnel if `CLOUDFLARE_TUNNEL_TOKEN` is set
 
@@ -101,15 +99,6 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
 | `CLOUDFLARE_TUNNEL_TOKEN` | Enables Cloudflare tunnel on `make start` |
 | `FEATURED_REPO_URL` | GitHub URL of a public repo to feature on the home page |
 
-**GlitchTip variables:**
-
-| Variable | Description |
-|---|---|
-| `GLITCHTIP_SECRET_KEY` | Strong random string for GlitchTip (required in prod) |
-| `GLITCHTIP_DOMAIN` | Public GlitchTip URL (e.g. `https://glitch.yoursite.com`) |
-| `GLITCHTIP_CSRF_TRUSTED_ORIGINS` | **Must include every scheme+host users access GlitchTip from.** Missing entries cause 403 on login. Example: `https://glitch.yoursite.com,http://localhost:4505` |
-| `SENTRY_DSN` | Written automatically by `make start` — do not edit manually |
-
 > **`SECURE_SSL_REDIRECT` must stay `False`** when running behind nginx or Cloudflare. Both terminate TLS and forward HTTP to Django. Setting it `True` causes an infinite redirect loop.
 
 ---
@@ -133,14 +122,13 @@ make production-release
 
 Interactive script — walks through the full deployment:
 
-1. Prompts for install path, domains, admin email, GlitchTip password, service user
-2. Generates `SECRET_KEY`, `FIELD_ENCRYPTION_KEY`, `GITHUB_WEBHOOK_SECRET`, `GLITCHTIP_SECRET_KEY`
+1. Prompts for install path, domains, admin email, service user
+2. Generates `SECRET_KEY`, `FIELD_ENCRYPTION_KEY`, `GITHUB_WEBHOOK_SECRET`
 3. Runs `make init` (venv + npm + postgres + migrate)
-4. Starts GlitchTip and creates admin user
-5. Starts full stack
-6. **Confirms paths before writing** systemd service files to `/etc/systemd/system/`
-7. `systemctl enable --now` the services
-8. Prints nginx config and offers to write + enable it
+4. Starts full stack
+5. **Confirms paths before writing** systemd service files to `/etc/systemd/system/`
+6. `systemctl enable --now` the services
+7. Prints nginx config and offers to write + enable it
 
 Re-run safely — each step asks before acting.
 
@@ -321,48 +309,15 @@ server {
 
 ---
 
-## GlitchTip operations
-
-```bash
-make start-glitchtip       # start + provision org/projects + write SENTRY_DSN
-make setup-glitchtip       # re-run provisioning + refresh DSN (idempotent)
-make glitchtip-verify      # show projects + service tag inventory
-make sentry-test-services  # emit test logs to all service buckets
-make logs-glitchtip        # tail GlitchTip container logs
-
-make glitchtip-db-dump     # backup → _running/backups/
-make reset-glitchtip       # drop + recreate GlitchTip DB, re-provision
-make fresh-glitchtip       # dump, then reset
-```
-
-**Service tags** — all Django sub-apps route to the `Backend` project, distinguished by `service` tag:
-
-| Service tag | What it covers |
-|---|---|
-| `django` | Django web process |
-| `django-api` | `apps.api` |
-| `django-analysis` | `apps.analysis` |
-| `django-repositories` | `apps.repositories` |
-| `django-users` | `apps.users` |
-| `django-config` | `config.*` modules |
-| `celery-workers` | Celery worker |
-| `celery-beat` | Celery beat scheduler |
-| `celery-flower` | Flower |
-
-Filter in GlitchTip Issues/Logs: add tag filter `service = django-analysis` etc.
-
----
-
 ## Startup / shutdown order
 
 `make start` and `make stop` handle ordering automatically.
 
 Manual order if needed:
 1. Start Postgres + Redis
-2. Start GlitchTip (`glitchtip-web` + `glitchtip-worker`)
-3. Start Django / Celery / Beat / Flower / Vite
+2. Start Django / Celery / Beat / Flower / Vite
 
-Shutdown is reverse order — stop GlitchTip last so app shutdown logs are captured.
+Shutdown is reverse order.
 
 ---
 

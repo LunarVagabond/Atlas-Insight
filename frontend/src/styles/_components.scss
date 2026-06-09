@@ -2223,6 +2223,74 @@
   }
 }
 
+.readme-quality {
+  &__score-row {
+    display: flex;
+    align-items: baseline;
+    gap: $space-4;
+    margin-bottom: $space-4;
+    flex-wrap: wrap;
+  }
+
+  &__score {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  &__denom {
+    font-size: 0.875rem;
+    font-weight: 400;
+    color: var(--color-text-muted);
+  }
+
+  &__potential {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+  }
+
+  &__group-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-muted);
+    margin: 0 0 $space-2;
+  }
+
+  &__list {
+    list-style: none;
+    margin: 0 0 $space-4;
+    padding: 0;
+  }
+
+  &__item {
+    padding: $space-3 0;
+    border-bottom: 1px solid var(--color-border);
+
+    &:last-child { border-bottom: none; }
+  }
+
+  &__item-title {
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+
+  &__gain {
+    float: right;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #2da44e;
+  }
+
+  &__item-desc {
+    margin: $space-1 0 0;
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    clear: both;
+  }
+}
+
 .classify-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -4961,13 +5029,9 @@
 .git-history-stat__sep { color: var(--color-border); }
 .git-history-stat--warn strong { color: var(--color-warning); }
 
-// ── Chart + contributors side-by-side ────────────────────────────────────────
+// ── Commit history chart ─────────────────────────────────────────────────────
 .git-history-chart-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: $space-4;
   margin-top: $space-4;
-  align-items: start;
 
   &__chart {
     min-height: 180px;
@@ -7981,6 +8045,197 @@
   &__chart {
     height: 260px;
     position: relative;
+  }
+}
+
+// ===== CONTRIBUTOR LEADERBOARD =====
+.leaderboards-panel {
+  .contributor-graph {
+    margin-top: $space-5;
+    padding-top: $space-4;
+    border-top: 1px solid var(--color-border);
+  }
+}
+
+.contributor-leaderboard {
+  &--embedded {
+    margin-top: $space-5;
+    border-top: 1px solid var(--color-border);
+    padding-top: $space-4;
+  }
+
+  &__hint {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    margin: $space-1 0 0;
+  }
+
+  &__empty {
+    margin-top: $space-2;
+  }
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: $space-4;
+    margin-bottom: $space-4;
+    flex-wrap: wrap;
+  }
+
+  &__title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 $space-1;
+  }
+
+  &__subtitle {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    margin: 0;
+  }
+
+  &__filter-note {
+    color: var(--color-accent);
+  }
+
+  &__metrics {
+    display: flex;
+    gap: $space-1;
+    flex-wrap: wrap;
+  }
+
+  &__metric {
+    padding: $space-1 $space-3;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border: 1px solid var(--color-border);
+    border-radius: $radius-sm;
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: background $transition-fast, border-color $transition-fast, color $transition-fast;
+
+    &:hover:not(:disabled) {
+      background: var(--color-surface-hover);
+    }
+
+    &:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    &--active {
+      background: var(--color-accent-subtle);
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+    }
+  }
+
+  &__scroll {
+    max-height: 420px;
+    overflow-y: auto;
+    border: 1px solid var(--color-border);
+    border-radius: $radius-md;
+  }
+
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+  }
+
+  thead {
+    position: sticky;
+    top: 0;
+    background: var(--color-surface);
+    z-index: 1;
+  }
+
+  th {
+    text-align: left;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+    padding: $space-2 $space-3;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  td {
+    padding: $space-2 $space-3;
+    border-bottom: 1px solid var(--color-border-subtle);
+    vertical-align: middle;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  tbody tr:hover td {
+    background: var(--color-surface-hover);
+  }
+
+  &__col-rank {
+    width: 2.5rem;
+    text-align: center;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__col-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  &__col-add {
+    color: var(--color-success);
+  }
+
+  &__col-del {
+    color: var(--color-danger);
+  }
+
+  &__identity {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    text-decoration: none;
+    color: inherit;
+    min-width: 0;
+
+    &--link:hover .contributor-leaderboard__name {
+      color: var(--color-accent);
+    }
+  }
+
+  &__avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    flex-shrink: 0;
+  }
+
+  &__initials {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.625rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  &__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 

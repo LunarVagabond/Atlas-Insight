@@ -22,17 +22,7 @@ Analysis results are archived. Re-running a repository first checks for new comm
 
 ---
 
-<p align="center">
-  <img src="docs/image_assets/dashboard.png" alt="Atlas Insight Dashboard" width="48%" />
-  <img src="docs/image_assets/architecture.png" alt="Architecture View" width="48%" />
-</p>
-
-<p align="center">
-  <img src="docs/image_assets/repo_health.png" alt="Repository Health View" width="48%" />
-  <img src="docs/image_assets/heuristics.png" alt="Heuristics View" width="48%" />
-</p>
-
----
+<!-- Screenshots: add captures to docs/image_assets/ when available -->
 
 ## Features
 
@@ -42,10 +32,11 @@ Analysis results are archived. Re-running a repository first checks for new comm
 | **Architecture analysis** | Import graphs, circular dependencies, god modules, hot files               |
 | **Dependency health**     | Dependency inventory, lockfile checks, Docker image warnings               |
 | **Security scanning**     | Secret detection, `.gitignore` hygiene, repository safety signals          |
-| **Heuristic scoring**     | Eleven repository risk and maintenance indicators                          |
-| **OSS Score**             | Open-source readiness assessment from 0–10                                 |
+| **Heuristic scoring**     | Repository risk and maintenance indicators with mode-aware weighting       |
+| **Health score**          | Composite readiness assessment from 0–10 (OSS and closed-source modes)     |
 | **Contributing path**     | Actionable contribution opportunities from issues and repository structure |
 | **Architecture tours**    | Guided exploration paths through major subsystems                          |
+| **Spotlight & Trending**  | Weekly featured repo and community discovery views                         |
 | **Health badges**         | Embeddable SVG badges for analyzed repositories                            |
 
 ---
@@ -160,8 +151,19 @@ cd frontend
 # Type checking
 node_modules/.bin/vue-tsc --noEmit
 
+# Unit tests
+npm test
+
 # Production build
 make build
+```
+
+### All-in-one (from repo root)
+
+```bash
+make test        # backend pytest + frontend vitest
+make lint        # ruff + vue-tsc
+make type-check  # vue-tsc only
 ```
 
 ---
@@ -197,6 +199,18 @@ These endpoints retrieve live data and cache responses in Redis for 15 minutes u
 | GET    | `/api/v1/repositories/runs/{id}/similar`                  | Similar repository profiles   |
 | GET    | `/api/v1/repositories/runs/{id}/vulnerabilities`          | Dependency vulnerability data |
 | GET    | `/api/v1/repositories/runs/{id}/constellation`            | Repository relationship graph |
+| GET    | `/api/v1/repositories/runs/{id}/ai-summary`               | AI-generated run summary      |
+| GET    | `/api/v1/repositories/runs/{id}/pr-impact?pr=<num>`       | PR impact analysis            |
+
+### Discovery Endpoints
+
+| Method | Endpoint                               | Description                    |
+| ------ | -------------------------------------- | ------------------------------ |
+| GET    | `/api/v1/repositories/spotlight/current` | Current Repo of the Week     |
+| GET    | `/api/v1/repositories/spotlight/history` | Past spotlight picks         |
+| GET    | `/api/v1/repositories/trending`        | Trending public repositories   |
+| GET    | `/api/v1/repositories/featured`        | Featured repository list       |
+| GET    | `/api/v1/health`                       | Service health check           |
 
 ---
 
@@ -226,17 +240,25 @@ See [docs/roadmap.md](docs/roadmap.md) for the post-FOSS path and the longer-ter
 
 ## Contributing
 
-Contributions, bug reports, feature requests, and architectural discussions are welcome.
+There is a lot we can do together — Atlas Insight is built for curious developers who like digging into how repositories are structured, maintained, and improved. You do not need to be a Django or Vue expert to help; many contributions start with a small doc fix or a new language parser scaffold.
 
-If you're looking for a place to start, Atlas Insight surfaces contributor-friendly opportunities directly through its repository analysis workflow.
+### Quick paths
 
-Please review: 
+| I want to… | Start here |
+| ---------- | ---------- |
+| Fix a bug | [Open a bug report](https://github.com/LunarVagabond/Atlas-Insight/issues/new?template=bug_report.md) → [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Add a language parser | [docs/dev/adding-a-language.md](docs/dev/adding-a-language.md) → `make new-language` |
+| Add an infra tool detector | [docs/dev/adding-a-tool.md](docs/dev/adding-a-tool.md) → `make new-tool` |
+| Improve docs | [docs/README.md](docs/README.md) hub |
+| Explore bigger ideas | [docs/roadmap.md](docs/roadmap.md) |
 
-* [CONTRIBUTING.md](CONTRIBUTING.md)
-* [SECURITY.md](SECURITY.md)
-* [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) 
+### Before your first PR
 
-before submitting pull requests.
+1. Follow [CONTRIBUTING.md](CONTRIBUTING.md) for setup, branch naming (`<issue>-<desc>` or `noissue-<desc>`), and PR title format.
+2. Run `make test` and `make lint` from the repo root.
+3. Read [docs/dev/setup.md](docs/dev/setup.md) for project layout and [docs/dev/analysis-pipeline.md](docs/dev/analysis-pipeline.md) for how analysis runs.
+
+Also review [SECURITY.md](SECURITY.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before submitting pull requests.
 
 ---
 

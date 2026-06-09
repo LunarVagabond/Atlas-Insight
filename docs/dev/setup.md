@@ -126,9 +126,10 @@ backend/
     celery.py       Celery app
     urls.py         mounts NinjaAPI at /api/; register routers here
   apps/
-    repositories/   Repository + AnalysisRun models
+    repositories/   Models + routers (runs, JIT, meta, admin)
     analysis/       Celery tasks for repo cloning and analysis
-    api/            Django Ninja routers
+    api/            Shared Ninja routers (health, in-app docs)
+    users/          Auth and user endpoints
 
 frontend/src/
   styles/           all styles — no <style> blocks in .vue files
@@ -148,6 +149,5 @@ Full clean wipe:
 make teardown           # stop everything, docker down -v, remove _running/.venv/node_modules
 make init               # re-setup from scratch
 make start
-make glitchtip-create-admin EMAIL=you@example.com PASSWORD=yourpassword
 make promote-user EMAIL=you@example.com
 ```

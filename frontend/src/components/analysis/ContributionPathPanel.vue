@@ -80,8 +80,8 @@ const areas = Object.keys(AREA_META) as Area[]
 </script>
 
 <template>
-  <div class="contrib-path">
-    <h3 class="contrib-path__title">Contribution Path Generator</h3>
+  <div class="panel contrib-path">
+    <h2 class="panel__title">Contribution Path</h2>
     <p class="contrib-path__intro">Pick an area of interest and get a guided reading path + matching contribution opportunities.</p>
 
     <div class="contrib-path__areas">

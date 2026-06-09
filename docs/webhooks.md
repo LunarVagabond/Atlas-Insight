@@ -21,7 +21,7 @@ In your GitHub repository, go to **Settings → Webhooks → Add webhook** and f
 
 | Field | Value |
 |---|---|
-| Payload URL | `https://<your-domain>/api/v1/admin/webhooks/github` |
+| Payload URL | `https://<your-domain>/api/v1/repositories/webhooks/github` |
 | Content type | `application/json` |
 | Secret | A strong random string — must match `GITHUB_WEBHOOK_SECRET` in your Atlas Insight config |
 | Events | Select **Just the push event** |

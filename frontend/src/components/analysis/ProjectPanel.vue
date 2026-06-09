@@ -48,6 +48,14 @@ const description = computed(() =>
   gh?.github_description || readme?.description || null
 )
 
+const readmeQuality = computed(() => readme?.quality ?? null)
+const readmeMissingRecs = computed(
+  () => readmeQuality.value?.recommendations.filter(r => r.status === 'missing') ?? [],
+)
+const readmeImproveRecs = computed(
+  () => readmeQuality.value?.recommendations.filter(r => r.status === 'needs_improvement') ?? [],
+)
+
 const repoAge = computed(() => {
   const days = structure?.repo_age_days
   if (!days) return null
@@ -423,6 +431,39 @@ const interactionLinks = computed<DisplayLink[]>(() => {
 
       <!-- ── Right column: data / metric sections ── -->
       <div class="project-panel__col">
+
+        <!-- README quality -->
+        <section v-if="readmeQuality" class="project-panel__section">
+          <h2 class="panel__title">README Quality</h2>
+          <div class="readme-quality">
+            <div class="readme-quality__score-row">
+              <div class="readme-quality__score">{{ readmeQuality.score }}<span class="readme-quality__denom">/100</span></div>
+              <div v-if="readmeQuality.potential_score > readmeQuality.score" class="readme-quality__potential">
+                Up to {{ readmeQuality.potential_score }} if recommendations are applied
+              </div>
+            </div>
+            <div v-if="readmeMissingRecs.length" class="readme-quality__group">
+              <h3 class="readme-quality__group-title">Missing</h3>
+              <ul class="readme-quality__list">
+                <li v-for="rec in readmeMissingRecs" :key="rec.id" class="readme-quality__item">
+                  <span class="readme-quality__item-title">{{ rec.title }}</span>
+                  <span class="readme-quality__gain">+{{ rec.score_gain }}</span>
+                  <p class="readme-quality__item-desc">{{ rec.description }}</p>
+                </li>
+              </ul>
+            </div>
+            <div v-if="readmeImproveRecs.length" class="readme-quality__group">
+              <h3 class="readme-quality__group-title">Needs improvement</h3>
+              <ul class="readme-quality__list">
+                <li v-for="rec in readmeImproveRecs" :key="rec.id" class="readme-quality__item">
+                  <span class="readme-quality__item-title">{{ rec.title }}</span>
+                  <span class="readme-quality__gain">+{{ rec.score_gain }}</span>
+                  <p class="readme-quality__item-desc">{{ rec.description }}</p>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
 
         <!-- Repository Assessment -->
         <section v-if="cls" class="project-panel__section">

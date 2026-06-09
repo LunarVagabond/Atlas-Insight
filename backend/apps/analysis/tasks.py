@@ -33,6 +33,7 @@ from .ownership_analysis import analyze_ownership
 from .project_structure import analyze_structure
 from .project_structure.tech_stack import detect_tech_stack
 from .readme_parser import parse_readme
+from .readme_quality import score_readme_quality
 from .repo_type import detect_docs_only, detect_repo_type
 from .security_scan import scan_security
 from .test_coverage import analyze_test_coverage
@@ -403,6 +404,9 @@ def analyze_repository(self, run_id: str):
             )
             oss_score = compute_oss_score([], scoring_mode=scoring_mode)
             oss_score['mode_reason'] = scoring_mode_reason
+            readme['quality'] = score_readme_quality(
+                readme, structure, scoring_mode=scoring_mode,
+            )
 
             run.progress_step = 'finalizing'
             run.save(update_fields=['progress_step'])
@@ -550,6 +554,9 @@ def analyze_repository(self, run_id: str):
             )
             oss_score = compute_oss_score(signals, scoring_mode=scoring_mode)
             oss_score['mode_reason'] = scoring_mode_reason
+            readme['quality'] = score_readme_quality(
+                readme, structure, scoring_mode=scoring_mode,
+            )
             classification = classify_repo(
                 commits, graph, deps, readme, structure, security, github_meta,
                 scoring_mode=scoring_mode,

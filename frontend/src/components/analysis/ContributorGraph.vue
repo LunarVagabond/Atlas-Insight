@@ -11,10 +11,17 @@ import {
   Legend,
 } from 'chart.js'
 import type { CommitData } from '../../stores/analysis'
+import type { FilterSelection } from './TimelineFilter.vue'
+import { isFilterActive, monthInFilter } from '../../composables/timelineFilterUtils'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
-const props = defineProps<{ commits: CommitData }>()
+const props = withDefaults(defineProps<{
+  commits: CommitData
+  selection?: FilterSelection
+}>(), {
+  selection: () => ({ year: 'All', months: new Set(), days: new Set() }),
+})
 
 // Build per-author monthly commit counts from monthly_frequency + monthly_commits
 const PALETTE = [
@@ -28,8 +35,11 @@ const chartData = computed(() => {
 
   // Collect all months in order
   const months = Object.keys(monthly).sort()
-  // Last 18 months
-  const displayMonths = months.slice(-18)
+  let displayMonths = months.slice(-18)
+  if (isFilterActive(props.selection)) {
+    displayMonths = displayMonths.filter(m => monthInFilter(m, props.selection))
+  }
+  if (!displayMonths.length) return null
 
   // Collect all authors across those months
   const authorCounts: Record<string, Record<string, number>> = {}

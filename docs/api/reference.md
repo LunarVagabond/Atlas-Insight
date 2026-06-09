@@ -102,7 +102,7 @@ Returns the current state of a run. Poll until `status` is `completed` or `faile
 | Field | Type | Description |
 |---|---|---|
 | `status` | string | `pending` · `running` · `completed` · `failed` |
-| `progress_step` | string | Current step during analysis: `cloning` · `parsing` · `heuristics` · `metadata` · `finalizing` |
+| `progress_step` | string | Current step during analysis: `cloning` · `parsing` · `metadata` · `heuristics` · `finalizing` |
 | `branch` | string | Branch analyzed. Empty string = default branch |
 | `result` | object \| null | Full analysis payload; `null` while pending/running |
 | `cooldown_until` | ISO timestamp \| null | If set, retry blocked until this time |
@@ -250,6 +250,59 @@ GET /repositories/runs/{run_id}/pr-impact?pr=<number>
 ```
 
 Impact analysis for a specific pull request number.
+
+#### AI summary
+
+```
+GET /repositories/runs/{run_id}/ai-summary
+```
+
+Generated narrative summary of the analysis run. Cached 15 minutes.
+
+#### Constellation
+
+```
+GET /repositories/runs/{run_id}/constellation
+```
+
+Repository relationship graph data (cross-repo references).
+
+---
+
+### Discovery
+
+#### Repo of the Week
+
+```
+GET /repositories/spotlight/current
+GET /repositories/spotlight/history
+```
+
+Current and past weekly spotlight picks.
+
+#### Trending
+
+```
+GET /repositories/trending
+```
+
+Public repositories ranked by recent activity and engagement.
+
+#### Featured
+
+```
+GET /repositories/featured
+```
+
+Curated featured repository list.
+
+#### Health check
+
+```
+GET /health
+```
+
+Service health and dependency status (database, Redis).
 
 ---
 

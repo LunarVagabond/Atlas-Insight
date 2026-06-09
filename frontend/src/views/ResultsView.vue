@@ -16,6 +16,7 @@ import DependenciesPanel from '../components/analysis/DependenciesPanel.vue'
 import HeuristicsPanel from '../components/analysis/HeuristicsPanel.vue'
 import ProjectPanel from '../components/analysis/ProjectPanel.vue'
 import ContributingPanel from '../components/analysis/ContributingPanel.vue'
+import ContributionPathPanel from '../components/analysis/ContributionPathPanel.vue'
 import RoadmapTimeline from '../components/analysis/RoadmapTimeline.vue'
 import SecurityPanel from '../components/analysis/SecurityPanel.vue'
 import ArchitectureToursPanel from '../components/analysis/ArchitectureToursPanel.vue'
@@ -24,7 +25,7 @@ import LicensePanel from '../components/analysis/LicensePanel.vue'
 import CodeQualityPanel from '../components/analysis/CodeQualityPanel.vue'
 import DevOpsPanel from '../components/analysis/DevOpsPanel.vue'
 import DeltaPanel from '../components/analysis/DeltaPanel.vue'
-import ContributorGraph from '../components/analysis/ContributorGraph.vue'
+import LeaderboardsPanel from '../components/analysis/LeaderboardsPanel.vue'
 import StaleBranchesPanel from '../components/analysis/StaleBranchesPanel.vue'
 import SimilarReposPanel from '../components/analysis/SimilarReposPanel.vue'
 import CompareModal from '../components/ui/CompareModal.vue'
@@ -70,7 +71,7 @@ const hasRoadmap = computed(() => (result.value?.structure?.roadmap_parsed?.mile
 const CHAPTER_GROUPS = [
   { label: 'Health',    tabs: ['Overview', 'Heuristics', 'Security', 'Licenses', 'Dependencies'], color: '#f59e0b' },
   { label: 'Codebase',  tabs: ['Architecture', 'Code Quality', 'Project', 'History', 'Ownership'], color: '#6366f1' },
-  { label: 'Community', tabs: ['Contributing', 'DevOps', 'Tours'],                                 color: '#22c55e' },
+  { label: 'Community', tabs: ['Contributing', 'Contribution Path', 'Leaderboards', 'DevOps', 'Tours'], color: '#22c55e' },
 ]
 const DOCS_ONLY_TABS = new Set(['Overview', 'Project', 'History', 'Ownership', 'Security', 'Contributing'])
 const isDocsOnly = computed(() => result.value?.is_docs_only === true)
@@ -116,7 +117,11 @@ const tabBadges = computed<Record<string, number | string>>(() => {
   const contribCount = r.contribution_opportunities?.length ?? 0
   if (contribCount > 0) badges['Contributing'] = contribCount
 
+  const contributorCount = r.commits?.contributor_stats?.length ?? r.commits?.total_contributors ?? 0
+  if (contributorCount > 0) badges['Leaderboards'] = contributorCount
+
   const toursCount = r.arch_tours?.length ?? 0
+  if (toursCount > 0) badges['Contribution Path'] = toursCount
   if (toursCount > 0) badges['Tours'] = toursCount
 
   const highRiskHeuristics = (r.heuristics ?? []).filter(h => h.score >= 60).length
@@ -677,16 +682,23 @@ onUnmounted(() => {
           </div>
         </template>
         <template v-if="activeTab === 'History'">
-          <CommitTimelineChart :commits="result.commits" :repo-url="store.run?.repo_url" :github-contributors="result.github_meta?.contributors" />
-          <div style="margin-top: 1.5rem">
-            <ContributorGraph :commits="result.commits" />
-          </div>
+          <CommitTimelineChart
+            :commits="result.commits"
+            :repo-url="store.run?.repo_url"
+            :github-contributors="result.github_meta?.contributors"
+          />
           <div v-if="hasRoadmap && result.structure?.roadmap_parsed" style="margin-top: 1.5rem" class="panel">
             <RoadmapTimeline
               :milestones="result.structure.roadmap_parsed.milestones"
               :roadmap-file="result.structure.roadmap_file ?? 'ROADMAP.md'"
             />
           </div>
+        </template>
+        <template v-if="activeTab === 'Leaderboards'">
+          <LeaderboardsPanel
+            :commits="result.commits"
+            :github-contributors="result.github_meta?.contributors"
+          />
         </template>
         <template v-if="activeTab === 'Architecture'">
           <ArchitecturePanel
@@ -747,6 +759,13 @@ onUnmounted(() => {
           :tools="result.tools"
         />
         <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" :structure="result.structure" :todos="result.todos" :arch-tours="result.arch_tours ?? []" :commits="result.commits" :is-docs-only="isDocsOnly" :github-meta="result.github_meta" />
+        <ContributionPathPanel
+          v-if="activeTab === 'Contribution Path'"
+          :tours="result.arch_tours ?? []"
+          :opportunities="result.contribution_opportunities ?? []"
+          :repo-url="store.run?.repo_url"
+          :all-files="result.structure?.all_files"
+        />
         <ArchitectureToursPanel v-if="activeTab === 'Tours'" :tours="result.arch_tours ?? []" :repo-url="store.run?.repo_url" :run-id="runId" />
       </div>
       </Transition>
