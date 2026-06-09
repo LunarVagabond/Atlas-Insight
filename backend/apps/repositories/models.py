@@ -21,6 +21,7 @@ class Repository(models.Model):
     view_count = models.IntegerField(default=0)
     scan_count = models.IntegerField(default=0)
     is_watched = models.BooleanField(default=False)
+    watch_reason = models.CharField(max_length=20, blank=True, default='')
     cached_branch_count = models.IntegerField(null=True, blank=True, default=None)
 
     class Meta:

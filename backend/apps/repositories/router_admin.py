@@ -186,7 +186,8 @@ def watch_repo(request, repo_id: uuid.UUID):
     except Repository.DoesNotExist:
         raise HttpError(404, 'Repository not found')
     repo.is_watched = True
-    repo.save(update_fields=['is_watched'])
+    repo.watch_reason = 'manual'
+    repo.save(update_fields=['is_watched', 'watch_reason'])
     return 200, None
 
 
@@ -199,7 +200,8 @@ def unwatch_repo(request, repo_id: uuid.UUID):
     except Repository.DoesNotExist:
         raise HttpError(404, 'Repository not found')
     repo.is_watched = False
-    repo.save(update_fields=['is_watched'])
+    repo.watch_reason = ''
+    repo.save(update_fields=['is_watched', 'watch_reason'])
     return 204, None
 
 

@@ -7,6 +7,7 @@ import AppButton from '../components/ui/AppButton.vue'
 import SkeletonCard from '../components/ui/SkeletonCard.vue'
 import { useAnalysisStore } from '../stores/analysis'
 import { useAuthStore } from '../stores/auth'
+import { EXTERNAL_IMG_ATTRS } from '../utils/externalImage'
 import type { RunListItem } from '../stores/analysis'
 
 const router = useRouter()
@@ -106,6 +107,7 @@ async function handleDelete(run: RunListItem) {
           :src="authStore.user.avatar_url"
           :alt="authStore.displayName"
           class="dashboard-header__avatar"
+          v-bind="EXTERNAL_IMG_ATTRS"
         />
         <div class="dashboard-header__info">
           <h1 class="dashboard-header__title">My Analyses</h1>

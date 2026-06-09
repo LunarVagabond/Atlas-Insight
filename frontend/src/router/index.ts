@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
+import { useFeatureFlagsStore } from '../stores/featureFlags'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -86,6 +87,13 @@ const router = createRouter({
       component: () => import('../views/NotFoundView.vue'),
     },
   ],
+})
+
+router.beforeEach(async (to) => {
+  const flags = useFeatureFlagsStore()
+  if (!flags.loaded) await flags.fetchFlags()
+  if (to.name === 'spotlight' && !flags.spotlight) return { name: 'home' }
+  if (to.name === 'trending' && !flags.trending) return { name: 'home' }
 })
 
 export default router

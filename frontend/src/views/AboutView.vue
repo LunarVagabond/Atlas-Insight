@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
+import { EXTERNAL_IMG_ATTRS } from '../utils/externalImage'
 import axios from 'axios'
 import AppTabs from '../components/ui/AppTabs.vue'
 import AppButton from '../components/ui/AppButton.vue'
@@ -684,6 +685,7 @@ function renderMd(text: string): string {
               class="contrib-tab__avatar"
               width="80"
               height="80"
+              v-bind="EXTERNAL_IMG_ATTRS"
             />
           </div>
           <div class="contrib-tab__content-col">

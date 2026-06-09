@@ -26,6 +26,7 @@ import CodeQualityPanel from '../components/analysis/CodeQualityPanel.vue'
 import DevOpsPanel from '../components/analysis/DevOpsPanel.vue'
 import DeltaPanel from '../components/analysis/DeltaPanel.vue'
 import LeaderboardsPanel from '../components/analysis/LeaderboardsPanel.vue'
+import CommunityFilesPanel from '../components/analysis/CommunityFilesPanel.vue'
 import StaleBranchesPanel from '../components/analysis/StaleBranchesPanel.vue'
 import SimilarReposPanel from '../components/analysis/SimilarReposPanel.vue'
 import CompareModal from '../components/ui/CompareModal.vue'
@@ -71,9 +72,9 @@ const hasRoadmap = computed(() => (result.value?.structure?.roadmap_parsed?.mile
 const CHAPTER_GROUPS = [
   { label: 'Health',    tabs: ['Overview', 'Heuristics', 'Security', 'Licenses', 'Dependencies'], color: '#f59e0b' },
   { label: 'Codebase',  tabs: ['Architecture', 'Code Quality', 'Project', 'History', 'Ownership'], color: '#6366f1' },
-  { label: 'Community', tabs: ['Contributing', 'Contribution Path', 'Leaderboards', 'DevOps', 'Tours'], color: '#22c55e' },
+  { label: 'Community', tabs: ['Contributing', 'Contribution Path', 'Community Files', 'Leaderboards', 'DevOps', 'Tours'], color: '#22c55e' },
 ]
-const DOCS_ONLY_TABS = new Set(['Overview', 'Project', 'History', 'Ownership', 'Security', 'Contributing'])
+const DOCS_ONLY_TABS = new Set(['Overview', 'Project', 'History', 'Ownership', 'Security', 'Contributing', 'Community Files'])
 const isDocsOnly = computed(() => result.value?.is_docs_only === true)
 
 const scoringMode = computed(
@@ -116,6 +117,11 @@ const tabBadges = computed<Record<string, number | string>>(() => {
 
   const contribCount = r.contribution_opportunities?.length ?? 0
   if (contribCount > 0) badges['Contributing'] = contribCount
+
+  const communityGap = r.structure?.community_health
+    ? Math.max(0, Math.round((r.structure.community_health.potential_score ?? 0) - (r.structure.community_health.score ?? 0)))
+    : 0
+  if (communityGap > 0) badges['Community Files'] = communityGap
 
   const contributorCount = r.commits?.contributor_stats?.length ?? r.commits?.total_contributors ?? 0
   if (contributorCount > 0) badges['Leaderboards'] = contributorCount
@@ -377,6 +383,11 @@ const badgeUrl = computed(() => {
   const { repo_owner: o, repo_name: n } = store.run
   return `${_apiOrigin}/api/v1/repositories/badge/${o}/${n}.svg`
 })
+const badgePreviewUrl = computed(() => {
+  if (!store.run) return ''
+  const { repo_owner: o, repo_name: n } = store.run
+  return `/api/v1/repositories/badge/${o}/${n}.svg`
+})
 
 const _runBranch = computed(() => store.run?.branch || '')
 const embedMarkdown = computed(() => {
@@ -388,6 +399,11 @@ const cardUrl = computed(() => {
   if (!store.run) return ''
   const branch = _runBranch.value ? `&branch=${encodeURIComponent(_runBranch.value)}` : ''
   return `${_apiOrigin}/api/v1/repositories/runs/${store.run.id}/card.svg?theme=${cardTheme.value}${branch}`
+})
+const cardPreviewUrl = computed(() => {
+  if (!store.run) return ''
+  const branch = _runBranch.value ? `&branch=${encodeURIComponent(_runBranch.value)}` : ''
+  return `/api/v1/repositories/runs/${store.run.id}/card.svg?theme=${cardTheme.value}${branch}`
 })
 const cardMarkdown = computed(() => {
   if (!store.run) return ''
@@ -640,12 +656,12 @@ onUnmounted(() => {
             <div class="embed-panel__previews">
               <div class="embed-panel__preview-item">
                 <span class="embed-panel__preview-label">Badge</span>
-                <img :src="badgeUrl" alt="Atlas Insight badge" class="embed-panel__badge-img" loading="lazy" />
+                <img :src="badgePreviewUrl" alt="Atlas Insight badge" class="embed-panel__badge-img" loading="lazy" />
               </div>
               <div class="embed-panel__preview-item embed-panel__preview-item--card">
                 <span class="embed-panel__preview-label">Card</span>
                 <div class="embed-panel__card-bg" :class="{ 'embed-panel__card-bg--light': cardTheme === 'light' }">
-                  <img :src="cardUrl" alt="Atlas Insight health card" class="embed-panel__card-img" loading="lazy" />
+                  <img :src="cardPreviewUrl" alt="Atlas Insight health card" class="embed-panel__card-img" loading="lazy" />
                 </div>
               </div>
             </div>
@@ -766,6 +782,7 @@ onUnmounted(() => {
           :repo-url="store.run?.repo_url"
           :all-files="result.structure?.all_files"
         />
+        <CommunityFilesPanel v-if="activeTab === 'Community Files'" :result="result" />
         <ArchitectureToursPanel v-if="activeTab === 'Tours'" :tours="result.arch_tours ?? []" :repo-url="store.run?.repo_url" :run-id="runId" />
       </div>
       </Transition>

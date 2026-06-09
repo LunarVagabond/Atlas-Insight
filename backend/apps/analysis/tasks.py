@@ -34,6 +34,7 @@ from .project_structure import analyze_structure
 from .project_structure.tech_stack import detect_tech_stack
 from .readme_parser import parse_readme
 from .readme_quality import score_readme_quality
+from .community_files_quality import score_community_files
 from .repo_type import detect_docs_only, detect_repo_type
 from .security_scan import scan_security
 from .test_coverage import analyze_test_coverage
@@ -407,6 +408,9 @@ def analyze_repository(self, run_id: str):
             readme['quality'] = score_readme_quality(
                 readme, structure, scoring_mode=scoring_mode,
             )
+            structure['community_health'] = score_community_files(
+                readme, structure, scoring_mode=scoring_mode,
+            )
 
             run.progress_step = 'finalizing'
             run.save(update_fields=['progress_step'])
@@ -555,6 +559,9 @@ def analyze_repository(self, run_id: str):
             oss_score = compute_oss_score(signals, scoring_mode=scoring_mode)
             oss_score['mode_reason'] = scoring_mode_reason
             readme['quality'] = score_readme_quality(
+                readme, structure, scoring_mode=scoring_mode,
+            )
+            structure['community_health'] = score_community_files(
                 readme, structure, scoring_mode=scoring_mode,
             )
             classification = classify_repo(
@@ -888,7 +895,10 @@ def select_repo_of_week():
     week_start = today - timedelta(days=today.weekday())
 
     if RepoOfTheWeek.objects.filter(week_start=week_start).exists():
-        logger.info('Repo of the Week already selected for week %s', week_start)
+        from apps.repositories.spotlight import sync_spotlight_watches
+
+        sync_spotlight_watches(week_start)
+        logger.info('Repo of the Week already selected for week %s — synced watches', week_start)
         return
 
     eligible_repos = list(
@@ -927,6 +937,15 @@ def select_repo_of_week():
         'Repo of the Week selected: %s/%s (pick #%d)',
         chosen.owner, chosen.name, current_picks + 1,
     )
+
+
+@shared_task
+def sync_spotlight_watches_task():
+    """Daily safety net: ensure only the current spotlight repo has watch_reason=spotlight."""
+    from apps.repositories.spotlight import sync_spotlight_watches
+
+    sync_spotlight_watches()
+    logger.info('Spotlight watch sync complete')
 
 
 @shared_task

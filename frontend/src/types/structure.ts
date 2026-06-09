@@ -24,6 +24,30 @@ export interface CommunityFilesContent {
   changelog: string | null
 }
 
+export interface CommunityHealthRecommendation {
+  id: string
+  file: string
+  status: 'missing' | 'needs_improvement'
+  title: string
+  description: string
+  score_gain: number
+  hints: string[]
+}
+
+export interface CommunityFileHealth {
+  key: string
+  label: string
+  present: boolean
+  score: number
+}
+
+export interface CommunityHealth {
+  score: number
+  potential_score: number
+  files: CommunityFileHealth[]
+  recommendations: CommunityHealthRecommendation[]
+}
+
 export interface StructureData {
   total_files: number
   total_lines: number
@@ -50,6 +74,7 @@ export interface StructureData {
     milestones: RoadmapMilestone[]
   } | null
   community_files_content: CommunityFilesContent
+  community_health?: CommunityHealth
   releases: { name: string; date: string }[]
   release_count: number
   last_release: { name: string; date: string } | null

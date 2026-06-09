@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { marked } from 'marked'
+import { computed } from 'vue'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
 import type { RunResult } from '../../stores/analysis'
@@ -16,44 +15,8 @@ interface DisplayLink {
   badge: string
 }
 
-// Community file modal
-const expandedFile = ref<string | null>(null)
-
-function toggleFile(key: string) {
-  expandedFile.value = key
-}
-
-function closeModal() {
-  expandedFile.value = null
-}
-
-function onModalKey(e: KeyboardEvent) {
-  if (e.key === 'Escape') closeModal()
-}
-
-function fileContent(key: string): string | null {
-  if (key === 'readme') return readme?.content ?? null
-  return structure?.community_files_content?.[key as keyof typeof structure.community_files_content] ?? null
-}
-
-function isMarkdown(key: string): boolean {
-  return key === 'readme'
-}
-
-function renderMarkdown(md: string): string {
-  return marked.parse(md) as string
-}
-
 const description = computed(() =>
   gh?.github_description || readme?.description || null
-)
-
-const readmeQuality = computed(() => readme?.quality ?? null)
-const readmeMissingRecs = computed(
-  () => readmeQuality.value?.recommendations.filter(r => r.status === 'missing') ?? [],
-)
-const readmeImproveRecs = computed(
-  () => readmeQuality.value?.recommendations.filter(r => r.status === 'needs_improvement') ?? [],
 )
 
 const repoAge = computed(() => {
@@ -141,20 +104,6 @@ const langBarColors = [
 function langColor(idx: number): string {
   return langBarColors[idx % langBarColors.length]
 }
-
-const communityFiles = computed(() => [
-  { key: 'readme', label: 'README', present: readme?.found ?? false, icon: '📄' },
-  {
-    key: 'license',
-    label: structure?.license_type ? `License (${structure.license_type})` : 'License',
-    present: !!structure?.license_file,
-    icon: '⚖️',
-  },
-  { key: 'contributing', label: 'Contributing Guide', present: !!structure?.has_contributing, icon: '🤝' },
-  { key: 'changelog', label: 'Changelog', present: !!structure?.has_changelog, icon: '📋' },
-  { key: 'coc', label: 'Code of Conduct', present: !!structure?.has_coc, icon: '🌐' },
-  { key: 'security', label: 'Security Policy', present: !!structure?.has_security_policy, icon: '🔒' },
-])
 
 function isDocsLikeUrl(url: string): boolean {
   const low = url.toLowerCase()
@@ -403,27 +352,14 @@ const interactionLinks = computed<DisplayLink[]>(() => {
           </AppCard>
         </section>
 
-        <!-- Community Health -->
+        <!-- Community Health — see Community Files tab -->
         <section class="project-panel__section">
           <h2 class="panel__title">Community Health Files</h2>
           <AppCard>
-            <div class="health-grid">
-              <div
-                v-for="item in communityFiles"
-                :key="item.label"
-                :class="[
-                  'health-item',
-                  item.present ? 'health-item--present' : 'health-item--missing',
-                  item.present && item.key && fileContent(item.key) ? 'health-item--clickable' : '',
-                ]"
-                @click="item.present && item.key && fileContent(item.key) ? toggleFile(item.key) : undefined"
-              >
-                <span class="health-item__check">{{ item.present ? '✓' : '✗' }}</span>
-                <span class="health-item__icon">{{ item.icon }}</span>
-                <span class="health-item__label">{{ item.label }}</span>
-                <span v-if="item.present && item.key && fileContent(item.key)" class="health-item__expand">↗</span>
-              </div>
-            </div>
+            <p class="project-empty__text" style="margin:0">
+              README quality scores and community file health live on the
+              <strong>Community Files</strong> tab.
+            </p>
           </AppCard>
         </section>
 
@@ -431,39 +367,6 @@ const interactionLinks = computed<DisplayLink[]>(() => {
 
       <!-- ── Right column: data / metric sections ── -->
       <div class="project-panel__col">
-
-        <!-- README quality -->
-        <section v-if="readmeQuality" class="project-panel__section">
-          <h2 class="panel__title">README Quality</h2>
-          <div class="readme-quality">
-            <div class="readme-quality__score-row">
-              <div class="readme-quality__score">{{ readmeQuality.score }}<span class="readme-quality__denom">/100</span></div>
-              <div v-if="readmeQuality.potential_score > readmeQuality.score" class="readme-quality__potential">
-                Up to {{ readmeQuality.potential_score }} if recommendations are applied
-              </div>
-            </div>
-            <div v-if="readmeMissingRecs.length" class="readme-quality__group">
-              <h3 class="readme-quality__group-title">Missing</h3>
-              <ul class="readme-quality__list">
-                <li v-for="rec in readmeMissingRecs" :key="rec.id" class="readme-quality__item">
-                  <span class="readme-quality__item-title">{{ rec.title }}</span>
-                  <span class="readme-quality__gain">+{{ rec.score_gain }}</span>
-                  <p class="readme-quality__item-desc">{{ rec.description }}</p>
-                </li>
-              </ul>
-            </div>
-            <div v-if="readmeImproveRecs.length" class="readme-quality__group">
-              <h3 class="readme-quality__group-title">Needs improvement</h3>
-              <ul class="readme-quality__list">
-                <li v-for="rec in readmeImproveRecs" :key="rec.id" class="readme-quality__item">
-                  <span class="readme-quality__item-title">{{ rec.title }}</span>
-                  <span class="readme-quality__gain">+{{ rec.score_gain }}</span>
-                  <p class="readme-quality__item-desc">{{ rec.description }}</p>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </section>
 
         <!-- Repository Assessment -->
         <section v-if="cls" class="project-panel__section">
@@ -604,29 +507,4 @@ const interactionLinks = computed<DisplayLink[]>(() => {
       </div>
     </div>
   </div>
-
-  <!-- Community file modal -->
-  <Teleport to="body">
-    <Transition name="file-modal">
-      <div v-if="expandedFile && fileContent(expandedFile)" class="file-modal" @keydown="onModalKey" @click.self="closeModal">
-        <div class="file-modal__panel" role="dialog" aria-modal="true">
-          <div class="file-modal__header">
-            <span class="file-modal__title">
-              {{ communityFiles.find(f => f.key === expandedFile)?.icon }}
-              {{ communityFiles.find(f => f.key === expandedFile)?.label }}
-            </span>
-            <button class="file-modal__close" @click="closeModal" aria-label="Close">✕</button>
-          </div>
-          <div class="file-modal__body">
-            <div
-              v-if="isMarkdown(expandedFile)"
-              class="file-viewer__markdown"
-              v-html="renderMarkdown(fileContent(expandedFile)!)"
-            />
-            <pre v-else class="file-viewer__content">{{ fileContent(expandedFile) }}</pre>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
 </template>

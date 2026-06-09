@@ -223,6 +223,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.analysis.tasks.reanalyze_watched_repos',
         'schedule': crontab(minute=0, hour=4),  # daily at 04:00 UTC
     },
+    'sync-spotlight-watches': {
+        'task': 'apps.analysis.tasks.sync_spotlight_watches_task',
+        'schedule': crontab(minute=30, hour=4),  # daily at 04:30 UTC
+    },
 }
 
 RUNS_TO_KEEP_PER_REPO = config('RUNS_TO_KEEP_PER_REPO', default=10, cast=int)

@@ -2493,6 +2493,13 @@
     flex-shrink: 0;
     opacity: 0.7;
   }
+
+  &__score {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    flex-shrink: 0;
+  }
 }
 
 .file-viewer {
@@ -8048,6 +8055,25 @@
   }
 }
 
+// ===== COMMUNITY FILES PANEL =====
+.community-files-panel {
+  &__mode-note {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    margin: 0 0 $space-5;
+  }
+
+  &__section {
+    margin-bottom: $space-6;
+  }
+
+  &__heading {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 $space-3;
+  }
+}
+
 // ===== CONTRIBUTOR LEADERBOARD =====
 .leaderboards-panel {
   .contributor-graph {
@@ -8068,6 +8094,10 @@
     font-size: 0.75rem;
     color: var(--color-text-muted);
     margin: $space-1 0 0;
+
+    &--cta {
+      color: var(--color-accent);
+    }
   }
 
   &__empty {

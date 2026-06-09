@@ -4,6 +4,7 @@ import type { CommitData, GitHubContributor } from '../../stores/analysis'
 import type { ContributorStat } from '../../types/commits'
 import type { FilterSelection } from './TimelineFilter.vue'
 import { commitInDayFilter, isFilterActive, monthInFilter } from '../../composables/timelineFilterUtils'
+import { EXTERNAL_IMG_ATTRS } from '../../utils/externalImage'
 
 type LeaderboardMetric = 'commits' | 'lines' | 'net'
 
@@ -135,6 +136,16 @@ const showLineStats = computed(() =>
   (props.commits.contributor_stats?.length ?? 0) > 0 && props.selection.days.size === 0,
 )
 
+const lineStatsDisabledReason = computed(() => {
+  if (props.selection.days.size > 0) {
+    return 'Line stats are available for month/year filters only, not day-level filters.'
+  }
+  if (!props.commits.contributor_stats?.length) {
+    return 'Re-run analysis on this repository to load line add/delete stats.'
+  }
+  return ''
+})
+
 const hasData = computed(() => rows.value.length > 0)
 
 const needsReanalysis = computed(() =>
@@ -157,8 +168,8 @@ function formatNum(n: number): string {
           All contributors in the last 2 years
           <span v-if="isFilterActive(selection)" class="contributor-leaderboard__filter-note">(filtered)</span>
         </p>
-        <p v-if="needsReanalysis" class="contributor-leaderboard__hint">
-          Re-run analysis to load line add/delete stats.
+        <p v-if="needsReanalysis" class="contributor-leaderboard__hint contributor-leaderboard__hint--cta">
+          Line add/delete stats require a fresh analysis. Re-submit the repository URL to refresh this run.
         </p>
       </div>
       <div v-if="hasData" class="contributor-leaderboard__metrics" role="group" aria-label="Sort metric">
@@ -171,12 +182,14 @@ function formatNum(n: number): string {
           type="button"
           :class="['contributor-leaderboard__metric', metric === 'lines' && 'contributor-leaderboard__metric--active']"
           :disabled="!showLineStats"
+          :title="!showLineStats ? lineStatsDisabledReason : undefined"
           @click="metric = 'lines'"
         >Lines changed</button>
         <button
           type="button"
           :class="['contributor-leaderboard__metric', metric === 'net' && 'contributor-leaderboard__metric--active']"
           :disabled="!showLineStats"
+          :title="!showLineStats ? lineStatsDisabledReason : undefined"
           @click="metric = 'net'"
         >Net lines</button>
       </div>
@@ -210,6 +223,7 @@ function formatNum(n: number): string {
                   :alt="row.author"
                   class="contributor-leaderboard__avatar"
                   :style="{ borderColor: row.color }"
+                  v-bind="EXTERNAL_IMG_ATTRS"
                 />
                 <span
                   v-else

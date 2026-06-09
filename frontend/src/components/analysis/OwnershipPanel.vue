@@ -4,6 +4,7 @@ import type { GitHubContributor, OwnershipData, OwnershipSubsystem } from '../..
 import type { JitIssue } from '../../types/jit'
 import FileHistoryDrawer from './FileHistoryDrawer.vue'
 import PrImpactCard from './PrImpactCard.vue'
+import { EXTERNAL_IMG_ATTRS } from '../../utils/externalImage'
 
 const props = defineProps<{
   ownership: OwnershipData
@@ -102,7 +103,12 @@ function toggleHint(e: Event, key: string) {
         class="ownership-contributor ownership-contributor--link"
         :title="`View ${c.login}'s GitHub profile`"
       >
-        <img :src="c.avatar_url" :alt="c.login" class="ownership-contributor__avatar" />
+        <img
+          :src="c.avatar_url"
+          :alt="c.login"
+          class="ownership-contributor__avatar"
+          v-bind="EXTERNAL_IMG_ATTRS"
+        />
         <div class="ownership-contributor__info">
           <span class="ownership-contributor__name">{{ c.login }}</span>
           <span class="ownership-contributor__files">{{ c.contributions.toLocaleString() }} commits</span>

@@ -2,11 +2,14 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
+import { useFeatureFlagsStore } from './stores/featureFlags'
+import { EXTERNAL_IMG_ATTRS } from './utils/externalImage'
 import ShortcutsModal from './components/ui/ShortcutsModal.vue'
 import ToastContainer from './components/ui/ToastContainer.vue'
 import logoUrl from './assets/logo.png'
 
 const authStore = useAuthStore()
+const featureFlags = useFeatureFlagsStore()
 const router = useRouter()
 
 const appVersion = __APP_VERSION__
@@ -50,6 +53,7 @@ onMounted(async () => {
   isDark.value = saved === 'dark'
   applyTheme(isDark.value)
   await authStore.fetchMe()
+  await featureFlags.fetchFlags()
   // Strip the ?login=success param allauth adds after OAuth redirect
   if (window.location.search.includes('login=success')) {
     router.replace({ query: {} })
@@ -87,8 +91,8 @@ function onDocClick() {
       <!-- Desktop nav links -->
       <div class="navbar__nav-links">
         <RouterLink to="/runs" class="navbar__nav-link">Browse</RouterLink>
-        <RouterLink to="/spotlight" class="navbar__nav-link">Spotlight</RouterLink>
-        <RouterLink to="/trending" class="navbar__nav-link">Trending</RouterLink>
+        <RouterLink v-if="featureFlags.spotlight" to="/spotlight" class="navbar__nav-link">Spotlight</RouterLink>
+        <RouterLink v-if="featureFlags.trending" to="/trending" class="navbar__nav-link">Trending</RouterLink>
         <RouterLink v-if="authStore.isAuthenticated" to="/dashboard" class="navbar__nav-link">My Analyses</RouterLink>
         <div class="navbar__more" @click.stop="moreOpen = !moreOpen">
           <button class="navbar__nav-link navbar__more-btn" :class="{ 'navbar__more-btn--open': moreOpen }">
@@ -136,6 +140,7 @@ function onDocClick() {
             :src="authStore.user.avatar_url"
             :alt="authStore.displayName"
             class="navbar__avatar"
+            v-bind="EXTERNAL_IMG_ATTRS"
           />
           <span class="navbar__username">{{ authStore.displayName }}</span>
           <span class="navbar__chevron">▾</span>
@@ -168,8 +173,8 @@ function onDocClick() {
         <button class="mobile-nav-overlay__close" @click="closeMobileNav" aria-label="Close navigation">✕</button>
         <nav class="mobile-nav-overlay__links">
           <RouterLink to="/runs" class="mobile-nav-overlay__link" @click="closeMobileNav">Browse</RouterLink>
-          <RouterLink to="/spotlight" class="mobile-nav-overlay__link" @click="closeMobileNav">Spotlight</RouterLink>
-          <RouterLink to="/trending" class="mobile-nav-overlay__link" @click="closeMobileNav">Trending</RouterLink>
+          <RouterLink v-if="featureFlags.spotlight" to="/spotlight" class="mobile-nav-overlay__link" @click="closeMobileNav">Spotlight</RouterLink>
+          <RouterLink v-if="featureFlags.trending" to="/trending" class="mobile-nav-overlay__link" @click="closeMobileNav">Trending</RouterLink>
           <RouterLink v-if="authStore.isAuthenticated" to="/dashboard" class="mobile-nav-overlay__link" @click="closeMobileNav">My Analyses</RouterLink>
           <RouterLink to="/learn" class="mobile-nav-overlay__link" @click="closeMobileNav">Learn</RouterLink>
           <RouterLink to="/resources" class="mobile-nav-overlay__link" @click="closeMobileNav">Resources</RouterLink>

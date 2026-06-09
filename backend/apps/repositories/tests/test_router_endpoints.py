@@ -300,6 +300,32 @@ class TestFileHistory:
 
 
 # ---------------------------------------------------------------------------
+# features
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class TestFeatures:
+    def test_features_endpoint_defaults(self):
+        from apps.repositories.models import FeatureFlag
+
+        FeatureFlag.objects.get_or_create(name='spotlight', defaults={'enabled': True})
+        FeatureFlag.objects.get_or_create(name='trending', defaults={'enabled': True})
+        resp = Client().get('/api/v1/repositories/features')
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data['spotlight'] is True
+        assert data['trending'] is True
+
+    def test_trending_disabled_returns_empty(self, completed_run):
+        from apps.repositories.models import FeatureFlag
+
+        FeatureFlag.objects.update_or_create(name='trending', defaults={'enabled': False})
+        resp = Client().get('/api/v1/repositories/trending')
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+
+# ---------------------------------------------------------------------------
 # trending
 # ---------------------------------------------------------------------------
 

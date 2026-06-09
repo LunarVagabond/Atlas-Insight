@@ -11,12 +11,17 @@ const runId = route.params.runId as string
 const run = ref<AnalysisRun | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
+let previousTitle = ''
 
 onMounted(async () => {
   document.documentElement.setAttribute('data-layout', 'print')
+  previousTitle = document.title
   try {
     const { data } = await axios.get(`/api/v1/repositories/runs/${runId}`)
     run.value = data
+    if (data?.repo_owner && data?.repo_name) {
+      document.title = `${data.repo_owner}/${data.repo_name} — Atlas Insight`
+    }
   } catch {
     error.value = 'Failed to load analysis data.'
   } finally {
@@ -26,6 +31,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.documentElement.removeAttribute('data-layout')
+  if (previousTitle) document.title = previousTitle
 })
 
 const result = computed<RunResult | null>(() => {
@@ -214,6 +220,7 @@ function exportCvesCsv() {
           <button class="print-controls__btn print-controls__btn--primary" @click="triggerPrint">
             ⎙ Print / Save PDF
           </button>
+          <span class="print-controls__hint">Turn off “Headers and footers” in the print dialog for a clean PDF.</span>
           <button class="print-controls__btn" @click="triggerClose">✕</button>
         </div>
       </div>

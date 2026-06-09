@@ -17,6 +17,11 @@ def _assert_not_limited(request):
         raise HttpError(429, 'Rate limit exceeded. Please try again later.')
 
 
+def _flag_enabled(name: str) -> bool:
+    from apps.utils.flags import flag_enabled
+    return flag_enabled(name)
+
+
 _BADGE_COLORS = {
     'thriving': '#4c1',
     'active': '#97ca00',
@@ -31,6 +36,13 @@ _BADGE_COLORS = {
 }
 
 _BADGE_NOT_ANALYZED = '#9f9f9f'
+
+
+def _public_svg_response(svg: str, *, max_age: int = 300) -> HttpResponse:
+    resp = HttpResponse(svg, content_type='image/svg+xml')
+    resp['Cache-Control'] = f'public, max-age={max_age}, stale-while-revalidate={max_age * 12}'
+    resp['Cross-Origin-Resource-Policy'] = 'cross-origin'
+    return resp
 
 
 def _svg_escape(text: str) -> str:
@@ -235,9 +247,7 @@ def run_card(request, run_id: uuid.UUID, theme: str = 'dark'):
         theme=card_theme,
         branch=run.branch or '',
     )
-    resp = HttpResponse(svg, content_type='image/svg+xml')
-    resp['Cache-Control'] = 'public, max-age=300, stale-while-revalidate=3600'
-    return resp
+    return _public_svg_response(svg)
 
 
 @router.get('/badge/{owner}/{name}.svg')
@@ -249,14 +259,14 @@ def repo_badge(request, owner: str, name: str):
         repo = Repository.objects.get(owner__iexact=owner, name__iexact=name)
     except Repository.DoesNotExist:
         svg = _make_svg('atlas insight', 'not found', _BADGE_NOT_ANALYZED)
-        return HttpResponse(svg, content_type='image/svg+xml', status=404)
+        resp = _public_svg_response(svg, max_age=300)
+        resp.status_code = 404
+        return resp
 
     run = repo.runs.filter(status='completed', branch='').order_by('-triggered_at').first()
     if not run or not run.result:
         svg = _make_svg('atlas insight', 'not analyzed', _BADGE_NOT_ANALYZED)
-        resp = HttpResponse(svg, content_type='image/svg+xml')
-        resp['Cache-Control'] = 'max-age=300'
-        return resp
+        return _public_svg_response(svg, max_age=300)
 
     cls = run.result.get('classification', {})
     health = cls.get('project_health', {})
@@ -265,9 +275,7 @@ def repo_badge(request, owner: str, name: str):
     color = _BADGE_COLORS.get(health.get('key', ''), '#555')
 
     svg = _make_svg(label, value, color)
-    resp = HttpResponse(svg, content_type='image/svg+xml')
-    resp['Cache-Control'] = 'public, max-age=300, stale-while-revalidate=3600'
-    return resp
+    return _public_svg_response(svg)
 
 
 @router.get('/my-repos', response=list[MyRepoSchema])
@@ -349,10 +357,25 @@ def get_featured(request):
     )
 
 
+class FeaturesSchema(Schema):
+    spotlight: bool
+    trending: bool
+
+
+@router.get('/features', response=FeaturesSchema)
+def get_features(request):
+    return FeaturesSchema(
+        spotlight=_flag_enabled('spotlight'),
+        trending=_flag_enabled('trending'),
+    )
+
+
 @router.get('/trending', response=list[TrendingRepoSchema])
 @ratelimit(key='user_or_ip', rate='60/h', method='GET', block=False)
 def trending(request):
     _assert_not_limited(request)
+    if not _flag_enabled('trending'):
+        return []
     from datetime import timedelta
     from django.db.models import Count
     from django.utils import timezone
@@ -394,6 +417,8 @@ def trending(request):
 
 @router.get('/spotlight/current', response={200: Optional[SpotlightSchema]})
 def get_spotlight_current(request):
+    if not _flag_enabled('spotlight'):
+        return 200, None
     from datetime import date, timedelta
     today = date.today()
     week_start = today - timedelta(days=today.weekday())
@@ -409,6 +434,8 @@ def get_spotlight_current(request):
 
 @router.get('/spotlight/history', response=SpotlightHistorySchema)
 def get_spotlight_history(request, page: int = 1, per_page: int = 20):
+    if not _flag_enabled('spotlight'):
+        return SpotlightHistorySchema(items=[], total=0, page=page, per_page=per_page)
     per_page = min(per_page, 20)
     qs = RepoOfTheWeek.objects.select_related('repo').order_by('-week_start')
     total = qs.count()

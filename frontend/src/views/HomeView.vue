@@ -11,6 +11,7 @@ import CompareModal from '../components/ui/CompareModal.vue'
 import { useAnalysisStore } from '../stores/analysis'
 import type { RunListItem } from '../stores/analysis'
 import { useAuthStore } from '../stores/auth'
+import { useFeatureFlagsStore } from '../stores/featureFlags'
 import logoUrl from '../assets/logo.png'
 import LanguageList from '../components/ui/LanguageList.vue'
 import { SUPPORTED_LANGUAGES } from '../data/languages'
@@ -19,6 +20,7 @@ const router = useRouter()
 const route = useRoute()
 const store = useAnalysisStore()
 const auth = useAuthStore()
+const featureFlags = useFeatureFlagsStore()
 
 const GITHUB_RE = /^https?:\/\/github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+\/?$/
 const initialUrl = ref('')
@@ -26,6 +28,10 @@ const initialUrl = ref('')
 const spotlight = ref<any>(null)
 
 async function fetchSpotlight() {
+  if (!featureFlags.spotlight) {
+    spotlight.value = null
+    return
+  }
   try {
     const { data } = await axios.get('/api/v1/repositories/spotlight/current')
     spotlight.value = data
@@ -194,7 +200,7 @@ function langIconUrl(name: string | null): string | null {
       </p>
     </main>
 
-    <div v-if="spotlight" class="home-discovery">
+    <div v-if="spotlight && featureFlags.spotlight" class="home-discovery">
       <RepoOfWeekCard :spotlight="spotlight" />
     </div>
 

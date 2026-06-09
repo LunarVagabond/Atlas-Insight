@@ -196,6 +196,7 @@ class TestSelectRepoOfWeek:
         select_repo_of_week()
         public_repo.refresh_from_db()
         assert public_repo.is_watched is True
+        assert public_repo.watch_reason == 'spotlight'
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
     def test_unwatches_previous_week_spotlight(self, public_repo, completed_run_for_repo, db):
@@ -209,6 +210,7 @@ class TestSelectRepoOfWeek:
             owner='other',
             name='prev',
             is_watched=True,
+            watch_reason='spotlight',
         )
         AnalysisRun.objects.create(repo=other, status='completed')
         today = date.today()
@@ -232,6 +234,7 @@ class TestSelectRepoOfWeek:
             owner='manual',
             name='other',
             is_watched=True,
+            watch_reason='manual',
         )
 
         select_repo_of_week()
