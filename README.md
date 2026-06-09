@@ -226,11 +226,11 @@ Contributions, bug reports, feature requests, and architectural discussions are 
 
 If you're looking for a place to start, Atlas Insight surfaces contributor-friendly opportunities directly through its repository analysis workflow.
 
-Please review:
+Please review: 
 
-* CONTRIBUTING.md
-* SECURITY.md
-* CODE_OF_CONDUCT.md
+* [CONTRIBUTING.md](CONTRIBUTING.md)
+* [SECURITY.md](SECURITY.md)
+* [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) 
 
 before submitting pull requests.
 
