@@ -369,6 +369,21 @@ class TestRetryPrivateRepo:
         resp = c.post(f'/api/v1/repositories/runs/{run.id}/retry')
         assert resp.status_code == 403
 
+    @patch('apps.repositories.router_runs.analyze_repository')
+    @patch('apps.repositories.router_runs._user_can_access_repo', return_value=True)
+    def test_private_repo_collaborator_can_retry(self, _access, mock_task, db):
+        mock_task.delay.return_value = MagicMock(id='collab-retry')
+        owner = User.objects.create_user(username='retry_own3', password='pass')
+        collab = User.objects.create_user(username='retry_col3', password='pass')
+        repo = Repository.objects.create(
+            url='https://github.com/priv/retry3', owner='priv', name='retry3', is_private=True
+        )
+        run = AnalysisRun.objects.create(repo=repo, status='completed', user=owner)
+        c = Client()
+        c.force_login(collab)
+        resp = c.post(f'/api/v1/repositories/runs/{run.id}/retry')
+        assert resp.status_code == 200
+
 
 # ---------------------------------------------------------------------------
 # _resolve_token: social token paths

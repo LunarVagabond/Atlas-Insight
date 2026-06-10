@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import AppTabs from '../ui/AppTabs.vue'
 import ProjectPanel from './ProjectPanel.vue'
 import CommitTimelineChart from './CommitTimelineChart.vue'
-import RoadmapTimeline from './RoadmapTimeline.vue'
 import StaleBranchesPanel from './StaleBranchesPanel.vue'
 import type { RunResult } from '../../stores/analysis'
 import type { CommitData } from '../../types/commits'
@@ -11,7 +9,7 @@ import type { GitHubContributor } from '../../stores/analysis'
 
 const SECTIONS = ['Profile', 'Activity', 'Branches'] as const
 
-const props = defineProps<{
+defineProps<{
   result: RunResult
   section: string
   repoUrl?: string
@@ -20,16 +18,12 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ 'update:section': [section: string] }>()
-
-const hasRoadmap = computed(
-  () => (props.result.structure?.roadmap_parsed?.milestones?.length ?? 0) > 0,
-)
 </script>
 
 <template>
   <div class="panel">
     <h2 class="panel__title">Repository</h2>
-    <p class="panel__subtitle">Project metadata, commit activity, and branch hygiene.</p>
+    <p class="panel__subtitle">Project metadata, commit activity, and branch hygiene. See the Roadmap tab when a roadmap file is present.</p>
 
     <div class="panel__sub-tabs">
       <AppTabs
@@ -52,12 +46,6 @@ const hasRoadmap = computed(
         embedded
       />
       <p v-else class="empty-state">No commit data available.</p>
-      <div v-if="hasRoadmap && result.structure?.roadmap_parsed" class="panel panel--nested">
-        <RoadmapTimeline
-          :milestones="result.structure.roadmap_parsed.milestones"
-          :roadmap-file="result.structure.roadmap_file ?? 'ROADMAP.md'"
-        />
-      </div>
     </template>
 
     <template v-else-if="section === 'Branches'">

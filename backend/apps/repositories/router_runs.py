@@ -608,8 +608,11 @@ def retry_run(request, run_id: uuid.UUID):
     except AnalysisRun.DoesNotExist:
         raise HttpError(404, 'Run not found')
     if original.repo.is_private:
-        if not request.user.is_authenticated or original.user != request.user:
+        if not request.user.is_authenticated:
             raise HttpError(403, 'Access denied')
+        if original.user != request.user:
+            if not _user_can_access_repo(request.user, original.repo.owner, original.repo.name):
+                raise HttpError(403, 'Access denied')
     is_super = request.user.is_authenticated and request.user.is_superuser
     if not is_super:
         cooldown = _cooldown_until(original.repo, branch=original.branch or '')

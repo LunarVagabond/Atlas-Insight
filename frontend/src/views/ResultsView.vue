@@ -13,6 +13,7 @@ import ArchitecturePanel from '../components/analysis/ArchitecturePanel.vue'
 import DependenciesPanel from '../components/analysis/DependenciesPanel.vue'
 import HeuristicsPanel from '../components/analysis/HeuristicsPanel.vue'
 import RepositoryPanel from '../components/analysis/RepositoryPanel.vue'
+import RoadmapPanel from '../components/analysis/RoadmapPanel.vue'
 import ToursPanel from '../components/analysis/ToursPanel.vue'
 import ContributingPanel from '../components/analysis/ContributingPanel.vue'
 import SecurityPanel from '../components/analysis/SecurityPanel.vue'
@@ -69,6 +70,10 @@ const currentStepLabel = computed(() => {
 
 const isDocsOnly = computed(() => result.value?.is_docs_only === true)
 
+const hasRoadmap = computed(
+  () => (result.value?.structure?.roadmap_parsed?.milestones?.length ?? 0) > 0,
+)
+
 const scoringMode = computed(
   () => result.value?.scoring_mode ?? result.value?.oss_score?.mode ?? null,
 )
@@ -90,7 +95,10 @@ const scoringModeTooltip = computed(() => {
 const GROUPS = computed(() =>
   CHAPTER_GROUPS
     .map(g => {
-      const allTabs = [...g.tabs]
+      let allTabs = [...g.tabs]
+      if (!hasRoadmap.value) {
+        allTabs = allTabs.filter(t => t !== 'Roadmap')
+      }
       return {
         label: g.label,
         color: g.color,
@@ -132,6 +140,9 @@ const tabBadges = computed<Record<string, number | string>>(() => {
 
   const complexityHotspots = r.complexity?.files_over_threshold ?? 0
   if (complexityHotspots > 0) badges['Code Quality'] = complexityHotspots
+
+  const roadmapMilestones = r.structure?.roadmap_parsed?.milestones?.length ?? 0
+  if (roadmapMilestones > 0) badges['Roadmap'] = roadmapMilestones
 
   const containerIssues = r.containers?.total_issues ?? 0
   const terraformIssues = r.tools?.terraform?.security_issues?.length ?? 0
@@ -674,6 +685,11 @@ onUnmounted(() => {
           :commits="result.commits"
           :github-contributors="result.github_meta?.contributors"
           @update:section="activeSection = $event"
+        />
+        <RoadmapPanel
+          v-if="activeTab === 'Roadmap'"
+          :result="result"
+          :repo-url="store.run?.repo_url"
         />
         <template v-if="activeTab === 'Leaderboards'">
           <LeaderboardsPanel

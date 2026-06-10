@@ -8,7 +8,7 @@ import {
 
 const TABS = [
   'Overview', 'Heuristics', 'Security', 'Licenses', 'Dependencies',
-  'Architecture', 'Code Quality', 'Repository', 'Ownership',
+  'Architecture', 'Code Quality', 'Repository', 'Roadmap', 'Ownership',
   'Contributing', 'Tours', 'Community Files', 'Leaderboards', 'DevOps',
 ]
 

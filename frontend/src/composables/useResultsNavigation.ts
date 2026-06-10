@@ -3,12 +3,12 @@ import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 
 export const CHAPTER_GROUPS = [
   { label: 'Health', tabs: ['Overview', 'Heuristics', 'Security', 'Licenses', 'Dependencies'], color: '#f59e0b' },
-  { label: 'Codebase', tabs: ['Architecture', 'Code Quality', 'Repository', 'Ownership'], color: '#6366f1' },
+  { label: 'Codebase', tabs: ['Architecture', 'Code Quality', 'Repository', 'Roadmap', 'Ownership'], color: '#6366f1' },
   { label: 'Community', tabs: ['Contributing', 'Tours', 'Community Files', 'Leaderboards', 'DevOps'], color: '#22c55e' },
 ] as const
 
 export const DOCS_ONLY_TABS: Set<string> = new Set([
-  'Overview', 'Repository', 'Ownership', 'Security', 'Contributing', 'Community Files',
+  'Overview', 'Repository', 'Roadmap', 'Ownership', 'Security', 'Contributing', 'Community Files',
 ])
 
 export const TAB_SECTIONS: Record<string, readonly string[] | null> = {

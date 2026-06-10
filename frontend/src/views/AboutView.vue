@@ -498,7 +498,8 @@ function renderMd(text: string): string {
           <li><strong>Dependencies</strong> — all declared dependencies, Docker base image warnings, missing lockfiles.</li>
           <li><strong>Architecture</strong> — import graph, god modules, circular dependencies, hot files.</li>
           <li><strong>Code Quality</strong> — file complexity hotspots (LOC distribution), unreferenced files, per-directory test coverage mapping.</li>
-          <li><strong>Repository</strong> — project profile, commit activity & roadmap, and stale branch hygiene (sub-tabs: Profile, Activity, Branches).</li>
+          <li><strong>Repository</strong> — project profile, commit activity, and stale branch hygiene (sub-tabs: Profile, Activity, Branches).</li>
+          <li><strong>Roadmap</strong> — parsed milestones from <code>ROADMAP.md</code> (or similar) with progress, dates, and checklist items (shown when a roadmap file exists).</li>
           <li><strong>Ownership</strong> — file ownership map, bus factor, subsystem breakdown, and <strong>PR Impact Preview</strong>.</li>
           <li><strong>Community → Contributing</strong> — actionable contribution opportunities with difficulty ratings.</li>
           <li><strong>Community → Community Files</strong> — README quality score, community file health, per-file breakdown.</li>
