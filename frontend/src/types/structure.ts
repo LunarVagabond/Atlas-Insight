@@ -1,11 +1,13 @@
 export interface RoadmapMilestone {
   title: string
   date: string | null
-  status: 'done' | 'in-progress' | 'planned'
+  kind: 'milestone' | 'informational'
+  status: 'done' | 'in-progress' | 'planned' | 'informational'
   done_count: number
   todo_count: number
   done_items: string[]
   todo_items: string[]
+  notes: string[]
 }
 
 export interface LanguageInfo {

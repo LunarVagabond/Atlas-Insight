@@ -4114,6 +4114,11 @@
     box-shadow: 0 0 0 1px var(--color-accent);
   }
 
+  &--informational .roadmap-card__body {
+    background: var(--color-surface);
+    border-style: dashed;
+  }
+
   &__rail {
     display: flex;
     flex-direction: column;
@@ -4228,6 +4233,11 @@
         font-weight: 700;
       }
     }
+
+    &--notes li::before {
+      content: 'ℹ';
+      font-size: 0.75rem;
+    }
   }
 
   &__empty {
@@ -4287,6 +4297,14 @@
     &--todo {
       color: var(--color-text);
     }
+
+    &--note {
+      color: var(--color-text-secondary);
+    }
+  }
+
+  &__list--notes {
+    gap: $space-2;
   }
 
   &__check {

@@ -13,11 +13,17 @@ function onKey(e: KeyboardEvent) { if (e.key === 'Escape') close() }
 onMounted(() => window.addEventListener('keydown', onKey))
 onUnmounted(() => window.removeEventListener('keydown', onKey))
 
+function isInformational(m: RoadmapMilestone): boolean {
+  return m.kind === 'informational' || m.status === 'informational'
+}
+
 function statusColor(s: RoadmapMilestone['status']): string {
+  if (s === 'informational') return 'var(--color-accent)'
   return s === 'done' ? 'var(--color-success)' : s === 'in-progress' ? 'var(--color-warning)' : 'var(--color-text-muted)'
 }
 
 function statusLabel(s: RoadmapMilestone['status']): string {
+  if (s === 'informational') return 'Info'
   if (s === 'done') return 'Complete'
   if (s === 'in-progress') return 'In progress'
   return 'Planned'
@@ -29,13 +35,15 @@ function progressPct(m: RoadmapMilestone): number {
   return Math.round((m.done_count / total) * 100)
 }
 
+const trackableMilestones = computed(() => props.milestones.filter(m => !isInformational(m)))
+
 const summary = computed(() => {
   let done = 0
   let inProgress = 0
   let planned = 0
   let itemsDone = 0
   let itemsTodo = 0
-  for (const m of props.milestones) {
+  for (const m of trackableMilestones.value) {
     if (m.status === 'done') done++
     else if (m.status === 'in-progress') inProgress++
     else planned++
@@ -48,6 +56,7 @@ const summary = computed(() => {
 })
 
 function previewItems(m: RoadmapMilestone): string[] {
+  if (isInformational(m)) return (m.notes ?? []).slice(0, 3)
   const open = m.status === 'done' ? m.done_items.slice(-2) : m.todo_items.slice(0, 3)
   return open
 }
@@ -63,7 +72,7 @@ function previewItems(m: RoadmapMilestone): string[] {
           <div class="roadmap__progress-fill" :style="{ width: `${summary.overallPct}%` }" />
         </div>
         <div class="roadmap__summary-meta">
-          {{ summary.itemsDone }} done · {{ summary.itemsTodo }} remaining across {{ milestones.length }} milestones
+          {{ summary.itemsDone }} done · {{ summary.itemsTodo }} remaining across {{ trackableMilestones.length }} milestones
         </div>
       </div>
       <div class="roadmap__stats">
@@ -88,7 +97,11 @@ function previewItems(m: RoadmapMilestone): string[] {
       <li
         v-for="(m, i) in milestones"
         :key="i"
-        :class="['roadmap-card', `roadmap-card--${m.status}`, active?.title === m.title && 'roadmap-card--open']"
+        :class="[
+          'roadmap-card',
+          isInformational(m) ? 'roadmap-card--informational' : `roadmap-card--${m.status}`,
+          active?.title === m.title && 'roadmap-card--open',
+        ]"
         @click="open(m)"
       >
         <div class="roadmap-card__rail">
@@ -101,16 +114,16 @@ function previewItems(m: RoadmapMilestone): string[] {
             <span v-if="m.date" class="roadmap-card__date">{{ m.date }}</span>
           </div>
           <h3 class="roadmap-card__title">{{ m.title }}</h3>
-          <div class="roadmap-card__progress-row">
+          <div v-if="!isInformational(m)" class="roadmap-card__progress-row">
             <div class="roadmap-card__progress">
               <div class="roadmap-card__progress-fill" :style="{ width: `${progressPct(m)}%`, background: statusColor(m.status) }" />
             </div>
             <span class="roadmap-card__counts">{{ m.done_count }} / {{ m.done_count + m.todo_count || '—' }}</span>
           </div>
-          <ul v-if="previewItems(m).length" class="roadmap-card__preview">
+          <ul v-if="previewItems(m).length" :class="['roadmap-card__preview', isInformational(m) && 'roadmap-card__preview--notes']">
             <li v-for="item in previewItems(m)" :key="item">{{ item }}</li>
           </ul>
-          <div v-else class="roadmap-card__empty">No checklist items detected</div>
+          <div v-else class="roadmap-card__empty">{{ isInformational(m) ? 'No notes in this section' : 'No checklist items detected' }}</div>
         </div>
       </li>
     </ol>
@@ -161,8 +174,26 @@ function previewItems(m: RoadmapMilestone): string[] {
                 </ul>
               </section>
 
-              <div v-if="!active.done_items.length && !active.todo_items.length" class="roadmap-drawer__empty">
+              <section v-if="isInformational(active) && (active.notes?.length ?? 0)" class="h-drawer__section">
+                <h3 class="h-drawer__section-title">Notes</h3>
+                <ul class="roadmap-drawer__list roadmap-drawer__list--notes">
+                  <li v-for="note in active.notes" :key="note" class="roadmap-drawer__item roadmap-drawer__item--note">
+                    <span>{{ note }}</span>
+                  </li>
+                </ul>
+              </section>
+
+              <div
+                v-if="!isInformational(active) && !active.done_items.length && !active.todo_items.length"
+                class="roadmap-drawer__empty"
+              >
                 No items detected in this section.
+              </div>
+              <div
+                v-else-if="isInformational(active) && !(active.notes?.length)"
+                class="roadmap-drawer__empty"
+              >
+                No notes in this section.
               </div>
             </div>
           </div>

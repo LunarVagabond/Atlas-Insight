@@ -87,6 +87,30 @@ class TestClassifyItem:
         result = _classify_item('  - Indented item')
         assert result == ('todo', 'Indented item')
 
+    def test_done_prefix_bold(self):
+        result = _classify_item('- **Done:** Spotlight feature')
+        assert result == ('done', 'Spotlight feature')
+
+    def test_done_prefix_plain(self):
+        result = _classify_item('- Completed: shipped API')
+        assert result == ('done', 'shipped API')
+
+    def test_done_suffix(self):
+        result = _classify_item('- Feature X (done)')
+        assert result == ('done', 'Feature X')
+
+    def test_done_emoji_prefix(self):
+        result = _classify_item('- ✅ Released v2')
+        assert result == ('done', 'Released v2')
+
+    def test_inline_strikethrough(self):
+        result = _classify_item('- ~~partial~~ strike')
+        assert result == ('done', 'partial strike')
+
+    def test_context_done_subsection(self):
+        result = _classify_item('- Legacy API removal', context_done=True)
+        assert result == ('done', 'Legacy API removal')
+
 
 class TestFinalize:
     def test_all_todo(self):
@@ -130,6 +154,31 @@ class TestFinalize:
     def test_empty_lines_skipped(self):
         result = _finalize('Phase', ['', '- Item A', ''])
         assert result['todo_count'] == 1
+
+    def test_informational_title(self):
+        result = _finalize('How to read this', ['- Near-term means soon', '- Medium-term means later'])
+        assert result['kind'] == 'informational'
+        assert result['status'] == 'informational'
+        assert result['notes'] == ['Near-term means soon', 'Medium-term means later']
+        assert result['todo_count'] == 0
+
+    def test_prose_notes(self):
+        result = _finalize('Phase 1', ['Gate work before release.', '- Task A'])
+        assert result['notes'] == ['Gate work before release.']
+        assert result['todo_count'] == 1
+
+    def test_subsection_done_context(self):
+        lines = ['**Done**', '- Shipped auth', '- Shipped billing', '**Up next**', '- Payments']
+        result = _finalize('Features', lines)
+        assert result['done_count'] == 2
+        assert result['todo_count'] == 1
+        assert 'Shipped auth' in result['done_items']
+        assert 'Payments' in result['todo_items']
+
+    def test_kind_and_notes_fields(self):
+        result = _finalize('Phase', ['- Item'])
+        assert result['kind'] == 'milestone'
+        assert result['notes'] == []
 
 
 class TestParseRoadmap:
@@ -189,8 +238,25 @@ class TestParseRoadmap:
         m = result['milestones'][0]
         assert 'title' in m
         assert 'date' in m
+        assert 'kind' in m
         assert 'status' in m
         assert 'done_count' in m
         assert 'todo_count' in m
         assert 'done_items' in m
         assert 'todo_items' in m
+        assert 'notes' in m
+
+    def test_informational_section_included(self):
+        content = '## How to read this\n- Tier one\n- Tier two\n## Phase 1\n- Task\n'
+        result = parse_roadmap(content)
+        assert len(result['milestones']) == 2
+        assert result['milestones'][0]['kind'] == 'informational'
+        assert result['milestones'][1]['kind'] == 'milestone'
+
+    def test_done_prefix_in_roadmap(self):
+        content = '## Self-hosted\n- **Done:** Feature flags\n- Extend flags\n'
+        result = parse_roadmap(content)
+        m = result['milestones'][0]
+        assert m['done_count'] == 1
+        assert m['todo_count'] == 1
+        assert 'Feature flags' in m['done_items']
