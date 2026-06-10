@@ -589,8 +589,66 @@ class TestScoringModeFairness:
                 'security_hygiene', 'release_cadence', 'abandonment_risk',
                 'license_risk', 'test_coverage', 'dependency_health',
                 'cicd_maturity', 'bus_factor_risk', 'complexity_debt',
-                'container_hygiene', 'monolith_growth', 'commit_velocity', 'burnout',
+                'container_hygiene', 'repo_clutter', 'monolith_growth',
+                'commit_velocity', 'burnout',
             )
         ]
         result = cos(signals, scoring_mode='closed_source')
         assert result['mode'] == 'closed_source'
+
+
+class TestRepoClutter:
+    def test_repo_clutter_signal_with_junk(self):
+        junk = {
+            'count': 2,
+            'score': 20,
+            'by_category': {'temp_file': 1, 'os_junk': 1},
+            'files': [
+                {'path': 'tmp.txt', 'category': 'temp_file'},
+                {'path': '.DS_Store', 'category': 'os_junk'},
+            ],
+        }
+        signals = compute_heuristics(
+            _base_commits(), _base_graph(), _base_deps(),
+            junk_files_data=junk,
+        )
+        sig = next(s for s in signals if s['signal'] == 'repo_clutter')
+        assert sig['score'] == 20
+        assert '2 clutter files' in sig['description']
+        assert len(sig['items']) == 2
+
+    def test_repo_clutter_clean_repo(self):
+        junk = {'count': 0, 'score': 0, 'by_category': {}, 'files': []}
+        signals = compute_heuristics(
+            _base_commits(), _base_graph(), _base_deps(),
+            junk_files_data=junk,
+        )
+        sig = next(s for s in signals if s['signal'] == 'repo_clutter')
+        assert sig['score'] == 0
+        assert 'No clutter files' in sig['description']
+
+    def test_oss_weights_sum_to_one(self):
+        from apps.analysis.heuristics import compute_oss_score as cos
+        weights = {
+            'community_health': 0.12,
+            'documentation_quality': 0.10,
+            'ci_health': 0.10,
+            'security_hygiene': 0.09,
+            'release_cadence': 0.08,
+            'abandonment_risk': 0.08,
+            'license_risk': 0.07,
+            'test_coverage': 0.07,
+            'dependency_health': 0.06,
+            'cicd_maturity': 0.05,
+            'bus_factor_risk': 0.05,
+            'complexity_debt': 0.04,
+            'container_hygiene': 0.03,
+            'repo_clutter': 0.03,
+            'monolith_growth': 0.02,
+            'commit_velocity': 0.005,
+            'burnout': 0.005,
+        }
+        assert abs(sum(weights.values()) - 1.0) < 0.001
+        signals = [{'signal': k, 'score': 50} for k in weights]
+        result = cos(signals, scoring_mode='oss')
+        assert result['score'] == 5.0

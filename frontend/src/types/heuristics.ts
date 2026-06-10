@@ -15,6 +15,7 @@ export type HeuristicSignalKey =
   | 'test_coverage'
   | 'cicd_maturity'
   | 'container_hygiene'
+  | 'repo_clutter'
 
 export interface HeuristicSignal {
   signal: HeuristicSignalKey

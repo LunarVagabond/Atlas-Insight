@@ -104,6 +104,7 @@ class AnalysisRun(models.Model):
     license_data = models.JSONField(null=True, blank=True)
     complexity_data = models.JSONField(null=True, blank=True)
     dead_code_data = models.JSONField(null=True, blank=True)
+    junk_files_data = models.JSONField(null=True, blank=True)
     test_coverage_data = models.JSONField(null=True, blank=True)
     containers_data = models.JSONField(null=True, blank=True)
     cicd_data = models.JSONField(null=True, blank=True)
@@ -137,6 +138,7 @@ class AnalysisRun(models.Model):
             ('license', self.license_data),
             ('complexity', self.complexity_data),
             ('dead_code', self.dead_code_data),
+            ('junk_files', self.junk_files_data),
             ('test_coverage', self.test_coverage_data),
             ('containers', self.containers_data),
             ('cicd', self.cicd_data),
@@ -218,6 +220,7 @@ class AnalysisRun(models.Model):
         self.license_data = value.get('license')
         self.complexity_data = value.get('complexity')
         self.dead_code_data = value.get('dead_code')
+        self.junk_files_data = value.get('junk_files')
         self.test_coverage_data = value.get('test_coverage')
         self.containers_data = value.get('containers')
         self.cicd_data = value.get('cicd')

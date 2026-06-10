@@ -28,6 +28,7 @@ export type {
   LicenseData, LicenseDepEntry, LicenseIssue,
   ComplexityData, ComplexityHotspot,
   DeadCodeData, DeadCodeEntry,
+  JunkFilesData, JunkFileEntry,
   TestCoverageData, UntestedDir,
   ContainerData, DockerfileResult, ComposeResult, ContainerIssue,
   CicdData, CicdWorkflow,

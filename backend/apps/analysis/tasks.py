@@ -21,6 +21,7 @@ from .commit_analysis import analyze_commits
 from .complexity import analyze_complexity
 from .contribution_analysis import analyze_contributions
 from .dead_code import analyze_dead_code
+from .junk_files import scan_junk_files
 from .dep_report import analyze_dependencies
 from .diff_analysis import compute_run_diff
 from .git_ops import clone_or_fetch
@@ -53,7 +54,7 @@ _RESULT_UPDATE_FIELDS = [
     'readme_data', 'structure_data', 'security_data', 'github_meta_data',
     'classification_data', 'todos_data', 'arch_tours_data', 'ownership_data',
     'contribution_opportunities_data', 'repo_type_data', 'license_data',
-    'complexity_data', 'dead_code_data', 'test_coverage_data', 'containers_data',
+    'complexity_data', 'dead_code_data', 'junk_files_data', 'test_coverage_data', 'containers_data',
     'cicd_data', 'tools_data', 'changelog_data', 'diff_data', 'similar_runs_data',
     'issues_data', 'pr_refs_data',
 ]
@@ -117,6 +118,7 @@ def _extract_run_fields(run: 'AnalysisRun', result: dict) -> None:
     run.license_data = result.get('license')
     run.complexity_data = result.get('complexity')
     run.dead_code_data = result.get('dead_code')
+    run.junk_files_data = result.get('junk_files')
     run.test_coverage_data = result.get('test_coverage')
     run.containers_data = result.get('containers')
     run.cicd_data = result.get('cicd')
@@ -518,6 +520,9 @@ def analyze_repository(self, run_id: str):
             def _run_test_coverage():
                 return analyze_test_coverage(repo_dir, structure)
 
+            def _run_junk_files():
+                return scan_junk_files(repo_obj, repo_dir)
+
             def _run_tools():
                 return detect_tools(repo_dir)
 
@@ -531,13 +536,14 @@ def analyze_repository(self, run_id: str):
                 'license': _run_license,
                 'complexity': _run_complexity,
                 'dead_code': _run_dead_code,
+                'junk_files': _run_junk_files,
                 'test_coverage': _run_test_coverage,
                 'tools': _run_tools,
                 'cicd': _run_cicd,
                 'changelog': _run_changelog,
             }
             _extra_results: dict = {}
-            with ThreadPoolExecutor(max_workers=7) as _pool:
+            with ThreadPoolExecutor(max_workers=8) as _pool:
                 _futures = {_pool.submit(fn): key for key, fn in _extra_tasks.items()}
                 for _future in as_completed(_futures):
                     _key = _futures[_future]
@@ -553,6 +559,7 @@ def analyze_repository(self, run_id: str):
                 license_data=_extra_results.get('license'),
                 complexity_data=_extra_results.get('complexity'),
                 test_coverage_data=_extra_results.get('test_coverage'),
+                junk_files_data=_extra_results.get('junk_files'),
                 cicd_data=_extra_results.get('cicd'),
                 container_data=_tools.get('docker'),
                 scoring_mode=scoring_mode,
@@ -622,6 +629,7 @@ def analyze_repository(self, run_id: str):
                 'license': _extra_results.get('license', {}),
                 'complexity': _extra_results.get('complexity', {}),
                 'dead_code': _extra_results.get('dead_code', {}),
+                'junk_files': _extra_results.get('junk_files', {}),
                 'test_coverage': _extra_results.get('test_coverage', {}),
                 'tools': _tools,
                 'containers': _tools.get('docker', {}),

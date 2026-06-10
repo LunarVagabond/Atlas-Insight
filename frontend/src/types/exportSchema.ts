@@ -38,6 +38,7 @@ export interface AnalysisExportV2 {
   quality: {
     complexity: RunResult['complexity']
     dead_code: RunResult['dead_code']
+    junk_files: RunResult['junk_files']
     test_coverage: RunResult['test_coverage']
     license: RunResult['license']
   }

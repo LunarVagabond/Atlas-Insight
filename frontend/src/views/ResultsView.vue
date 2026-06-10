@@ -139,7 +139,9 @@ const tabBadges = computed<Record<string, number | string>>(() => {
   if (licenseIssues > 0) badges['Licenses'] = licenseIssues
 
   const complexityHotspots = r.complexity?.files_over_threshold ?? 0
-  if (complexityHotspots > 0) badges['Code Quality'] = complexityHotspots
+  const junkCount = r.junk_files?.count ?? 0
+  const cqBadge = complexityHotspots + junkCount
+  if (cqBadge > 0) badges['Code Quality'] = cqBadge
 
   const roadmapMilestones = r.structure?.roadmap_parsed?.milestones?.length ?? 0
   if (roadmapMilestones > 0) badges['Roadmap'] = roadmapMilestones
@@ -304,6 +306,7 @@ function exportJson() {
     quality: {
       complexity: r.complexity ?? null,
       dead_code: r.dead_code ?? null,
+      junk_files: r.junk_files ?? null,
       test_coverage: r.test_coverage ?? null,
       license: r.license ?? null,
     },
@@ -751,6 +754,7 @@ onUnmounted(() => {
           v-if="activeTab === 'Code Quality'"
           :complexity="result.complexity"
           :dead-code="result.dead_code"
+          :junk-files="result.junk_files"
           :test-coverage="result.test_coverage"
           :structure="result.structure"
           :section="activeSection ?? 'Tests'"

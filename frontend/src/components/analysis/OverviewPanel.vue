@@ -54,6 +54,11 @@ const notableFindings = computed<Finding[]>(() => {
     findings.push({ icon: '⚠️', text: `${secIssues} security hygiene issue${secIssues > 1 ? 's' : ''} detected`, variant: 'warning' })
   }
 
+  const junkCount = r.junk_files?.count ?? 0
+  if (junkCount > 0) {
+    findings.push({ icon: '🗑️', text: `${junkCount} clutter file${junkCount > 1 ? 's' : ''} tracked in git — temp files, OS junk, or gitignore gaps`, variant: 'warning' })
+  }
+
   const totalContributors = r.commits.total_contributors ?? 0
   const busFactor = r.ownership?.bus_factor ?? r.structure?.bus_factor ?? 0
   if (busFactor > 0 && busFactor <= 2 && totalContributors > 1) {

@@ -48,7 +48,7 @@ const GUIDE_ENTRIES: GuideEntry[] = [
     section: 'Scores & Risk',
     defHtml: `A single number summarizing how ready a project is for open-source collaboration and long-term sustainability. <span class="guide-kw">10 is best</span>. This is not a code quality score — it measures community scaffolding: docs, CI, licensing, and regular releases.`,
     methodLabel: 'How we compute it',
-    method: 'Weighted combination of 16 heuristics: community health (13%), documentation (11%), CI/testing (11%), security hygiene (9%), release cadence (8%), abandonment risk (8%), license risk (7%), test coverage (7%), dependency health (6%), CI/CD maturity (5%), bus factor (5%), complexity debt (4%), container hygiene (3%), monolith growth (2%), commit velocity (1%), burnout (1%). Each is inverted (100 − risk score) so lower risk = higher contribution to the OSS score, then normalized to 0–10. Only signals computable for that repo contribute; weights are renormalized if some are missing.',
+    method: 'Weighted combination of 17 heuristics: community health (12%), documentation (10%), CI/testing (10%), security hygiene (9%), release cadence (8%), abandonment risk (8%), license risk (7%), test coverage (7%), dependency health (6%), CI/CD maturity (5%), bus factor (5%), complexity debt (4%), container hygiene (3%), repo clutter (3%), monolith growth (2%), commit velocity (0.5%), burnout (0.5%). Each is inverted (100 − risk score) so lower risk = higher contribution to the OSS score, then normalized to 0–10. Only signals computable for that repo contribute; weights are renormalized if some are missing.',
     searchText: 'oss score open source sustainability champion thriving growing seedling struggling dormant 10 weighted community docs ci release bus factor security dependency monolith velocity burnout license test coverage cicd container complexity',
   },
   {
@@ -366,6 +366,15 @@ const GUIDE_ENTRIES: GuideEntry[] = [
   },
   // ── DevOps ─────────────────────────────────────────────────────────────────
   {
+    id: 'repo-clutter',
+    term: 'Repo Clutter',
+    section: 'Project Health',
+    defHtml: `Scans <span class="guide-kw">git-tracked files</span> for temp/scratch filenames, OS junk (.DS_Store, Thumbs.db), editor backups, log files, build artifacts, and paths matching common .gitignore patterns that are still committed. Helps teams spot vibe-coding leftovers and accidental clutter.`,
+    methodLabel: 'How we detect clutter',
+    method: 'We list all git-tracked files and match against pattern categories: OS junk, editor swap files, temp/scratch names, log files, build artifacts, AI/scratch output files, and gitignore-gap paths (files that match should-ignore patterns like dist/, *.log, __pycache__). Each match includes a category, confidence level, and reason. Score scales with count and category weights.',
+    searchText: 'repo clutter junk files tmp temp scratch ds_store thumbs.db gitignore gap build artifact log backup vibe coding',
+  },
+  {
     id: 'container-hygiene',
     term: 'Container Hygiene',
     section: 'Project Health',
@@ -538,7 +547,7 @@ function renderMd(text: string): string {
             <div><strong>Dormant (0–2)</strong><span>Abandoned or severely under-maintained.</span></div>
           </div>
         </div>
-        <p class="about-view__note">Score weights (16 signals): Community health 13% · Documentation 11% · CI/testing 11% · Security hygiene 9% · Release cadence 8% · Abandonment risk 8% · License risk 7% · Test coverage 7% · Dependency health 6% · CI/CD maturity 5% · Bus factor 5% · Complexity debt 4% · Container hygiene 3% · Monolith growth 2% · Commit velocity 1% · Burnout 1%.</p>
+        <p class="about-view__note">Score weights (17 signals): Community health 12% · Documentation 10% · CI/testing 10% · Security hygiene 9% · Release cadence 8% · Abandonment risk 8% · License risk 7% · Test coverage 7% · Dependency health 6% · CI/CD maturity 5% · Bus factor 5% · Complexity debt 4% · Container hygiene 3% · Repo clutter 3% · Monolith growth 2% · Commit velocity 0.5% · Burnout 0.5%.</p>
       </section>
 
       <section class="about-view__section">

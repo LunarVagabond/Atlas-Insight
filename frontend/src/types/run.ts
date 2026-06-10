@@ -80,6 +80,23 @@ export interface DeadCodeData {
   note: string | null
 }
 
+export interface JunkFileEntry {
+  path: string
+  category: string
+  reason: string
+  confidence: 'high' | 'medium'
+  size_bytes?: number | null
+}
+
+export interface JunkFilesData {
+  files: JunkFileEntry[]
+  count: number
+  by_category: Record<string, number>
+  total_bytes: number
+  score: number
+  note: string | null
+}
+
 export interface UntestedDir {
   path: string
   source_files: number
@@ -210,6 +227,7 @@ export interface RunResult {
   license?: LicenseData
   complexity?: ComplexityData
   dead_code?: DeadCodeData
+  junk_files?: JunkFilesData
   test_coverage?: TestCoverageData
   containers?: ContainerData
   cicd?: CicdData

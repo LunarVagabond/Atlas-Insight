@@ -503,6 +503,7 @@ def get_ai_summary(request, run_id: uuid.UUID):
     security = r.get('security') or {}
     complexity = r.get('complexity') or {}
     dead_code = r.get('dead_code') or {}
+    junk_files = r.get('junk_files') or {}
     test_coverage = r.get('test_coverage') or {}
     cicd = r.get('cicd') or {}
     containers = r.get('containers') or {}
@@ -622,6 +623,8 @@ def get_ai_summary(request, run_id: uuid.UUID):
                 cq_parts.append(f"{complexity.get('files_over_threshold', 0)} complexity hotspots")
     if dead_code:
                 cq_parts.append(f"{dead_code.get('count', 0)} unreferenced files")
+    if junk_files:
+                cq_parts.append(f"{junk_files.get('count', 0)} clutter files")
     if test_coverage:
                 ratio = test_coverage.get('test_ratio')
                 if isinstance(ratio, (int, float)):

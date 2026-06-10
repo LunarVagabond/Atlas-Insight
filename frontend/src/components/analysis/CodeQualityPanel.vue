@@ -3,13 +3,24 @@ import { computed } from 'vue'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
 import AppTabs from '../ui/AppTabs.vue'
-import type { ComplexityData, DeadCodeData, TestCoverageData } from '../../stores/analysis'
+import type { ComplexityData, DeadCodeData, JunkFilesData, TestCoverageData } from '../../stores/analysis'
 
-const SECTIONS = ['Tests', 'Complexity', 'Dead Code'] as const
+const SECTIONS = ['Tests', 'Complexity', 'Dead Code', 'Clutter'] as const
+
+const CATEGORY_LABELS: Record<string, string> = {
+  os_junk: 'OS junk',
+  editor_swap: 'Editor swap',
+  temp_file: 'Temp file',
+  log_file: 'Log file',
+  build_artifact: 'Build artifact',
+  gitignore_gap: 'Gitignore gap',
+  ai_scratch: 'AI/scratch',
+}
 
 const props = defineProps<{
   complexity?: ComplexityData
   deadCode?: DeadCodeData
+  junkFiles?: JunkFilesData
   testCoverage?: TestCoverageData
   section?: string
 }>()
@@ -28,8 +39,22 @@ function riskLevel(score: number): 'low' | 'medium' | 'high' {
   return 'high'
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function categoryLabel(category: string): string {
+  return CATEGORY_LABELS[category] ?? category.replace(/_/g, ' ')
+}
+
 const testRatioPercent = computed(() =>
   props.testCoverage ? Math.round((props.testCoverage.test_ratio ?? 0) * 100) : 0
+)
+
+const highConfidenceCount = computed(() =>
+  (props.junkFiles?.files ?? []).filter(f => f.confidence === 'high').length
 )
 
 const distributionTotal = computed(() => {
@@ -48,7 +73,7 @@ function distPct(key: keyof NonNullable<ComplexityData['distribution']>): number
 <template>
   <div class="panel">
     <h2 class="panel__title">Code Quality</h2>
-    <p class="panel__subtitle">Static proxy metrics for code health: file size distribution, unreferenced files, and test coverage mapping. No runtime execution — all derived from source files.</p>
+    <p class="panel__subtitle">Static proxy metrics for code health: file size distribution, unreferenced files, clutter detection, and test coverage mapping. No runtime execution — all derived from source files.</p>
 
     <div class="panel__sub-tabs">
       <AppTabs
@@ -117,7 +142,6 @@ function distPct(key: keyof NonNullable<ComplexityData['distribution']>): number
         </AppCard>
       </div>
 
-      <!-- Distribution bar -->
       <div v-if="complexity?.distribution" class="cq-dist">
         <div class="cq-dist__label">File size distribution</div>
         <div class="cq-dist__bar">
@@ -202,6 +226,66 @@ function distPct(key: keyof NonNullable<ComplexityData['distribution']>): number
         No unreferenced files detected in the import graph.
       </div>
       <div v-else class="panel__hint">Import graph analysis not available.</div>
+    </section>
+
+    <!-- ── Repo clutter ───────────────────────────────────────── -->
+    <section v-else-if="activeSection === 'Clutter'" class="cq-section">
+      <h3 class="cq-section__title">Repo Clutter</h3>
+      <p class="panel__subtitle" style="margin-top: 0">Tracked files that match temp, OS junk, backup, log, or common gitignore patterns. Pattern-based hints — review before deleting; some files may be intentional.</p>
+
+      <div v-if="junkFiles?.note" class="panel__hint">{{ junkFiles.note }}</div>
+
+      <template v-if="(junkFiles?.count ?? 0) > 0">
+        <div class="panel__grid panel__grid--3col" style="margin-bottom: 1rem">
+          <AppCard elevated>
+            <div class="stat">
+              <div class="stat__value" :class="`stat__value--${riskLevel(junkFiles?.score ?? 0)}`">
+                {{ junkFiles?.count }}
+              </div>
+              <div class="stat__label">Clutter Files</div>
+            </div>
+          </AppCard>
+          <AppCard elevated>
+            <div class="stat">
+              <div class="stat__value">{{ highConfidenceCount }}</div>
+              <div class="stat__label">High Confidence</div>
+            </div>
+          </AppCard>
+          <AppCard elevated>
+            <div class="stat">
+              <div class="stat__value">{{ formatBytes(junkFiles?.total_bytes ?? 0) }}</div>
+              <div class="stat__label">Total Size</div>
+            </div>
+          </AppCard>
+        </div>
+
+        <table class="data-table">
+          <thead>
+            <tr><th>File</th><th>Category</th><th>Reason</th><th>Confidence</th><th>Size</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="entry in junkFiles?.files?.slice(0, 50)" :key="entry.path">
+              <td class="mono cq-truncate">{{ entry.path }}</td>
+              <td><span class="cq-category-chip">{{ categoryLabel(entry.category) }}</span></td>
+              <td>{{ entry.reason }}</td>
+              <td>
+                <span class="cq-confidence" :class="`cq-confidence--${entry.confidence}`">
+                  {{ entry.confidence }}
+                </span>
+              </td>
+              <td>{{ entry.size_bytes != null ? formatBytes(entry.size_bytes) : '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-if="(junkFiles?.count ?? 0) > 50" class="panel__hint" style="margin-top: 0.75rem">
+          Showing 50 of {{ junkFiles?.count }} clutter files.
+        </p>
+      </template>
+
+      <div v-else-if="junkFiles" class="panel__hint">
+        No clutter files detected in tracked paths.
+      </div>
+      <div v-else class="panel__hint">Clutter analysis not available.</div>
     </section>
   </div>
 </template>

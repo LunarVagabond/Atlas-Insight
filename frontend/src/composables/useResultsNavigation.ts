@@ -18,7 +18,7 @@ export const TAB_SECTIONS: Record<string, readonly string[] | null> = {
   Licenses: null,
   Dependencies: ['Packages', 'Containers'],
   Architecture: ['Explorer', 'Graph'],
-  'Code Quality': ['Tests', 'Complexity', 'Dead Code'],
+  'Code Quality': ['Tests', 'Complexity', 'Dead Code', 'Clutter'],
   Repository: ['Profile', 'Activity', 'Branches'],
   Ownership: null,
   Contributing: null,

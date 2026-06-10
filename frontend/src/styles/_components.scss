@@ -10126,6 +10126,31 @@ kbd {
   white-space: nowrap;
 }
 
+.cq-category-chip {
+  display: inline-block;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.cq-confidence {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: capitalize;
+
+  &--high {
+    color: var(--color-error);
+  }
+
+  &--medium {
+    color: var(--color-warning);
+  }
+}
+
 .stat__value--ok   { color: var(--color-success); }
 .stat__value--warn { color: var(--color-warning); }
 

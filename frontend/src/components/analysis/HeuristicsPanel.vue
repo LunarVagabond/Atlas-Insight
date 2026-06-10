@@ -59,6 +59,7 @@ const SIGNAL_ICONS: Record<HeuristicSignalKey, string> = {
   test_coverage:         '🧪',
   cicd_maturity:         '🚀',
   container_hygiene:     '🐳',
+  repo_clutter:          '🗑️',
 }
 
 const SIGNAL_ORDER: Record<HeuristicSignalKey, number> = {
@@ -69,7 +70,7 @@ const SIGNAL_ORDER: Record<HeuristicSignalKey, number> = {
   // Testing & CI (grouped together)
   test_coverage: 20, ci_health: 21, cicd_maturity: 22,
   // Dependencies & Security
-  dependency_health: 30, security_hygiene: 31, license_risk: 32, container_hygiene: 33,
+  dependency_health: 30, security_hygiene: 31, license_risk: 32, container_hygiene: 33, repo_clutter: 34,
   // Community & Docs
   documentation_quality: 40, community_health: 41, release_cadence: 42, bus_factor_risk: 43,
 }
@@ -150,6 +151,7 @@ const SIGNAL_DESCRIPTIONS: Partial<Record<HeuristicSignalKey, string>> = {
   test_coverage:         'How much of the codebase has test files? Untested directories are blind spots for regressions.',
   cicd_maturity:         'Does the CI pipeline go beyond just building — does it run tests and lint on every change?',
   container_hygiene:     'Are the Dockerfiles following security best practices — avoiding root, pinning base images?',
+  repo_clutter:          'Are there temp files, OS junk, or build artifacts accidentally committed to git?',
 }
 
 const improvementHints = computed<string[]>(() => {
@@ -184,6 +186,9 @@ const improvementHints = computed<string[]>(() => {
         break
       case 'container_hygiene':
         hints.push('Pin base image tags and add a non-root USER to Dockerfiles')
+        break
+      case 'repo_clutter':
+        hints.push('Remove tracked temp/OS junk files and update .gitignore to prevent re-committing')
         break
       case 'complexity_debt':
         hints.push('Refactor the largest files into smaller, focused modules')

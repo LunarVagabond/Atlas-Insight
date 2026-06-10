@@ -16,6 +16,7 @@ def compute_heuristics(
     test_coverage_data: dict | None = None,
     cicd_data: dict | None = None,
     container_data: dict | None = None,
+    junk_files_data: dict | None = None,
     scoring_mode: ScoringMode = 'oss',
 ) -> list[dict]:
     signals = []
@@ -562,6 +563,35 @@ def compute_heuristics(
             'description': cont_desc,
         })
 
+    # ── Repo clutter ──────────────────────────────────────────────────────────
+    if junk_files_data is not None:
+        from .junk_files import _CATEGORY_LABELS, format_category_summary
+
+        clutter_score = junk_files_data.get('score', 0)
+        count = junk_files_data.get('count', 0)
+        by_cat = junk_files_data.get('by_category', {})
+        files = junk_files_data.get('files', [])
+
+        if count == 0:
+            clutter_desc = 'No clutter files detected in tracked paths'
+        else:
+            summary = format_category_summary(by_cat)
+            clutter_desc = f'{count} clutter file{"s" if count != 1 else ""} tracked ({summary})'
+
+        clutter_items = []
+        for f in files[:5]:
+            label = _CATEGORY_LABELS.get(f.get('category', ''), f.get('category', ''))
+            clutter_items.append(f"{f['path']} · {label}")
+
+        signals.append({
+            'signal': 'repo_clutter',
+            'label': 'Repo Clutter',
+            'score': min(100, clutter_score),
+            'confidence': 'high' if count > 0 else 'medium',
+            'description': clutter_desc,
+            'items': clutter_items,
+        })
+
     return signals
 
 
@@ -570,9 +600,9 @@ def compute_oss_score(signals: list[dict], scoring_mode: ScoringMode = 'oss') ->
     signal_map = {s['signal']: s['score'] for s in signals}
 
     weights = {
-        'community_health': 0.13,
-        'documentation_quality': 0.11,
-        'ci_health': 0.11,
+        'community_health': 0.12,
+        'documentation_quality': 0.10,
+        'ci_health': 0.10,
         'security_hygiene': 0.09,
         'release_cadence': 0.08,
         'abandonment_risk': 0.08,
@@ -583,9 +613,10 @@ def compute_oss_score(signals: list[dict], scoring_mode: ScoringMode = 'oss') ->
         'bus_factor_risk': 0.05,
         'complexity_debt': 0.04,
         'container_hygiene': 0.03,
+        'repo_clutter': 0.03,
         'monolith_growth': 0.02,
-        'commit_velocity': 0.01,
-        'burnout': 0.01,
+        'commit_velocity': 0.005,
+        'burnout': 0.005,
     }
     if scoring_mode == 'closed_source':
         weights = {

@@ -134,6 +134,7 @@ const subProjects = computed(() => result.value?.repo_type?.sub_projects ?? [])
 const codeQuality = computed(() => ({
   complexity: result.value?.complexity,
   deadCode: result.value?.dead_code,
+  junkFiles: result.value?.junk_files,
   testCoverage: result.value?.test_coverage,
 }))
 const devOps = computed(() => ({
@@ -859,6 +860,10 @@ function exportCvesCsv() {
           <div class="print-stat">
             <div class="print-stat__value">{{ codeQuality.deadCode?.count ?? 0 }}</div>
             <div class="print-stat__label">Unreferenced Files</div>
+          </div>
+          <div class="print-stat">
+            <div class="print-stat__value">{{ codeQuality.junkFiles?.count ?? 0 }}</div>
+            <div class="print-stat__label">Clutter Files</div>
           </div>
           <div class="print-stat">
             <div class="print-stat__value">{{ formatPct(codeQuality.testCoverage?.test_ratio ?? null) }}</div>

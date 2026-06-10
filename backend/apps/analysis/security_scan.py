@@ -3,6 +3,8 @@ from pathlib import Path
 
 from git import Repo
 
+from .gitignore_patterns import GITIGNORE_RECOMMENDED, gitignore_covers
+
 SENSITIVE_GIT_PATTERNS = [
     (r'(^|/)\.env$', 'high', '.env file committed'),
     (r'(^|/)\.env\.[^e][^x]', 'high', '.env variant committed'),
@@ -18,37 +20,6 @@ SENSITIVE_GIT_PATTERNS = [
 SAFE_PATTERNS = re.compile(
     r'\.(example|sample|template|test|dist|stub|fake)$', re.IGNORECASE
 )
-
-GITIGNORE_RECOMMENDED = [
-    '.env', '*.pem', '*.key', 'id_rsa', 'node_modules',
-    '__pycache__', '.venv', 'venv', '*.log', 'dist/',
-]
-
-
-def _gitignore_covers(pattern: str, gi_lines_lower: list[str]) -> bool:
-    """Return True if any non-comment gitignore line covers this pattern."""
-    pat = pattern.rstrip('/')
-    for raw in gi_lines_lower:
-        # Normalize: strip leading anchor prefixes and trailing slash (dir markers)
-        line = raw.rstrip('/')
-        if line.startswith('**/'):
-            line = line[3:]
-        if line.startswith('/'):
-            line = line[1:]
-
-        if line == pat:
-            return True
-        # path-prefixed entry: "frontend/node_modules" or "backend/.venv" covers the bare pattern
-        if line.endswith(f'/{pat}'):
-            return True
-        # *.ext pattern: "*.log" or "**/*.log" cover "*.log"
-        if pat.startswith('*.') and line.endswith(pat[1:]):
-            return True
-        # dot-prefix like ".env": covered by ".env" or ".env.*" but NOT ".envrc"
-        if pat.startswith('.') and (line == pat or line.startswith(f'{pat}.')):
-            return True
-    return False
-
 
 def scan_security(repo_obj: Repo, repo_dir: str, path_prefix: str | None = None) -> dict:
     base = Path(repo_dir)
@@ -106,7 +77,7 @@ def scan_security(repo_obj: Repo, repo_dir: str, path_prefix: str | None = None)
             gi_lines_lower = [l.lower() for l in gi_lines]
             for pattern in GITIGNORE_RECOMMENDED:
                 pat = pattern.lower().rstrip('/')
-                if not _gitignore_covers(pat, gi_lines_lower):
+                if not gitignore_covers(pat, gi_lines_lower):
                     gitignore_gaps.append(pattern)
         except Exception:
             pass

@@ -195,6 +195,17 @@ const SIGNAL_INFO: Record<HeuristicSignalKey, SignalInfo> = {
     guidance:
       'Running containers as root is the most common and impactful issue — add a non-root USER instruction before the CMD. Pinning base image tags (e.g. python:3.12.3-slim instead of python:latest) improves reproducibility and eliminates surprise dependency updates.',
   },
+  repo_clutter: {
+    overview:
+      'Scans git-tracked files for temp/scratch filenames, OS junk (.DS_Store, Thumbs.db), editor backups, log files, build artifacts, and paths that match common .gitignore patterns but are still committed.',
+    raises: [
+      'tmp.txt, scratch files, or AI output files tracked in git',
+      'OS metadata files like .DS_Store committed',
+      'Build output or log files that should be gitignored',
+    ],
+    guidance:
+      'Remove clutter files from the repo and add matching patterns to .gitignore. Use git rm --cached for files that should stay on disk locally. See the Code Quality → Clutter tab for the full file list.',
+  },
 }
 
 const info = computed(() => {
@@ -248,7 +259,7 @@ const ICONS: Record<HeuristicSignalKey, string> = {
   bus_factor_risk: '🚌', security_hygiene: '🔒', release_cadence: '🏷️',
   community_health: '🤝', commit_velocity: '📈',
   license_risk: '⚖️', complexity_debt: '🧩', test_coverage: '🧪',
-  cicd_maturity: '🚀', container_hygiene: '🐳',
+  cicd_maturity: '🚀', container_hygiene: '🐳', repo_clutter: '🗑️',
 }
 
 interface RepoInsightItem {
@@ -353,6 +364,19 @@ const repoInsight = computed<RepoInsightItem[] | null>(() => {
         }
         if (vulns.length > 4) items.push({ text: `…and ${vulns.length - 4} more CVE${vulns.length - 4 > 1 ? 's' : ''}` })
       }
+    }
+  }
+
+  if (sig === 'repo_clutter') {
+    const junk = r.junk_files
+    if (junk?.count) {
+      items.push({ text: `${junk.count} clutter file${junk.count !== 1 ? 's' : ''} tracked`, highlight: true })
+      for (const f of (junk.files ?? []).slice(0, 6)) {
+        items.push({ text: f.path, sub: f.reason, highlight: f.confidence === 'high', monospace: true })
+      }
+      if (junk.count > 6) items.push({ text: `…and ${junk.count - 6} more` })
+    } else {
+      items.push({ text: 'No clutter files detected' })
     }
   }
 
