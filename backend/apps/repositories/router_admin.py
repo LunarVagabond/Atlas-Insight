@@ -5,7 +5,7 @@ import uuid
 from typing import Optional
 
 from django_ratelimit.decorators import ratelimit
-from ninja import Router, Schema
+from ninja import Router, Schema, Status
 from ninja.errors import HttpError
 
 from apps.analysis.tasks import analyze_repository
@@ -188,7 +188,7 @@ def watch_repo(request, repo_id: uuid.UUID):
     repo.is_watched = True
     repo.watch_reason = 'manual'
     repo.save(update_fields=['is_watched', 'watch_reason'])
-    return 200, None
+    return Status(200, None)
 
 
 @router.delete('/repos/{repo_id}/watch', response={204: None})
@@ -202,7 +202,7 @@ def unwatch_repo(request, repo_id: uuid.UUID):
     repo.is_watched = False
     repo.watch_reason = ''
     repo.save(update_fields=['is_watched', 'watch_reason'])
-    return 204, None
+    return Status(204, None)
 
 
 @router.post('/admin/purge-cache', response={200: dict})
@@ -280,7 +280,7 @@ def github_webhook(request):
     if raw_delivery_id:
         dedup_key = f'gh_delivery_{raw_delivery_id}'
         if cache.get(dedup_key):
-            return 200, None
+            return Status(200, None)
         cache.set(dedup_key, 1, 3600)
 
     try:
@@ -301,15 +301,15 @@ def github_webhook(request):
     )
 
     if event_type != 'push':
-        return 200, None
+        return Status(200, None)
 
     if not repo_html_url:
-        return 200, None
+        return Status(200, None)
 
     try:
         repo = Repository.objects.get(url=repo_html_url.rstrip('/'))
     except Repository.DoesNotExist:
-        return 200, None
+        return Status(200, None)
 
     run = AnalysisRun.objects.create(repo=repo, status='pending')
     task = analyze_repository.delay(str(run.id))
@@ -321,4 +321,4 @@ def github_webhook(request):
     delivery.save(update_fields=['triggered_reanalysis', 'run'])
 
     logger.info('Webhook triggered re-analysis for %s/%s (run %s)', repo.owner, repo.name, run.id)
-    return 200, None
+    return Status(200, None)

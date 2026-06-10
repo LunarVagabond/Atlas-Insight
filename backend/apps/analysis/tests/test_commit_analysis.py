@@ -47,14 +47,17 @@ class TestBuildContributorStats:
 
     def test_monthly_buckets(self):
         cutoff = datetime.now(timezone.utc) - timedelta(days=730)
+        month_a = datetime(2025, 4, 15, tzinfo=timezone.utc)
+        month_b = datetime(2025, 6, 15, tzinfo=timezone.utc)
         commits = [
-            _FakeCommit('Alice', 'alice@example.com', _ts(10), 10, 2),
-            _FakeCommit('Alice', 'alice@example.com', _ts(40), 20, 4),
+            _FakeCommit('Alice', 'alice@example.com', month_a.timestamp(), 10, 2),
+            _FakeCommit('Alice', 'alice@example.com', month_b.timestamp(), 20, 4),
         ]
         stats = _build_contributor_stats(commits, cutoff)
         alice = stats[0]
         assert len(alice['monthly']) == 2
         month_keys = sorted(alice['monthly'].keys())
+        assert month_keys == ['2025-04', '2025-06']
         assert alice['monthly'][month_keys[0]]['commits'] == 1
         assert alice['monthly'][month_keys[1]]['commits'] == 1
 

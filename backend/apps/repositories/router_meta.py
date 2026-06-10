@@ -4,7 +4,7 @@ from typing import Optional
 
 from django.http import HttpResponse
 from django_ratelimit.decorators import ratelimit
-from ninja import Router, Schema
+from ninja import Router, Schema, Status
 from ninja.errors import HttpError
 
 from .models import AnalysisRun, Repository, RepoOfTheWeek, UserFavorite
@@ -331,19 +331,19 @@ def get_featured(request):
     from django.conf import settings as django_settings
     featured_url = getattr(django_settings, 'FEATURED_REPO_URL', '').strip()
     if not featured_url:
-        return 200, None
+        return Status(200, None)
     try:
         repo = Repository.objects.get(url=featured_url.rstrip('/'))
     except Repository.DoesNotExist:
-        return 200, None
+        return Status(200, None)
     if repo.is_private:
-        return 200, None
+        return Status(200, None)
     run = repo.runs.filter(status='completed', branch='').order_by('-triggered_at').first()
     if not run or not run.result:
-        return 200, None
+        return Status(200, None)
     meta = run.result.get('github_meta', {})
     health = run.result.get('classification', {}).get('project_health', {})
-    return 200, FeaturedRepoSchema(
+    return Status(200, FeaturedRepoSchema(
         run_id=run.id,
         repo_url=repo.url,
         repo_owner=repo.owner,
@@ -354,7 +354,7 @@ def get_featured(request):
         primary_language=meta.get('primary_language'),
         topics=meta.get('topics', []),
         github_description=meta.get('github_description'),
-    )
+    ))
 
 
 class FeaturesSchema(Schema):
@@ -418,7 +418,7 @@ def trending(request):
 @router.get('/spotlight/current', response={200: Optional[SpotlightSchema]})
 def get_spotlight_current(request):
     if not _flag_enabled('spotlight'):
-        return 200, None
+        return Status(200, None)
     from datetime import date, timedelta
     today = date.today()
     week_start = today - timedelta(days=today.weekday())
@@ -427,9 +427,9 @@ def get_spotlight_current(request):
         or RepoOfTheWeek.objects.select_related('repo').order_by('-week_start').first()
     )
     if not spot:
-        return 200, None
+        return Status(200, None)
     schema = _spotlight_to_schema(spot)
-    return 200, schema
+    return Status(200, schema)
 
 
 @router.get('/spotlight/history', response=SpotlightHistorySchema)
@@ -473,7 +473,7 @@ def add_favorite(request, repo_id: uuid.UUID):
     except Repository.DoesNotExist:
         raise HttpError(404, 'Repository not found')
     UserFavorite.objects.get_or_create(user=request.user, repo=repo)
-    return 200, None
+    return Status(200, None)
 
 
 @router.delete('/repos/{repo_id}/favorite', response={204: None})
@@ -483,4 +483,4 @@ def remove_favorite(request, repo_id: uuid.UUID):
     if not request.user.is_authenticated:
         raise HttpError(403, 'Authentication required')
     UserFavorite.objects.filter(user=request.user, repo__id=repo_id).delete()
-    return 204, None
+    return Status(204, None)

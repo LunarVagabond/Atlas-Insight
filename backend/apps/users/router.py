@@ -5,7 +5,7 @@ from typing import Optional
 
 from django.contrib.auth import logout as auth_logout
 from django.utils import timezone
-from ninja import Router, Schema
+from ninja import Router, Schema, Status
 from ninja.errors import HttpError
 from ninja.security import HttpBearer
 
@@ -54,7 +54,7 @@ def me(request):
         account__user=request.user,
         account__provider='github',
     ).exists()
-    return 200, UserSchema(
+    return Status(200, UserSchema(
         id=request.user.id,
         username=request.user.username,
         email=request.user.email or '',
@@ -63,7 +63,7 @@ def me(request):
         github_connected=has_token,
         is_staff=request.user.is_staff,
         is_superuser=request.user.is_superuser,
-    )
+    ))
 
 
 @router.post('/logout')
@@ -95,7 +95,7 @@ def list_tokens(request):
     if not request.user.is_authenticated:
         raise HttpError(401, 'Not authenticated')
     tokens = APIToken.objects.filter(user=request.user, revoked_at__isnull=True)
-    return 200, [
+    return Status(200, [
         APITokenListItem(
             id=t.id,
             name=t.name,
@@ -103,7 +103,7 @@ def list_tokens(request):
             last_used_at=t.last_used_at.isoformat() if t.last_used_at else None,
         )
         for t in tokens
-    ]
+    ])
 
 
 @router.post('/tokens', response={201: APITokenCreated, 401: dict})
@@ -121,12 +121,12 @@ def create_token(request, payload: CreateTokenRequest):
         name=name,
         token_hash=APIToken.hash_token(raw_token),
     )
-    return 201, APITokenCreated(
+    return Status(201, APITokenCreated(
         id=token.id,
         name=token.name,
         token=raw_token,
         created_at=token.created_at.isoformat(),
-    )
+    ))
 
 
 @router.delete('/tokens/{token_id}', response={204: None, 401: dict, 404: dict})
@@ -139,4 +139,4 @@ def revoke_token(request, token_id: uuid.UUID):
         raise HttpError(404, 'Token not found')
     token.revoked_at = timezone.now()
     token.save(update_fields=['revoked_at'])
-    return 204, None
+    return Status(204, None)
