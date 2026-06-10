@@ -10,7 +10,7 @@
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-Email **chris.conlon1993@gmail.com** with:
+Email **lvagabond@dsyndicate.dev** with:
 
 - Description of the vulnerability
 - Steps to reproduce

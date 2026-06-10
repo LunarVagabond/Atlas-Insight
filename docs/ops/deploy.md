@@ -17,8 +17,8 @@ Self-hosted deployment on a Linux server with Nginx, Postgres, Redis, and system
 
 ```bash
 # 1. Clone
-git clone https://github.com/youruser/atlas-insight.git
-cd atlas-insight
+git clone https://github.com/LunarVagabond/Atlas-Insight.git
+cd Atlas-Insight
 
 # 2. Configure
 cp backend/.env.example backend/.env

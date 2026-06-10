@@ -4,6 +4,7 @@ import {
   sectionsForTab,
   TAB_SECTIONS,
   LEGACY_TAB_MAP,
+  buildNavPositions,
 } from '../composables/useResultsNavigation'
 
 const TABS = [
@@ -52,5 +53,16 @@ describe('useResultsNavigation helpers', () => {
     expect(TAB_SECTIONS.Architecture).toEqual(['Explorer', 'Graph'])
     expect(TAB_SECTIONS.Repository).toEqual(['Profile', 'Activity', 'Branches'])
     expect(TAB_SECTIONS.Tours).toEqual(['Guided', 'Start Here'])
+  })
+
+  it('builds a flat nav list that steps across sectionless tabs', () => {
+    const positions = buildNavPositions(TABS)
+    const overviewIdx = positions.findIndex(p => p.tab === 'Overview')
+    const licensesIdx = positions.findIndex(p => p.tab === 'Licenses')
+    const depsIdx = positions.findIndex(p => p.tab === 'Dependencies' && p.section === 'Packages')
+
+    expect(positions[overviewIdx + 1]?.tab).toBe('Heuristics')
+    expect(positions[licensesIdx + 1]).toEqual({ tab: 'Dependencies', section: 'Packages' })
+    expect(positions[depsIdx - 1]).toEqual({ tab: 'Licenses', section: null })
   })
 })

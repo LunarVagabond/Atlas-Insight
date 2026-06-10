@@ -71,22 +71,19 @@ export function sectionsForTab(tab: string): string[] | null {
 
 type NavPosition = { tab: string; section: string | null }
 
-function navIndex(tabs: string[], pos: NavPosition): number {
-  const tabIdx = tabs.indexOf(pos.tab)
-  if (tabIdx < 0) return 0
-  const sections = sectionsForTab(pos.tab)
-  if (!sections) return tabIdx * 1000
-  const secIdx = sections.indexOf(pos.section ?? sections[0])
-  return tabIdx * 1000 + Math.max(secIdx, 0)
+export function buildNavPositions(tabs: string[]): NavPosition[] {
+  const positions: NavPosition[] = []
+  for (const tab of tabs) {
+    const sections = sectionsForTab(tab)
+    if (!sections) positions.push({ tab, section: null })
+    else for (const section of sections) positions.push({ tab, section })
+  }
+  return positions
 }
 
-function positionFromIndex(tabs: string[], index: number): NavPosition {
-  const tabIdx = Math.floor(index / 1000)
-  const secIdx = index % 1000
-  const tab = tabs[Math.min(tabIdx, tabs.length - 1)] ?? 'Overview'
-  const sections = sectionsForTab(tab)
-  if (!sections) return { tab, section: null }
-  return { tab, section: sections[Math.min(secIdx, sections.length - 1)] }
+function navIndex(positions: NavPosition[], pos: NavPosition): number {
+  const idx = positions.findIndex(p => p.tab === pos.tab && p.section === pos.section)
+  return idx >= 0 ? idx : 0
 }
 
 export function useResultsNavigation(
@@ -113,23 +110,20 @@ export function useResultsNavigation(
     return `Ch.${activeChapterIndex.value + 1} / ${tabs.value.length}`
   })
 
+  const navPositions = computed(() => buildNavPositions(tabs.value))
+
   const prevNav = computed<NavPosition | null>(() => {
-    const list = tabs.value
-    const cur = navIndex(list, { tab: activeTab.value, section: activeSection.value })
+    const positions = navPositions.value
+    const cur = navIndex(positions, { tab: activeTab.value, section: activeSection.value })
     if (cur <= 0) return null
-    return positionFromIndex(list, cur - 1)
+    return positions[cur - 1]
   })
 
   const nextNav = computed<NavPosition | null>(() => {
-    const list = tabs.value
-    const cur = navIndex(list, { tab: activeTab.value, section: activeSection.value })
-    const maxIdx = list.reduce((max, tab, i) => {
-      const sections = sectionsForTab(tab)
-      const last = sections ? i * 1000 + sections.length - 1 : i * 1000
-      return Math.max(max, last)
-    }, 0)
-    if (cur >= maxIdx) return null
-    return positionFromIndex(list, cur + 1)
+    const positions = navPositions.value
+    const cur = navIndex(positions, { tab: activeTab.value, section: activeSection.value })
+    if (cur >= positions.length - 1) return null
+    return positions[cur + 1]
   })
 
   const prevChapterLabel = computed(() => {

@@ -22,11 +22,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         <div class="shortcuts-modal__section-title">Navigation (Results page)</div>
         <div class="shortcuts-modal__row">
           <span class="shortcuts-modal__keys"><kbd>j</kbd></span>
-          <span class="shortcuts-modal__desc">Next tab</span>
+          <span class="shortcuts-modal__desc">Previous tab (←)</span>
         </div>
         <div class="shortcuts-modal__row">
           <span class="shortcuts-modal__keys"><kbd>k</kbd></span>
-          <span class="shortcuts-modal__desc">Previous tab</span>
+          <span class="shortcuts-modal__desc">Next tab (→)</span>
         </div>
       </div>
 

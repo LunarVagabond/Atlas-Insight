@@ -22,7 +22,7 @@ Analysis results are archived. Re-running a repository first checks for new comm
 
 ---
 
-<!-- Screenshots: add captures to docs/image_assets/ when available -->
+<!-- Screenshots: add PNG captures to docs/image_assets/ and embed below when ready -->
 
 ## Features
 
