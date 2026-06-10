@@ -259,6 +259,8 @@ def _parse_issues(raw: list, seen: set[int]) -> list[dict]:
             'url': issue['html_url'],
             'labels': sorted(issue_labels),
             'body_excerpt': (issue.get('body') or '')[:300],
+            'comments': issue.get('comments', 0),
+            'updated_at': issue.get('updated_at', ''),
         })
     return results
 

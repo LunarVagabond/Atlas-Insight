@@ -96,7 +96,9 @@ function riskVariant(r: ContributionOpportunity['risk']) {
 }
 
 function readinessVariant(label: string) {
-  return label === 'Ready' ? 'completed' : label === 'Approachable' ? 'warning' : 'failed'
+  if (label === 'Clear' || label === 'Ready') return 'completed'
+  if (label === 'Partial' || label === 'Approachable') return 'warning'
+  return 'failed'
 }
 
 const availableFilters = computed(() =>

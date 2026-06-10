@@ -76,10 +76,11 @@ const notableFindings = computed<Finding[]>(() => {
   }
 
   const beginnerIssues = (r.contribution_opportunities ?? []).filter(
-    o => o.difficulty === 'beginner' && o.category === 'github-issue' && o.readiness_label === 'Ready'
+    o => o.difficulty === 'beginner' && o.category === 'github-issue'
+      && (o.readiness_label === 'Clear' || o.readiness_label === 'Ready'),
   ).length
   if (beginnerIssues > 0) {
-    findings.push({ icon: '✅', text: `${beginnerIssues} ready-to-pick beginner issue${beginnerIssues > 1 ? 's' : ''} — great entry points for new contributors`, variant: 'success' })
+    findings.push({ icon: '✅', text: `${beginnerIssues} well-specified beginner issue${beginnerIssues > 1 ? 's' : ''} — great entry points for new contributors`, variant: 'success' })
   }
 
   if (cls && ['very_easy', 'easy'].includes(cls.contribution_difficulty.key) && beginnerIssues === 0) {

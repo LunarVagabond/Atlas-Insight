@@ -231,19 +231,83 @@ class TestHeuristicOpportunities:
 
 
 class TestIssueReadiness:
-    def test_beginner_label_boosts_score(self):
+    def test_detailed_issue_scores_clear(self):
         from apps.analysis.contribution_analysis.issue_ops import score_issue_readiness
-        issue = {'labels': ['good first issue'], 'body_excerpt': 'x' * 300, 'number': 1}
-        score, label = score_issue_readiness(issue, set())
-        assert score >= 75
-        assert label == 'Ready'
+        issue = {
+            'labels': ['enhancement'],
+            'body_excerpt': 'x' * 300 + '\n- [ ] add tests',
+            'title': 'Add widget support',
+            'comments': 2,
+            'updated_at': '2026-05-01T00:00:00Z',
+            'number': 1,
+        }
+        score, label, signals = score_issue_readiness(issue, set())
+        assert score >= 60
+        assert label == 'Clear'
+        assert 'Detailed description' in signals
 
     def test_has_open_pr_reduces_score(self):
         from apps.analysis.contribution_analysis.issue_ops import score_issue_readiness
-        issue = {'labels': [], 'body_excerpt': '', 'number': 42}
-        score_without, _ = score_issue_readiness(issue, set())
-        score_with, _ = score_issue_readiness(issue, {42})
+        issue = {
+            'labels': [],
+            'body_excerpt': 'x' * 300,
+            'title': 'Fix export regression',
+            'comments': 2,
+            'updated_at': '2026-05-01T00:00:00Z',
+            'number': 42,
+        }
+        score_without, _, _ = score_issue_readiness(issue, set())
+        score_with, _, signals = score_issue_readiness(issue, {42})
         assert score_with < score_without
+        assert 'Open PR already in progress' in signals
+
+    def test_labels_do_not_affect_score(self):
+        from apps.analysis.contribution_analysis.issue_ops import score_issue_readiness
+        base = {
+            'body_excerpt': 'x' * 300,
+            'title': 'Add export button',
+            'comments': 0,
+            'updated_at': '2026-05-01T00:00:00Z',
+            'number': 2,
+        }
+        gfi_score, _, _ = score_issue_readiness({**base, 'labels': ['good first issue']}, set())
+        plain_score, _, _ = score_issue_readiness({**base, 'labels': ['enhancement']}, set())
+        assert gfi_score == plain_score
+
+    def test_sparse_stale_issue_scores_low(self):
+        from apps.analysis.contribution_analysis.issue_ops import score_issue_readiness
+        issue = {
+            'labels': ['enhancement'],
+            'body_excerpt': 'do this',
+            'title': 'x',
+            'comments': 0,
+            'updated_at': '2024-01-01T00:00:00Z',
+            'number': 3,
+        }
+        score, label, signals = score_issue_readiness(issue, set())
+        assert score < 30
+        assert label == 'Vague'
+        assert 'Brief description' in signals
+
+    def test_scores_vary_by_body_not_labels(self):
+        from apps.analysis.contribution_analysis.issue_ops import score_issue_readiness
+        rich = score_issue_readiness({
+            'labels': ['enhancement'],
+            'body_excerpt': 'x' * 300 + '\n- [ ] add tests',
+            'title': 'Support CSV export',
+            'comments': 2,
+            'updated_at': '2026-05-01T00:00:00Z',
+            'number': 4,
+        }, set())[0]
+        sparse = score_issue_readiness({
+            'labels': ['good first issue'],
+            'body_excerpt': 'do this',
+            'title': 'x',
+            'comments': 0,
+            'updated_at': '2024-01-01T00:00:00Z',
+            'number': 5,
+        }, set())[0]
+        assert rich > sparse
 
 
 class TestTodoOpportunities:

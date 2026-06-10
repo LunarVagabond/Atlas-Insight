@@ -291,12 +291,12 @@ const GUIDE_ENTRIES: GuideEntry[] = [
   },
   {
     id: 'readiness-score',
-    term: 'Readiness Score',
+    term: 'Spec Clarity',
     section: 'Contributing & Opportunities',
-    defHtml: `Whether an opportunity is actually <span class="guide-kw">ready to be picked up right now</span>. A "Ready" issue has no open PR already addressing it and is not blocked. A "Claimed" issue has an open PR. "Stale" issues have not been touched in a long time.`,
+    defHtml: `How well-specified an issue looks from its write-up and activity — <span class="guide-kw">Clear</span> (60+), <span class="guide-kw">Partial</span> (30–59), or <span class="guide-kw">Vague</span> (below 30). This estimates description quality, not code difficulty. Issues with an open PR already in flight score lower.`,
     methodLabel: 'How we compute it',
-    method: 'We cross-reference open issues against open PRs using JIT data fetched from GitHub after analysis completes. A PR mentioning an issue number (via "Fixes #123" or "Closes #123") marks that issue as claimed.',
-    searchText: 'readiness ready claimed stale open pr issue cross reference fixes closes blocked available',
+    method: 'We score from description length, acceptance criteria (checkboxes, numbered steps), comment activity, recency, and whether an open PR already references the issue. GitHub labels are shown but not used in scoring — label conventions vary too much across repos. Individual signals are listed on each issue.',
+    searchText: 'spec clarity readiness clear partial vague description acceptance criteria open pr stale issue signals',
   },
   {
     id: 'arch-tours',

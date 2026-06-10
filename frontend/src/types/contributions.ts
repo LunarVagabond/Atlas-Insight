@@ -15,6 +15,7 @@ export interface ContributionOpportunity {
   affected_file_count?: number
   readiness_score?: number
   readiness_label?: string
+  readiness_signals?: string[]
 }
 
 export interface ArchTourFile {

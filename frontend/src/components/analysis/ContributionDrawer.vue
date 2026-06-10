@@ -87,6 +87,12 @@ function renderHint(hint: string): string {
   return hint.replace(/`([^`]+)`/g, '<code>$1</code>')
 }
 
+function specClarityClass(label: string): string {
+  if (label === 'Clear' || label === 'Ready') return 'clear'
+  if (label === 'Partial' || label === 'Approachable') return 'partial'
+  return 'vague'
+}
+
 function diffVariant(d: ContributionOpportunity['difficulty']) {
   return d === 'beginner' ? 'completed' : d === 'intermediate' ? 'warning' : 'failed'
 }
@@ -173,12 +179,14 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
               </ul>
             </template>
 
-            <!-- Issue readiness score -->
             <template v-if="opportunity.readiness_label">
               <hr class="contrib-drawer__sep" />
-              <h4 class="contrib-drawer__section-title">Approachability</h4>
+              <h4 class="contrib-drawer__section-title">Spec Clarity</h4>
+              <p class="contrib-drawer__spec-note">
+                How well-specified this issue looks from its description and activity — not how hard the code change will be.
+              </p>
               <div class="contrib-drawer__readiness">
-                <div :class="['readiness-badge', `readiness-badge--${opportunity.readiness_label.toLowerCase()}`]">
+                <div :class="['readiness-badge', `readiness-badge--${specClarityClass(opportunity.readiness_label)}`]">
                   {{ opportunity.readiness_label }}
                 </div>
                 <div class="readiness-bar">
@@ -186,6 +194,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
                 </div>
                 <span class="readiness-score-text">{{ opportunity.readiness_score }}/100</span>
               </div>
+              <ul v-if="opportunity.readiness_signals?.length" class="contrib-drawer__signals">
+                <li v-for="signal in opportunity.readiness_signals" :key="signal">{{ signal }}</li>
+              </ul>
             </template>
 
             <!-- Contributor guidance: suggested files from arch tours -->
