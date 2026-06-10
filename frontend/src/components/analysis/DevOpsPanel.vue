@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
+import AppTabs from '../ui/AppTabs.vue'
 import type { CicdData, ContainerData, ChangelogData, TerraformData, ToolsData } from '../../stores/analysis'
 
 const props = defineProps<{
@@ -9,7 +10,10 @@ const props = defineProps<{
   containers?: ContainerData
   changelog?: ChangelogData
   tools?: ToolsData
+  section?: string
 }>()
+
+const emit = defineEmits<{ 'update:section': [section: string] }>()
 
 function severityVariant(s: string): 'failed' | 'warning' | 'info' {
   if (s === 'high') return 'failed'
@@ -67,6 +71,20 @@ function tfScoreBadge(score: number): 'info' | 'warning' | 'failed' {
   if (score >= 40) return 'warning'
   return 'failed'
 }
+
+const visibleSections = computed(() => {
+  const sections: string[] = ['CI/CD']
+  if ((props.containers?.dockerfile_count ?? 0) > 0) sections.push('Containers')
+  if (props.changelog?.found || (props.changelog?.issues?.length ?? 0) > 0) sections.push('Changelog')
+  sections.push('Infrastructure')
+  return sections
+})
+
+const activeSection = computed(() => {
+  const visible = visibleSections.value
+  if (props.section && visible.includes(props.section)) return props.section
+  return visible[0]
+})
 </script>
 
 <template>
@@ -74,8 +92,16 @@ function tfScoreBadge(score: number): 'info' | 'warning' | 'failed' {
     <h2 class="panel__title">DevOps</h2>
     <p class="panel__subtitle">CI/CD pipeline depth, container hygiene from Dockerfile static analysis, and changelog discipline. All static — no runtime checks.</p>
 
+    <div class="panel__sub-tabs">
+      <AppTabs
+        :tabs="visibleSections"
+        :model-value="activeSection"
+        @update:model-value="emit('update:section', $event)"
+      />
+    </div>
+
     <!-- ── CI/CD ──────────────────────────────────────────────── -->
-    <section class="devops-section">
+    <section v-if="activeSection === 'CI/CD'" class="devops-section">
       <h3 class="devops-section__title">CI/CD Pipeline</h3>
 
       <div class="panel__grid panel__grid--2col" style="margin-bottom: 1rem">
@@ -138,7 +164,7 @@ function tfScoreBadge(score: number): 'info' | 'warning' | 'failed' {
     </section>
 
     <!-- ── Container hygiene ──────────────────────────────────── -->
-    <section class="devops-section">
+    <section v-else-if="activeSection === 'Containers'" class="devops-section">
       <h3 class="devops-section__title">Container Hygiene</h3>
 
       <div v-if="(containers?.dockerfile_count ?? 0) === 0" class="panel__hint">
@@ -194,7 +220,7 @@ function tfScoreBadge(score: number): 'info' | 'warning' | 'failed' {
     </section>
 
     <!-- ── Changelog discipline ───────────────────────────────── -->
-    <section class="devops-section">
+    <section v-else-if="activeSection === 'Changelog'" class="devops-section">
       <h3 class="devops-section__title">Changelog Discipline</h3>
       <p class="panel__hint" style="margin: 0 0 0.75rem 0">
         Checks whether a changelog exists, what style it uses, and whether it appears stale. “Keep a Changelog” is a detected format label, not a hard requirement.
@@ -256,21 +282,20 @@ function tfScoreBadge(score: number): 'info' | 'warning' | 'failed' {
       <div v-else-if="changelog?.found" class="panel__hint">Changelog is up to date with no detected issues.</div>
     </section>
 
-    <!-- ── Infrastructure fallback ───────────────────────────── -->
-    <section v-if="!terraform" class="devops-section">
-      <h3 class="devops-section__title">Infrastructure Analysis</h3>
-      <div class="devops-infra-hint">
-        <p>No supported infrastructure tooling detected in this repository.</p>
-        <p>Atlas Insight analyses <strong>Docker</strong> and <strong>Terraform</strong> configurations — detecting providers, resource counts, hygiene scores, and common security issues. These sections appear automatically when the tool is detected.</p>
-        <p class="devops-infra-hint__links">
-          Supported tooling: <a href="/supported#tools" target="_blank">What's Supported</a>
-          · <a href="/docs/dev/adding-a-tool" target="_blank">Adding a tool</a>
-        </p>
-      </div>
-    </section>
+    <!-- ── Infrastructure ─────────────────────────────────────── -->
+    <section v-else-if="activeSection === 'Infrastructure'" class="devops-section">
+      <template v-if="!terraform">
+        <div class="devops-infra-hint">
+          <p>No supported infrastructure tooling detected in this repository.</p>
+          <p>Atlas Insight analyses <strong>Docker</strong> and <strong>Terraform</strong> configurations — detecting providers, resource counts, hygiene scores, and common security issues. These sections appear automatically when the tool is detected.</p>
+          <p class="devops-infra-hint__links">
+            Supported tooling: <a href="/supported#tools" target="_blank">What's Supported</a>
+            · <a href="/docs/dev/adding-a-tool" target="_blank">Adding a tool</a>
+          </p>
+        </div>
+      </template>
 
-    <!-- ── Terraform ──────────────────────────────────────────── -->
-    <section v-if="terraform" class="devops-section">
+      <template v-else>
       <h3 class="devops-section__title">Terraform</h3>
 
       <div class="panel__grid panel__grid--2col" style="margin-bottom: 1rem">
@@ -343,6 +368,7 @@ function tfScoreBadge(score: number): 'info' | 'warning' | 'failed' {
         </table>
       </div>
       <div v-else class="panel__hint">No Terraform security issues detected.</div>
+      </template>
     </section>
   </div>
 </template>

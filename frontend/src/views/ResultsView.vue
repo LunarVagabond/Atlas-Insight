@@ -9,17 +9,13 @@ import AppBadge from '../components/ui/AppBadge.vue'
 import AppBranchSelect from '../components/ui/AppBranchSelect.vue'
 import AnalysisStatusCard from '../components/analysis/AnalysisStatusCard.vue'
 import OverviewPanel from '../components/analysis/OverviewPanel.vue'
-import CommitTimelineChart from '../components/analysis/CommitTimelineChart.vue'
 import ArchitecturePanel from '../components/analysis/ArchitecturePanel.vue'
-import DependencyGraphView from '../components/analysis/DependencyGraphView.vue'
 import DependenciesPanel from '../components/analysis/DependenciesPanel.vue'
 import HeuristicsPanel from '../components/analysis/HeuristicsPanel.vue'
-import ProjectPanel from '../components/analysis/ProjectPanel.vue'
+import RepositoryPanel from '../components/analysis/RepositoryPanel.vue'
+import ToursPanel from '../components/analysis/ToursPanel.vue'
 import ContributingPanel from '../components/analysis/ContributingPanel.vue'
-import ContributionPathPanel from '../components/analysis/ContributionPathPanel.vue'
-import RoadmapTimeline from '../components/analysis/RoadmapTimeline.vue'
 import SecurityPanel from '../components/analysis/SecurityPanel.vue'
-import ArchitectureToursPanel from '../components/analysis/ArchitectureToursPanel.vue'
 import OwnershipPanel from '../components/analysis/OwnershipPanel.vue'
 import LicensePanel from '../components/analysis/LicensePanel.vue'
 import CodeQualityPanel from '../components/analysis/CodeQualityPanel.vue'
@@ -27,9 +23,13 @@ import DevOpsPanel from '../components/analysis/DevOpsPanel.vue'
 import DeltaPanel from '../components/analysis/DeltaPanel.vue'
 import LeaderboardsPanel from '../components/analysis/LeaderboardsPanel.vue'
 import CommunityFilesPanel from '../components/analysis/CommunityFilesPanel.vue'
-import StaleBranchesPanel from '../components/analysis/StaleBranchesPanel.vue'
 import SimilarReposPanel from '../components/analysis/SimilarReposPanel.vue'
 import CompareModal from '../components/ui/CompareModal.vue'
+import {
+  CHAPTER_GROUPS,
+  DOCS_ONLY_TABS,
+  useResultsNavigation,
+} from '../composables/useResultsNavigation'
 import axios from 'axios'
 
 const route = useRoute()
@@ -67,14 +67,6 @@ const currentStepLabel = computed(() => {
   return PROGRESS_STEPS.find(s => s.key === step)?.label ?? 'Analyzing…'
 })
 
-const hasRoadmap = computed(() => (result.value?.structure?.roadmap_parsed?.milestones?.length ?? 0) > 0)
-
-const CHAPTER_GROUPS = [
-  { label: 'Health',    tabs: ['Overview', 'Heuristics', 'Security', 'Licenses', 'Dependencies'], color: '#f59e0b' },
-  { label: 'Codebase',  tabs: ['Architecture', 'Code Quality', 'Project', 'History', 'Ownership'], color: '#6366f1' },
-  { label: 'Community', tabs: ['Contributing', 'Contribution Path', 'Community Files', 'Leaderboards', 'DevOps', 'Tours'], color: '#22c55e' },
-]
-const DOCS_ONLY_TABS = new Set(['Overview', 'Project', 'History', 'Ownership', 'Security', 'Contributing', 'Community Files'])
 const isDocsOnly = computed(() => result.value?.is_docs_only === true)
 
 const scoringMode = computed(
@@ -97,11 +89,14 @@ const scoringModeTooltip = computed(() => {
 })
 const GROUPS = computed(() =>
   CHAPTER_GROUPS
-    .map(g => ({
-      label: g.label,
-      color: g.color,
-      tabs: isDocsOnly.value ? g.tabs.filter(t => DOCS_ONLY_TABS.has(t)) : g.tabs,
-    }))
+    .map(g => {
+      const allTabs = [...g.tabs]
+      return {
+        label: g.label,
+        color: g.color,
+        tabs: isDocsOnly.value ? allTabs.filter(t => DOCS_ONLY_TABS.has(t)) : allTabs,
+      }
+    })
     .filter(g => g.tabs.length > 0)
 )
 // Flat tab order derived from groups — keeps j/k navigation aligned with visual group order
@@ -127,7 +122,6 @@ const tabBadges = computed<Record<string, number | string>>(() => {
   if (contributorCount > 0) badges['Leaderboards'] = contributorCount
 
   const toursCount = r.arch_tours?.length ?? 0
-  if (toursCount > 0) badges['Contribution Path'] = toursCount
   if (toursCount > 0) badges['Tours'] = toursCount
 
   const highRiskHeuristics = (r.heuristics ?? []).filter(h => h.score >= 60).length
@@ -147,35 +141,28 @@ const tabBadges = computed<Record<string, number | string>>(() => {
   return badges
 })
 
-const activeTab = ref((route.query.tab as string) || 'Overview')
-
-const activeGroupColor = computed(() =>
-  GROUPS.value.find(g => g.tabs.includes(activeTab.value))?.color ?? 'var(--color-border)'
-)
-
-const activeChapterIndex = computed(() => TABS.value.indexOf(activeTab.value))
-const prevChapter = computed(() => activeChapterIndex.value > 0 ? TABS.value[activeChapterIndex.value - 1] : null)
-const nextChapter = computed(() => activeChapterIndex.value < TABS.value.length - 1 ? TABS.value[activeChapterIndex.value + 1] : null)
-
 const scrollRef = ref<HTMLElement | null>(null)
 
-function goToChapter(tab: string) {
-  activeTab.value = tab
-  scrollRef.value?.scrollTo({ top: 0, behavior: 'smooth' })
-}
+const {
+  activeTab,
+  activeSection,
+  chapterPositionLabel,
+  prevNav,
+  nextNav,
+  prevChapterLabel,
+  nextChapterLabel,
+  goToChapter,
+  onTabKey,
+  syncFromRoute,
+} = useResultsNavigation(route, router, TABS, scrollRef)
 
-
-watch(activeTab, (tab) => {
-  router.replace({ query: { ...route.query, tab } })
-})
-
-watch(TABS, (tabs) => {
-  if (!tabs.includes(activeTab.value)) activeTab.value = 'Overview'
-})
+const activeGroupColor = computed(() =>
+  GROUPS.value.find(g => (g.tabs as string[]).includes(activeTab.value))?.color ?? 'var(--color-border)'
+)
 
 watch(runId, async (id) => {
   if (!id) { router.push('/'); return }
-  activeTab.value = (route.query.tab as string) || 'Overview'
+  syncFromRoute()
   store._stopPolling()
   store.branches = null
   store.scannedBranches = null
@@ -455,17 +442,8 @@ const activeArchSubProject = ref<string | null>(null)
 const activeDepsSubProject = ref<string | null>(null)
 const activeHeuristicsSubProject = ref<string | null>(null)
 
-function onTabKey(e: KeyboardEvent) {
-  const tag = (e.target as HTMLElement).tagName
-  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return
-  if ((e.target as HTMLElement).isContentEditable) return
-  const tabs = TABS.value
-  const idx = tabs.indexOf(activeTab.value)
-  if (e.key === 'j') activeTab.value = tabs[Math.max(idx - 1, 0)]
-  else if (e.key === 'k') activeTab.value = tabs[Math.min(idx + 1, tabs.length - 1)]
-}
-
 onMounted(() => {
+  syncFromRoute()
   window.addEventListener('keydown', onTabKey)
   document.addEventListener('click', closeOverflow)
 })
@@ -688,51 +666,34 @@ onUnmounted(() => {
             </div>
           </div>
         </template>
-        <template v-if="activeTab === 'Project'">
-          <ProjectPanel :result="result" />
-          <div v-if="result.structure" style="margin-top: 1.5rem" class="panel">
-            <StaleBranchesPanel
-              :stale-branches="result.structure.stale_branches ?? []"
-              :stale-branch-count="result.structure.stale_branch_count ?? 0"
-            />
-          </div>
-        </template>
-        <template v-if="activeTab === 'History'">
-          <CommitTimelineChart
-            :commits="result.commits"
-            :repo-url="store.run?.repo_url"
-            :github-contributors="result.github_meta?.contributors"
-          />
-          <div v-if="hasRoadmap && result.structure?.roadmap_parsed" style="margin-top: 1.5rem" class="panel">
-            <RoadmapTimeline
-              :milestones="result.structure.roadmap_parsed.milestones"
-              :roadmap-file="result.structure.roadmap_file ?? 'ROADMAP.md'"
-            />
-          </div>
-        </template>
+        <RepositoryPanel
+          v-if="activeTab === 'Repository'"
+          :result="result"
+          :section="activeSection ?? 'Profile'"
+          :repo-url="store.run?.repo_url"
+          :commits="result.commits"
+          :github-contributors="result.github_meta?.contributors"
+          @update:section="activeSection = $event"
+        />
         <template v-if="activeTab === 'Leaderboards'">
           <LeaderboardsPanel
             :commits="result.commits"
             :github-contributors="result.github_meta?.contributors"
           />
         </template>
-        <template v-if="activeTab === 'Architecture'">
-          <ArchitecturePanel
-            :graph="result.graph"
-            :hot-files="result.structure?.hot_files"
-            :structure="result.structure"
-            :run-id="runId"
-            :repo-url="store.run?.repo_url"
-            :sub-projects="result.repo_type?.sub_projects"
-            :selected-sub-project="activeArchSubProject"
-            @update:selected-sub-project="activeArchSubProject = $event"
-          />
-          <div style="margin-top: 1.5rem">
-            <DependencyGraphView
-              :graph="activeArchSubProject && result.repo_type?.sub_projects?.find(sp => sp.name === activeArchSubProject)?.graph || result.graph"
-            />
-          </div>
-        </template>
+        <ArchitecturePanel
+          v-if="activeTab === 'Architecture'"
+          :graph="result.graph"
+          :hot-files="result.structure?.hot_files"
+          :structure="result.structure"
+          :run-id="runId"
+          :repo-url="store.run?.repo_url"
+          :sub-projects="result.repo_type?.sub_projects"
+          :selected-sub-project="activeArchSubProject"
+          :section="activeSection ?? 'Explorer'"
+          @update:selected-sub-project="activeArchSubProject = $event"
+          @update:section="activeSection = $event"
+        />
         <OwnershipPanel
           v-if="activeTab === 'Ownership'"
           :ownership="result.ownership ?? { subsystems: [], top_contributors: [], bus_factor: 0 }"
@@ -748,16 +709,26 @@ onUnmounted(() => {
           :security="result.security"
           :sub-projects="result.repo_type?.sub_projects"
           :selected-sub-project="activeDepsSubProject"
+          :section="activeSection ?? 'Packages'"
           @update:selected-sub-project="activeDepsSubProject = $event"
+          @update:section="activeSection = $event"
         />
-        <SecurityPanel v-if="activeTab === 'Security'" :security="result.security" :heuristics="result.heuristics" :structure="result.structure" />
+        <SecurityPanel
+          v-if="activeTab === 'Security'"
+          :security="result.security"
+          :structure="result.structure"
+          :section="activeSection ?? 'Patterns'"
+          @update:section="activeSection = $event"
+        />
         <HeuristicsPanel
           v-if="activeTab === 'Heuristics'"
           :signals="result.heuristics"
           :result="result"
           :sub-projects="result.repo_type?.sub_projects"
           :selected-sub-project="activeHeuristicsSubProject"
+          :section="activeSection ?? 'Summary'"
           @update:selected-sub-project="activeHeuristicsSubProject = $event"
+          @update:section="activeSection = $event"
         />
         <LicensePanel v-if="activeTab === 'Licenses'" :license="result.license" />
         <CodeQualityPanel
@@ -766,6 +737,8 @@ onUnmounted(() => {
           :dead-code="result.dead_code"
           :test-coverage="result.test_coverage"
           :structure="result.structure"
+          :section="activeSection ?? 'Tests'"
+          @update:section="activeSection = $event"
         />
         <DevOpsPanel
           v-if="activeTab === 'DevOps'"
@@ -773,17 +746,26 @@ onUnmounted(() => {
           :containers="result.containers"
           :changelog="result.changelog"
           :tools="result.tools"
+          :section="activeSection ?? 'CI/CD'"
+          @update:section="activeSection = $event"
         />
         <ContributingPanel v-if="activeTab === 'Contributing'" :opportunities="result.contribution_opportunities ?? []" :repo-url="store.run?.repo_url" :structure="result.structure" :todos="result.todos" :arch-tours="result.arch_tours ?? []" :commits="result.commits" :is-docs-only="isDocsOnly" :github-meta="result.github_meta" />
-        <ContributionPathPanel
-          v-if="activeTab === 'Contribution Path'"
+        <ToursPanel
+          v-if="activeTab === 'Tours'"
+          :section="activeSection ?? 'Guided'"
           :tours="result.arch_tours ?? []"
           :opportunities="result.contribution_opportunities ?? []"
           :repo-url="store.run?.repo_url"
+          :run-id="runId"
           :all-files="result.structure?.all_files"
+          @update:section="activeSection = $event"
         />
-        <CommunityFilesPanel v-if="activeTab === 'Community Files'" :result="result" />
-        <ArchitectureToursPanel v-if="activeTab === 'Tours'" :tours="result.arch_tours ?? []" :repo-url="store.run?.repo_url" :run-id="runId" />
+        <CommunityFilesPanel
+          v-if="activeTab === 'Community Files'"
+          :result="result"
+          :section="activeSection ?? 'Checklist'"
+          @update:section="activeSection = $event"
+        />
       </div>
       </Transition>
       </div><!-- /.results-layout__tab-frame -->
@@ -791,15 +773,15 @@ onUnmounted(() => {
 
     <!-- ── Pinned chapter nav ───────────────────────────────────────── -->
     <div v-if="result" class="results-layout__chapter-nav">
-      <button v-if="prevChapter" class="btn btn--secondary chapter-nav__btn" @click="goToChapter(prevChapter)">
-        ← {{ prevChapter }}
+      <button v-if="prevNav" class="btn btn--secondary chapter-nav__btn" @click="goToChapter(prevNav.tab, prevNav.section)">
+        ← {{ prevChapterLabel }}
       </button>
       <span v-else class="chapter-nav__spacer" />
       <span class="chapter-nav__position">
-        Ch.{{ activeChapterIndex + 1 }} / {{ TABS.length }}
+        {{ chapterPositionLabel }}
       </span>
-      <button v-if="nextChapter" class="btn btn--primary chapter-nav__btn" @click="goToChapter(nextChapter)">
-        {{ nextChapter }} →
+      <button v-if="nextNav" class="btn btn--primary chapter-nav__btn" @click="goToChapter(nextNav.tab, nextNav.section)">
+        {{ nextChapterLabel }} →
       </button>
       <span v-else class="chapter-nav__spacer" />
     </div>

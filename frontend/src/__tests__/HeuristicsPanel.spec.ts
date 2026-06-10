@@ -7,6 +7,7 @@ import type { RunResult } from '../types/run'
 // Minimal stubs for complex child components
 const stubs = {
   AppCard: { template: '<div><slot /></div>' },
+  AppTabs: { template: '<div />' },
   HeuristicDrawer: { template: '<div />' },
   SubProjectSelector: { template: '<div />' },
 }
@@ -115,7 +116,7 @@ describe('HeuristicsPanel — individual signal cards', () => {
     ]
 
     const wrapper = mount(HeuristicsPanel, {
-      props: { signals },
+      props: { signals, section: 'Signals' },
       global: { stubs },
     })
 
@@ -130,7 +131,7 @@ describe('HeuristicsPanel — individual signal cards', () => {
     ]
 
     const wrapper = mount(HeuristicsPanel, {
-      props: { signals },
+      props: { signals, section: 'Signals' },
       global: { stubs },
     })
 

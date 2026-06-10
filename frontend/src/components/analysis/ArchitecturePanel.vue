@@ -2,10 +2,14 @@
 import { ref, computed, watch } from 'vue'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
+import AppTabs from '../ui/AppTabs.vue'
 import SubProjectSelector from './SubProjectSelector.vue'
+import DependencyGraphView from './DependencyGraphView.vue'
 import type { GraphData, StructureData, FileHistory, SubProject } from '../../stores/analysis'
 import { useAnalysisStore } from '../../stores/analysis'
 import { useTableFilter } from '../../composables/useTableFilter'
+
+const SECTIONS = ['Explorer', 'Graph'] as const
 
 const props = defineProps<{
   graph: GraphData
@@ -15,9 +19,19 @@ const props = defineProps<{
   repoUrl?: string
   subProjects?: SubProject[]
   selectedSubProject?: string | null
+  section?: string
 }>()
 
-const emit = defineEmits<{ 'update:selectedSubProject': [name: string | null] }>()
+const emit = defineEmits<{
+  'update:selectedSubProject': [name: string | null]
+  'update:section': [section: string]
+}>()
+
+const activeSection = computed(() =>
+  props.section && SECTIONS.includes(props.section as typeof SECTIONS[number])
+    ? props.section
+    : 'Explorer',
+)
 
 const activeGraph = computed<GraphData>(() => {
   if (!props.selectedSubProject || !props.subProjects?.length) return props.graph
@@ -322,8 +336,21 @@ const explorerResults = computed(() => {
       @update:model-value="emit('update:selectedSubProject', $event)"
     />
 
+    <div class="panel__sub-tabs">
+      <AppTabs
+        :tabs="[...SECTIONS]"
+        :model-value="activeSection"
+        @update:model-value="emit('update:section', $event)"
+      />
+    </div>
+
+    <DependencyGraphView
+      v-if="activeSection === 'Graph'"
+      :graph="activeGraph"
+    />
+
     <!-- Stats + File Explorer top row -->
-    <div class="arch-top-row">
+    <div v-if="activeSection === 'Explorer'" class="arch-top-row">
       <div class="arch-top-row__stats">
         <div class="panel__grid arch-stats-grid">
           <AppCard>
@@ -376,7 +403,7 @@ const explorerResults = computed(() => {
     </div>
 
     <!-- Two-column analysis split — sections placed directly so rows align -->
-    <div class="arch-split">
+    <div v-if="activeSection === 'Explorer'" class="arch-split">
 
       <!-- Row 1 left: Most-Connected Files -->
       <div v-if="activeGraph.hotspots.length" class="arch-section arch-section--col1">

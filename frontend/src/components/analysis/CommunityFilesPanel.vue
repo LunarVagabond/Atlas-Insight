@@ -2,9 +2,20 @@
 import { computed, ref } from 'vue'
 import { marked } from 'marked'
 import AppCard from '../ui/AppCard.vue'
+import AppTabs from '../ui/AppTabs.vue'
 import type { RunResult } from '../../stores/analysis'
 
-const props = defineProps<{ result: RunResult }>()
+const SECTIONS = ['Checklist', 'Scores'] as const
+
+const props = defineProps<{ result: RunResult; section?: string }>()
+
+const emit = defineEmits<{ 'update:section': [section: string] }>()
+
+const activeSection = computed(() =>
+  props.section && SECTIONS.includes(props.section as typeof SECTIONS[number])
+    ? props.section
+    : 'Checklist',
+)
 
 const readme = computed(() => props.result.readme)
 const structure = computed(() => props.result.structure)
@@ -92,7 +103,15 @@ const scoringModeLabel = computed(() => {
     <h2 class="panel__title">Community Files</h2>
     <p class="community-files-panel__mode-note">{{ scoringModeLabel }}</p>
 
-    <section class="community-files-panel__section">
+    <div class="panel__sub-tabs">
+      <AppTabs
+        :tabs="[...SECTIONS]"
+        :model-value="activeSection"
+        @update:model-value="emit('update:section', $event)"
+      />
+    </div>
+
+    <section v-if="activeSection === 'Checklist'" class="community-files-panel__section">
       <h3 class="community-files-panel__heading">Community Health Files</h3>
       <AppCard>
         <div class="health-grid">
@@ -116,6 +135,7 @@ const scoringModeLabel = computed(() => {
       </AppCard>
     </section>
 
+    <template v-else-if="activeSection === 'Scores'">
     <section v-if="communityHealth" class="community-files-panel__section">
       <h3 class="community-files-panel__heading">Community Files Score</h3>
       <div class="readme-quality">
@@ -230,6 +250,7 @@ const scoringModeLabel = computed(() => {
       </div>
       <p v-else class="empty-state">Re-run analysis to generate README quality scores.</p>
     </section>
+    </template>
   </div>
 
   <Teleport to="body">

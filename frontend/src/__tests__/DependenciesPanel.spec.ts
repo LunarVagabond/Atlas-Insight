@@ -6,6 +6,7 @@ import type { DepsData, SecurityData } from '../stores/analysis'
 const stubs = {
   AppCard: { template: '<div class="card"><slot /></div>' },
   AppBadge: { template: '<span class="badge" :data-variant="variant"><slot /></span>', props: ['variant'] },
+  AppTabs: { template: '<div />' },
   SubProjectSelector: { template: '<div />' },
 }
 
@@ -39,13 +40,16 @@ describe('DependenciesPanel — stat cards', () => {
     expect(w.text()).toContain('Total Dependencies')
   })
 
-  it('shows docker issues count', () => {
+  it('shows docker issues on Containers sub-tab', () => {
     const deps = makeDeps({
       docker_issues: [{ file: 'Dockerfile', issue: 'no healthcheck' }],
     })
-    const w = mount(DependenciesPanel, { props: { deps }, global: { stubs } })
-    expect(w.text()).toContain('1')
-    expect(w.text()).toContain('Docker Issues')
+    const w = mount(DependenciesPanel, {
+      props: { deps, section: 'Containers' },
+      global: { stubs },
+    })
+    expect(w.text()).toContain('Dockerfile')
+    expect(w.text()).toContain('no healthcheck')
   })
 })
 

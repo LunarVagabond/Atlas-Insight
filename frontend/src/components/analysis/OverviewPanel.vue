@@ -7,6 +7,8 @@ import type { RunResult } from '../../stores/analysis'
 
 const props = defineProps<{ result: RunResult; runId?: string }>()
 
+const showSubprojects = ref(false)
+
 const { commits, heuristics, structure, classification: cls } = props.result
 
 const overallScore = Math.round(
@@ -184,8 +186,17 @@ function formatMonth(ym: string): string {
 
     <!-- Sub-project scorecards -->
     <div v-if="result.repo_type?.sub_projects?.length" class="overview-subprojects">
-      <h3 class="overview-subprojects__title">Sub-projects</h3>
-      <div class="overview-subprojects__grid">
+      <button
+        type="button"
+        class="overview-subprojects__disclosure"
+        :aria-expanded="showSubprojects"
+        @click="showSubprojects = !showSubprojects"
+      >
+        <span>Monorepo breakdown</span>
+        <span class="overview-subprojects__disclosure-meta">{{ result.repo_type.sub_projects.length }} sub-projects</span>
+        <span class="overview-subprojects__chevron">{{ showSubprojects ? '▾' : '▸' }}</span>
+      </button>
+      <div v-show="showSubprojects" class="overview-subprojects__grid">
         <AppCard
           v-for="sp in result.repo_type.sub_projects"
           :key="sp.name"

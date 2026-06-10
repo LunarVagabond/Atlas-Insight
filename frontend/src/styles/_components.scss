@@ -7501,6 +7501,116 @@
 }
 
 // ── Chapter Nav ───────────────────────────────────────────────────────────────
+.panel__sub-tabs {
+  margin: $space-4 0 $space-5;
+}
+
+.panel--nested {
+  margin-top: $space-6;
+  padding-top: $space-5;
+  border-top: 1px solid var(--color-border);
+}
+
+.panel-table-scroll {
+  max-height: 280px;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.contrib-filter-row {
+  margin-bottom: $space-4;
+}
+
+.contrib-filter-select {
+  display: none;
+  width: 100%;
+  padding: $space-2 $space-3;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.875rem;
+
+  @media (max-width: $bp-md) {
+    display: block;
+  }
+}
+
+.contrib-filter-bar--desktop {
+  @media (max-width: $bp-md) {
+    display: none;
+  }
+}
+
+.contrib-grid--flat {
+  margin-top: $space-2;
+}
+
+.overview-subprojects__disclosure {
+  display: flex;
+  align-items: center;
+  gap: $space-3;
+  width: 100%;
+  padding: $space-3 $space-4;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+
+  &:hover {
+    border-color: var(--color-border-strong);
+  }
+}
+
+.overview-subprojects__disclosure-meta {
+  margin-left: auto;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.overview-subprojects__chevron {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.ownership-card__header--toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: $space-3;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ownership-card__chevron {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.ownership-card__activity-chip {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.ownership-card__body {
+  margin-top: $space-3;
+  padding-top: $space-3;
+  border-top: 1px solid var(--color-border);
+}
+
 .chapter-nav {
   display: flex;
   align-items: center;

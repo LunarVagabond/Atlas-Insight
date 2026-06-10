@@ -78,6 +78,19 @@ function toggleHint(e: Event, key: string) {
   e.stopPropagation()
   activeHint.value = activeHint.value === key ? null : key
 }
+
+const expandedSubsystems = ref<Set<string>>(new Set())
+
+function toggleSubsystem(id: string) {
+  const next = new Set(expandedSubsystems.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  expandedSubsystems.value = next
+}
+
+function isExpanded(id: string) {
+  return expandedSubsystems.value.has(id)
+}
 </script>
 
 <template>
@@ -135,18 +148,31 @@ function toggleHint(e: Event, key: string) {
 
     <!-- Subsystem cards -->
     <div v-if="sortedSubsystems.length" class="ownership-grid">
-      <div v-for="sub in sortedSubsystems" :key="sub.id" class="ownership-card">
-        <div class="ownership-card__header">
+      <div
+        v-for="sub in sortedSubsystems"
+        :key="sub.id"
+        class="ownership-card"
+        :class="{ 'ownership-card--expanded': isExpanded(sub.id) }"
+      >
+        <button
+          type="button"
+          class="ownership-card__header ownership-card__header--toggle"
+          :aria-expanded="isExpanded(sub.id)"
+          @click="toggleSubsystem(sub.id)"
+        >
           <span class="ownership-card__icon">{{ SUBSYSTEM_ICONS[sub.subsystem_type] ?? '📁' }}</span>
           <div class="ownership-card__header-text">
             <span class="ownership-card__name">{{ sub.name }}</span>
             <div class="ownership-card__badges">
               <span class="ownership-card__file-count">{{ sub.file_count }} files</span>
               <span v-if="sub.primary_language" class="ownership-card__lang">{{ sub.primary_language }}</span>
+              <span class="ownership-card__activity-chip">{{ Math.round(sub.activity_score * 100) }}% activity</span>
             </div>
           </div>
-        </div>
+          <span class="ownership-card__chevron">{{ isExpanded(sub.id) ? '▾' : '▸' }}</span>
+        </button>
 
+        <div v-show="isExpanded(sub.id)" class="ownership-card__body">
         <!-- Activity bar -->
         <div class="ownership-activity-bar" :title="`${Math.round(sub.activity_score * 100)}% of all recent git commits happened in this area`">
           <div class="ownership-activity-bar__fill" :style="{ width: `${Math.min(sub.activity_score * 100, 100)}%` }" />
@@ -207,6 +233,7 @@ function toggleHint(e: Event, key: string) {
             </div>
             <span v-else class="ownership-card__jit-unavailable">No matching open issues</span>
           </template>
+        </div>
         </div>
       </div>
     </div>

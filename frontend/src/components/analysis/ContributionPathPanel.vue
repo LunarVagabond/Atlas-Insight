@@ -7,6 +7,7 @@ const props = defineProps<{
   opportunities: ContributionOpportunity[]
   repoUrl?: string
   allFiles?: string[]
+  embedded?: boolean
 }>()
 
 type Area = 'frontend' | 'api' | 'data' | 'tests' | 'config' | 'docs'
@@ -80,9 +81,11 @@ const areas = Object.keys(AREA_META) as Area[]
 </script>
 
 <template>
-  <div class="panel contrib-path">
-    <h2 class="panel__title">Contribution Path</h2>
-    <p class="contrib-path__intro">Pick an area of interest and get a guided reading path + matching contribution opportunities.</p>
+  <div :class="embedded ? 'contrib-path' : 'panel contrib-path'">
+    <template v-if="!embedded">
+      <h2 class="panel__title">Contribution Path</h2>
+      <p class="contrib-path__intro">Pick an area of interest and get a guided reading path + matching contribution opportunities.</p>
+    </template>
 
     <div class="contrib-path__areas">
       <button

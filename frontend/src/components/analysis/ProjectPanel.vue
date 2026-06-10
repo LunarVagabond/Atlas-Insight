@@ -4,7 +4,7 @@ import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
 import type { RunResult } from '../../stores/analysis'
 
-const props = defineProps<{ result: RunResult }>()
+const props = defineProps<{ result: RunResult; embedded?: boolean }>()
 
 const { readme, structure, github_meta: gh, classification: cls } = props.result
 
@@ -215,7 +215,7 @@ const interactionLinks = computed<DisplayLink[]>(() => {
 </script>
 
 <template>
-  <div class="panel project-panel">
+  <div :class="embedded ? 'project-panel' : 'panel project-panel'">
 
     <!-- Project Info — full width top row -->
     <section v-if="structure" class="project-panel__section project-panel__section--top">
@@ -349,17 +349,6 @@ const interactionLinks = computed<DisplayLink[]>(() => {
               <AppBadge variant="warning">Not Found</AppBadge>
               <p class="project-empty__text">No social or community links were detected from this repository.</p>
             </div>
-          </AppCard>
-        </section>
-
-        <!-- Community Health — see Community Files tab -->
-        <section class="project-panel__section">
-          <h2 class="panel__title">Community Health Files</h2>
-          <AppCard>
-            <p class="project-empty__text" style="margin:0">
-              README quality scores and community file health live on the
-              <strong>Community Files</strong> tab.
-            </p>
           </AppCard>
         </section>
 

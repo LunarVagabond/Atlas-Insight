@@ -7,6 +7,7 @@ const props = defineProps<{
   tours: ArchTour[]
   repoUrl?: string
   runId?: string
+  embedded?: boolean
 }>()
 
 const activeFilePath = ref<string | null>(null)
@@ -94,11 +95,13 @@ const SUBSYSTEM_ICONS: Record<string, string> = {
 </script>
 
 <template>
-  <div class="panel">
-    <h2 class="panel__title">Architecture Tours</h2>
-    <p class="tours-intro">
-      Curated reading paths for each major subsystem — generated from the dependency graph, commit history, and project structure.
-    </p>
+  <div :class="embedded ? 'tours-panel-embedded' : 'panel'">
+    <template v-if="!embedded">
+      <h2 class="panel__title">Architecture Tours</h2>
+      <p class="tours-intro">
+        Curated reading paths for each major subsystem — generated from the dependency graph, commit history, and project structure.
+      </p>
+    </template>
 
     <div v-if="tours.length" class="tours-grid">
       <div

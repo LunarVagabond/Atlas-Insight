@@ -1,18 +1,31 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import AppCard from '../ui/AppCard.vue'
+import AppTabs from '../ui/AppTabs.vue'
 import HeuristicDrawer from './HeuristicDrawer.vue'
 import SubProjectSelector from './SubProjectSelector.vue'
 import type { HeuristicSignal, HeuristicSignalKey, RunResult, SubProject } from '../../stores/analysis'
+
+const SECTIONS = ['Summary', 'Signals'] as const
 
 const props = defineProps<{
   signals: HeuristicSignal[]
   result?: RunResult
   subProjects?: SubProject[]
   selectedSubProject?: string | null
+  section?: string
 }>()
 
-const emit = defineEmits<{ 'update:selectedSubProject': [name: string | null] }>()
+const emit = defineEmits<{
+  'update:selectedSubProject': [name: string | null]
+  'update:section': [section: string]
+}>()
+
+const activeSection = computed(() =>
+  props.section && SECTIONS.includes(props.section as typeof SECTIONS[number])
+    ? props.section
+    : 'Summary',
+)
 
 const activeSignals = computed<HeuristicSignal[]>(() => {
   const raw = (!props.selectedSubProject || !props.subProjects?.length)
@@ -207,8 +220,16 @@ const improvementHints = computed<string[]>(() => {
       Repo-wide signals (Documentation, CI Health, Community Health, Release Cadence, Bus Factor) are omitted in sub-project view.
     </p>
 
-    <!-- Score Breakdown -->
-    <div v-if="overallScore !== null" class="score-breakdown">
+    <div class="panel__sub-tabs">
+      <AppTabs
+        :tabs="[...SECTIONS]"
+        :model-value="activeSection"
+        @update:model-value="emit('update:section', $event)"
+      />
+    </div>
+
+    <!-- Score Breakdown (Summary only) -->
+    <div v-if="activeSection === 'Summary' && overallScore !== null" class="score-breakdown">
       <h4 class="score-breakdown__heading">At a Glance</h4>
       <div class="score-breakdown__body">
         <div class="score-breakdown__summary">
@@ -236,15 +257,15 @@ const improvementHints = computed<string[]>(() => {
       </div>
     </div>
 
-    <!-- Improvement hints -->
-    <div v-if="improvementHints.length" class="improvement-hints">
+    <!-- Improvement hints (Summary only) -->
+    <div v-if="activeSection === 'Summary' && improvementHints.length" class="improvement-hints">
       <p class="improvement-hints__heading">Ways to improve this score</p>
       <ul class="improvement-hints__list">
         <li v-for="(hint, i) in improvementHints" :key="i">{{ hint }}</li>
       </ul>
     </div>
 
-    <div class="heuristics-grid">
+    <div v-if="activeSection === 'Signals'" class="heuristics-grid">
       <AppCard
         v-for="signal in activeSignals"
         :key="signal.signal"

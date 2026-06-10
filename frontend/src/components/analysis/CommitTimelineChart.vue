@@ -24,6 +24,7 @@ const props = defineProps<{
   commits: CommitData
   repoUrl?: string
   githubContributors?: GitHubContributor[]
+  embedded?: boolean
 }>()
 
 // ── Filter (shared: chart + git log) ─────────────────────────────────────────
@@ -234,8 +235,8 @@ const commitDateRange = computed<string>(() => {
 </script>
 
 <template>
-  <div class="panel git-history-panel">
-    <h2 class="panel__title">Commit History</h2>
+  <div :class="embedded ? 'git-history-panel' : 'panel git-history-panel'">
+    <h2 v-if="!embedded" class="panel__title">Commit History</h2>
 
     <!-- Filter + chart + contributors row -->
     <div v-if="commits.monthly_frequency.length">

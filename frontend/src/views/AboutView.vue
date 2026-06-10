@@ -213,7 +213,7 @@ const GUIDE_ENTRIES: GuideEntry[] = [
     section: 'Community',
     defHtml: `Ranked contributor table on <span class="guide-kw">Community → Leaderboards</span> with commit counts and optional <span class="guide-kw">lines added / removed / net</span> when per-author stats are available from the latest analysis.`,
     methodLabel: 'How we compute it',
-    method: 'Commits aggregated from git history with optional time-range filters from the History tab. Line stats computed per author during analysis. Re-run analysis to refresh line metrics on older runs.',
+    method: 'Commits aggregated from git history with optional time-range filters from the Repository → Activity sub-tab. Line stats computed per author during analysis. Re-run analysis to refresh line metrics on older runs.',
     searchText: 'leaderboard contributor commits lines added removed net community tab',
   },
   {
@@ -498,15 +498,13 @@ function renderMd(text: string): string {
           <li><strong>Dependencies</strong> — all declared dependencies, Docker base image warnings, missing lockfiles.</li>
           <li><strong>Architecture</strong> — import graph, god modules, circular dependencies, hot files.</li>
           <li><strong>Code Quality</strong> — file complexity hotspots (LOC distribution), unreferenced files, per-directory test coverage mapping.</li>
-          <li><strong>Project</strong> — tech stack, links, releases, and pointers to deeper community docs.</li>
-          <li><strong>History</strong> — commit timeline, contributor churn, monthly breakdown, roadmap milestones.</li>
+          <li><strong>Repository</strong> — project profile, commit activity & roadmap, and stale branch hygiene (sub-tabs: Profile, Activity, Branches).</li>
           <li><strong>Ownership</strong> — file ownership map, bus factor, subsystem breakdown, and <strong>PR Impact Preview</strong>.</li>
           <li><strong>Community → Contributing</strong> — actionable contribution opportunities with difficulty ratings.</li>
-          <li><strong>Community → Contribution Path</strong> — guided first-contribution walkthrough from arch tours.</li>
           <li><strong>Community → Community Files</strong> — README quality score, community file health, per-file breakdown.</li>
           <li><strong>Community → Leaderboards</strong> — contributor rankings with commit and line stats.</li>
           <li><strong>Community → DevOps</strong> — CI/CD pipeline depth, Dockerfile hygiene, changelog discipline.</li>
-          <li><strong>Community → Tours</strong> — guided reading paths through major subsystems.</li>
+          <li><strong>Community → Tours</strong> — guided reading paths (Guided) and area-specific contribution entry points (Start Here).</li>
         </ul>
       </section>
 

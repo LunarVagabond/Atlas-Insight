@@ -2,13 +2,25 @@
 import { computed } from 'vue'
 import AppCard from '../ui/AppCard.vue'
 import AppBadge from '../ui/AppBadge.vue'
+import AppTabs from '../ui/AppTabs.vue'
 import type { ComplexityData, DeadCodeData, TestCoverageData } from '../../stores/analysis'
+
+const SECTIONS = ['Tests', 'Complexity', 'Dead Code'] as const
 
 const props = defineProps<{
   complexity?: ComplexityData
   deadCode?: DeadCodeData
   testCoverage?: TestCoverageData
+  section?: string
 }>()
+
+const emit = defineEmits<{ 'update:section': [section: string] }>()
+
+const activeSection = computed(() =>
+  props.section && SECTIONS.includes(props.section as typeof SECTIONS[number])
+    ? props.section
+    : 'Tests',
+)
 
 function riskLevel(score: number): 'low' | 'medium' | 'high' {
   if (score < 30) return 'low'
@@ -38,8 +50,16 @@ function distPct(key: keyof NonNullable<ComplexityData['distribution']>): number
     <h2 class="panel__title">Code Quality</h2>
     <p class="panel__subtitle">Static proxy metrics for code health: file size distribution, unreferenced files, and test coverage mapping. No runtime execution — all derived from source files.</p>
 
+    <div class="panel__sub-tabs">
+      <AppTabs
+        :tabs="[...SECTIONS]"
+        :model-value="activeSection"
+        @update:model-value="emit('update:section', $event)"
+      />
+    </div>
+
     <!-- ── Test coverage ──────────────────────────────────────── -->
-    <section class="cq-section">
+    <section v-if="activeSection === 'Tests'" class="cq-section">
       <h3 class="cq-section__title">Test Coverage</h3>
       <div class="panel__grid panel__grid--2col" style="margin-bottom: 1rem">
         <AppCard elevated>
@@ -80,7 +100,7 @@ function distPct(key: keyof NonNullable<ComplexityData['distribution']>): number
     </section>
 
     <!-- ── Complexity hotspots ────────────────────────────────── -->
-    <section class="cq-section">
+    <section v-else-if="activeSection === 'Complexity'" class="cq-section">
       <h3 class="cq-section__title">Complexity Hotspots</h3>
       <div class="panel__grid panel__grid--2col" style="margin-bottom: 1rem">
         <AppCard elevated>
@@ -138,7 +158,7 @@ function distPct(key: keyof NonNullable<ComplexityData['distribution']>): number
     </section>
 
     <!-- ── Dead code candidates ───────────────────────────────── -->
-    <section class="cq-section">
+    <section v-else-if="activeSection === 'Dead Code'" class="cq-section">
       <h3 class="cq-section__title">Unreferenced Files</h3>
       <p class="panel__subtitle" style="margin-top: 0">Files with no inbound imports in the analyzed graph. Entry points and test files are excluded. Requires a reasonably dense import graph — treat as hints, not definitive dead code.</p>
 
