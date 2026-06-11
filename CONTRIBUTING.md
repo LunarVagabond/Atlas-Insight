@@ -17,6 +17,21 @@ make start
 noissue-<short-description>          e.g. noissue-update-readme
 ```
 
+## Commit messages
+
+```
+[#<issue>] - <short description>
+```
+
+Examples:
+```
+[#42] - fix auth token expiry check
+[#101] - add submodule champion detection
+[noissue] - update readme typo
+```
+
+Use `[noissue]` when no issue exists.
+
 ## Making changes
 
 1. Fork the repo and create a branch from `main`
@@ -70,6 +85,24 @@ Keep PRs focused. A PR that adds a feature and refactors an unrelated module is 
 
 - **Backend**: Black + Ruff. No comments unless the WHY is non-obvious.
 - **Frontend**: Vue 3 + TypeScript. All styles in `src/styles/` — zero `<style>` blocks in `.vue` files. BEM naming.
+
+## AI-assisted contributions
+
+AI-assisted code is welcome. If any part of a commit was written or significantly shaped by an AI tool, add a trailer identifying it:
+
+```bash
+git commit -m "[#42] - add submodule detection" --trailer "AI-tool: Claude"
+git commit -m "[#7] - correct pagination offset" --trailer "AI-tool: GitHub Copilot"
+git commit -m "[noissue] - simplify router registration" --trailer "AI-tool: Cursor"
+```
+
+The trailer key is `AI-tool` — use whatever value names the tool. This lets us grep AI-assisted commits later:
+
+```bash
+git log --grep="AI-tool"
+```
+
+No judgment on AI use. The same quality bar applies: tests pass, linters clean, PR description explains what and why.
 
 ## Reporting bugs
 
