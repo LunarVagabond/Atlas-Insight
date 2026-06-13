@@ -153,25 +153,25 @@ class TestResolveToken:
 class TestTokenHasRepoScope:
     @patch('requests.get')
     def test_has_repo_scope_returns_true(self, mock_get):
-        from apps.repositories.router_runs import _token_has_repo_scope
+        from apps.repositories.github_tokens import token_has_repo_scope
         mock_get.return_value = MagicMock(
             headers={'X-OAuth-Scopes': 'repo, read:user'}
         )
-        assert _token_has_repo_scope('ghp_token') is True
+        assert token_has_repo_scope('ghp_token') is True
 
     @patch('requests.get')
     def test_no_repo_scope_returns_false(self, mock_get):
-        from apps.repositories.router_runs import _token_has_repo_scope
+        from apps.repositories.github_tokens import token_has_repo_scope
         mock_get.return_value = MagicMock(
             headers={'X-OAuth-Scopes': 'read:user, gist'}
         )
-        assert _token_has_repo_scope('ghp_token') is False
+        assert token_has_repo_scope('ghp_token') is False
 
     @patch('requests.get')
     def test_exception_returns_true(self, mock_get):
-        from apps.repositories.router_runs import _token_has_repo_scope
+        from apps.repositories.github_tokens import token_has_repo_scope
         mock_get.side_effect = Exception('network error')
-        assert _token_has_repo_scope('ghp_token') is True
+        assert token_has_repo_scope('ghp_token') is True
 
 
 # ---------------------------------------------------------------------------
@@ -408,7 +408,7 @@ class TestResolveTokenSocial:
         result = _resolve_token(req, None)
         assert result == 'ghu_devicetoken'
 
-    @patch('apps.repositories.router_runs._token_has_repo_scope', return_value=False)
+    @patch('apps.repositories.github_tokens.token_has_repo_scope', return_value=False)
     def test_non_ghu_token_without_scope_raises_403(self, mock_scope, db):
         from apps.repositories.router_runs import _resolve_token
         from allauth.socialaccount.models import SocialAccount, SocialToken, SocialApp

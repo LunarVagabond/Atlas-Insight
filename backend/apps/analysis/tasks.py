@@ -10,6 +10,7 @@ from django.db.models import Exists, OuterRef
 from django.utils import timezone
 from prometheus_client import Counter, Gauge, Histogram
 
+from apps.repositories.github_tokens import resolve_analysis_token
 from apps.repositories.models import AnalysisRun
 
 from .arch_tours import generate_arch_tours
@@ -311,12 +312,13 @@ def analyze_repository(self, run_id: str):
     _start = time.monotonic()
 
     try:
-        run = AnalysisRun.objects.select_related('repo').get(id=run_id)
+        run = AnalysisRun.objects.select_related('repo', 'user').get(id=run_id)
     except AnalysisRun.DoesNotExist:
         logger.error('AnalysisRun %s not found', run_id)
         return
 
-    pat = run.repo.auth_token or None
+    stored_pat = run.repo.auth_token or None
+    pat = resolve_analysis_token(run.repo, run.user)
 
     run.status = 'running'
     run.progress_step = 'cloning'
@@ -666,7 +668,7 @@ def analyze_repository(self, run_id: str):
         if not run.branch:
             repo.last_commit_sha = sha
             update_fields.append('last_commit_sha')
-        if pat and pat != repo.auth_token:
+        if stored_pat and pat != repo.auth_token:
             repo.auth_token = pat
             repo.auth_token_warning = ''
             update_fields += ['auth_token', 'auth_token_warning']
@@ -687,8 +689,8 @@ def analyze_repository(self, run_id: str):
                     _repo.auth_token = ''
                     _repo.auth_token_warning = (
                         'A stored access token for this repository is no longer valid '
-                        'and has been removed. Re-submit with a new Personal Access Token '
-                        'to re-analyze private repositories.'
+                        'and has been removed. Reconnect your GitHub account or submit '
+                        'a new Personal Access Token to re-analyze private repositories.'
                     )
                     _repo.save(update_fields=['auth_token', 'auth_token_warning'])
             except Exception:

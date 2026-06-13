@@ -16,6 +16,7 @@ from apps.analysis.git_ops import list_remote_branches
 from apps.analysis.github_meta import fetch_latest_sha
 from apps.analysis.tasks import analyze_repository
 
+from .github_tokens import MissingRepoScopeError, require_github_oauth_token, token_has_repo_scope
 from .models import AnalysisRun, Repository, UserFavorite
 
 logger = logging.getLogger(__name__)
@@ -114,21 +115,10 @@ def _resolve_token(request, pat: Optional[str]) -> Optional[str]:
     if pat:
         return pat
     if request.user.is_authenticated:
-        from allauth.socialaccount.models import SocialToken
-        social = SocialToken.objects.filter(
-            account__user=request.user,
-            account__provider='github',
-        ).first()
-        if social:
-            token = social.token
-            if not token.startswith('ghu_') and not _token_has_repo_scope(token):
-                raise HttpError(
-                    403,
-                    'Your GitHub authorization is missing the "repo" scope required to '
-                    'access private repositories. Please disconnect and reconnect your '
-                    'GitHub account to re-authorize with the correct permissions.',
-                )
-            return token
+        try:
+            return require_github_oauth_token(request.user)
+        except MissingRepoScopeError as exc:
+            raise HttpError(403, str(exc)) from None
     return None
 
 
@@ -161,23 +151,6 @@ def _persist_repo_token(repo: Repository, token: Optional[str], *, explicit: boo
     repo.auth_token = token
     repo.auth_token_warning = ''
     repo.save(update_fields=['auth_token', 'auth_token_warning'])
-
-
-def _token_has_repo_scope(token: str) -> bool:
-    try:
-        import requests as _requests
-        r = _requests.get(
-            'https://api.github.com/user',
-            headers={
-                'Authorization': f'Bearer {token}',
-                'Accept': 'application/vnd.github+json',
-            },
-            timeout=5,
-        )
-        scopes = r.headers.get('X-OAuth-Scopes', '')
-        return 'repo' in [s.strip() for s in scopes.split(',')]
-    except Exception:
-        return True
 
 
 def _user_can_access_repo(user, owner: str, name: str) -> bool:
