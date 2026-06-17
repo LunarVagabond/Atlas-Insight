@@ -34,7 +34,7 @@ Use `[noissue]` when no issue exists.
 
 ## Making changes
 
-1. Fork the repo and create a branch from `main`
+1. Fork the repo and create a branch from `development`
 2. Write tests for new code — see `backend/apps/*/tests/` for patterns
 3. Run linters before opening a PR:
 
@@ -52,9 +52,24 @@ npm test
 ```
 
 4. Add an entry under `## Unreleased` in `CHANGELOG.md`
-5. Open a pull request against `main`
+5. Open a pull request against `development`
+
+## Branches
+
+| Branch | Purpose |
+|--------|---------|
+| `development` | Integration — all contributor PRs land here |
+| `main` | Production — release-ready code only |
+
+```
+feature branch → development → main
+```
+
+Never open a contributor PR against `main`. When `development` is ready for release, maintainers merge it into `main`.
 
 ## Pull requests
+
+**Base branch:** `development`. Feature and fix work lands there first; `main` is production and release-only.
 
 **Title format:** `<type>(<scope>): <short description>` — mirrors the commit convention used in this repo.
 
