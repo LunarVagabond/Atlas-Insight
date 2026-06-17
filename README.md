@@ -18,7 +18,13 @@ Analysis results are archived. Re-running a repository first checks for new comm
 
 ---
 
-**Quick Links:** [Features](#features) • [Quick Start](#quick-start) • [API](#api-reference) • [Deployment](#deployment) • [Roadmap](docs/roadmap.md) • [Contributing](#contributing)
+**Quick Links:** [Features](#features) • [Quick Start](#quick-start) • [API](#api-reference) • [Deployment](#deployment) • [Wiki](https://github.com/LunarVagabond/Atlas-Insight/wiki) • [Discussions](https://github.com/LunarVagabond/Atlas-Insight/discussions) • [Contributing](#contributing)
+
+**Documentation & Community:**
+
+- **Project Wiki:** https://github.com/LunarVagabond/Atlas-Insight/wiki
+- **GitHub Discussions:** https://github.com/LunarVagabond/Atlas-Insight/discussions
+- **Project policies and contribution rules:** [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [LICENSE](LICENSE) remain canonical in this repository.
 
 ---
 
@@ -225,10 +231,10 @@ These endpoints retrieve live data and cache responses in Redis for 15 minutes u
 
 ## Deployment
 
-Production deployment documentation is available at:
+Production deployment documentation is available in the GitHub Wiki:
 
 ```text
-docs/ops/deploy.md
+https://github.com/LunarVagabond/Atlas-Insight/wiki
 ```
 
 The deployment guide includes:
@@ -243,29 +249,29 @@ The deployment guide includes:
 
 ## Roadmap
 
-See [docs/roadmap.md](docs/roadmap.md) for the post-FOSS path and the longer-term product ideas we want to keep revisiting.
+See [Roadmap](https://github.com/LunarVagabond/Atlas-Insight/wiki/Roadmap) for the post-FOSS path and the longer-term product ideas we want to keep revisiting.
 
 ---
 
 ## Contributing
 
-There is a lot we can do together — Atlas Insight is built for curious developers who like digging into how repositories are structured, maintained, and improved. You do not need to be a Django or Vue expert to help; many contributions start with a small doc fix or a new language parser scaffold.
+Atlas Insight welcomes contributors interested in repository structure, maintenance, and improvement. Django or Vue expertise is not required; many contributions begin with documentation updates or a new language parser scaffold.
 
 ### Quick paths
 
 | I want to… | Start here |
 | ---------- | ---------- |
 | Fix a bug | [Open a bug report](https://github.com/LunarVagabond/Atlas-Insight/issues/new?template=bug_report.md) → [CONTRIBUTING.md](CONTRIBUTING.md) |
-| Add a language parser | [docs/dev/adding-a-language.md](docs/dev/adding-a-language.md) → `make new-language` |
-| Add an infra tool detector | [docs/dev/adding-a-tool.md](docs/dev/adding-a-tool.md) → `make new-tool` |
-| Improve docs | [docs/README.md](docs/README.md) hub |
-| Explore bigger ideas | [docs/roadmap.md](docs/roadmap.md) |
+| Add a language parser | [Project Wiki](https://github.com/LunarVagabond/Atlas-Insight/wiki) → `make new-language` |
+| Add an infra tool detector | [Project Wiki](https://github.com/LunarVagabond/Atlas-Insight/wiki) → `make new-tool` |
+| Improve docs | [Project Wiki](https://github.com/LunarVagabond/Atlas-Insight/wiki) |
+| Explore bigger ideas | [Roadmap (Wiki)](https://github.com/LunarVagabond/Atlas-Insight/wiki/Roadmap) |
 
 ### Before your first PR
 
 1. Follow [CONTRIBUTING.md](CONTRIBUTING.md) for setup, branch naming (`<issue>-<desc>` or `noissue-<desc>`), and PR title format.
 2. Run `make test` and `make lint` from the repo root.
-3. Read [docs/dev/setup.md](docs/dev/setup.md) for project layout and [docs/dev/analysis-pipeline.md](docs/dev/analysis-pipeline.md) for how analysis runs.
+3. Review the [Project Wiki](https://github.com/LunarVagabond/Atlas-Insight/wiki) for setup, project layout, and analysis pipeline guidance.
 
 Also review [SECURITY.md](SECURITY.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before submitting pull requests.
 
@@ -279,6 +285,6 @@ See [LICENSE](LICENSE) for details.
 
 ---
 
-_If Atlas Insight has been useful to you and you'd like to support ongoing development, consider buying me a coffee._
+_If Atlas Insight has been useful and you want to support ongoing development, consider buying me a coffee._
 
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/lunarvagabond)
