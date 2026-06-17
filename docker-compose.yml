@@ -129,16 +129,6 @@ services:
     profiles:
       - app
 
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: cloudflared
-    restart: unless-stopped
-    # host network so the tunnel can reach Django/Vite/Flower on localhost ports
-    network_mode: host
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
-    profiles:
-      - tunnel
-
 volumes:
   postgres_data:
   redis_data:

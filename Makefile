@@ -17,7 +17,6 @@ COMPOSE_BARE := docker compose -f $(ROOT_DIR)/docker-compose.yml
         start-vite    stop-vite \
         start-postgres stop-postgres \
         start-redis    stop-redis \
-        start-tunnel  stop-tunnel \
         migrate makemigrations createsuperuser shell dbshell collectstatic \
         test lint format build type-check \
 		logs-django logs-celery logs-beat logs-flower logs-vite \
@@ -48,7 +47,6 @@ help:
 	@echo "    start-vite   / stop-vite        Vite dev server    (port 4501)"
 	@echo "    start-postgres / stop-postgres  Postgres container (port 4503)"
 	@echo "    start-redis    / stop-redis     Redis container    (port 4502)"
-	@echo "    start-tunnel   / stop-tunnel    Cloudflare tunnel  (requires CLOUDFLARE_TUNNEL_TOKEN)"
 	@echo "    promote-user                    Promote a Django user to superuser (EMAIL=... optional)"
 	@echo ""
 	@echo "  ── Django management ────────────────────────────────────────────────"
@@ -154,22 +152,14 @@ start: _ensure_running_dirs
 	@until $(COMPOSE) exec -T postgres pg_isready -q 2>/dev/null; do sleep 1; done
 	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend start
 	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/frontend start
-	@$(MAKE) --no-print-directory start-tunnel
 	@echo ""
 	@echo "Atlas Insight running:"
 	@echo "  API:        http://localhost:4500/api/docs"
 	@echo "  App:        http://localhost:4501"
 	@echo "  Flower:     http://localhost:4504"
-	@if [ -n "$(CLOUDFLARE_TUNNEL_TOKEN)" ]; then \
-	  echo ""; \
-	  echo "  Tunnel:"; \
-	  echo "    App:    https://atlas.dsyndicate.dev"; \
-	  echo "    API:    https://ai-api.dsyndicate.dev"; \
-	  echo "    Flower: https://ai-flower.dsyndicate.dev"; \
-	fi
+	@echo "  Tunnel:     managed by cf-tunnel systemd service (~/projects/compose)"
 
 stop:
-	@$(MAKE) --no-print-directory stop-tunnel
 	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/frontend stop
 	@$(MAKE) --no-print-directory -C $(ROOT_DIR)/backend stop
 	@$(COMPOSE) stop 2>&1 | grep -v "^$$"
@@ -265,20 +255,6 @@ start-redis:
 stop-redis:
 	@$(COMPOSE) stop redis
 
-
-start-tunnel:
-	@if [ -z "$(CLOUDFLARE_TUNNEL_TOKEN)" ]; then \
-	  echo "  tunnel:    skipped (CLOUDFLARE_TUNNEL_TOKEN not set)"; \
-	else \
-	  echo "Starting Cloudflare tunnel..."; \
-	  docker stop cloudflared 2>/dev/null || true; \
-	  docker rm cloudflared 2>/dev/null || true; \
-	  CLOUDFLARE_TUNNEL_TOKEN=$(CLOUDFLARE_TUNNEL_TOKEN) $(COMPOSE) --profile tunnel up -d cloudflared 2>&1 | grep -v "^$$"; \
-	fi
-
-stop-tunnel:
-	@docker stop cloudflared 2>/dev/null || true
-	@docker rm cloudflared 2>/dev/null || true
 
 # ── Django management ──────────────────────────────────────────────────────────
 

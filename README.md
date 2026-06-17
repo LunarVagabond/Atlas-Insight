@@ -22,7 +22,16 @@ Analysis results are archived. Re-running a repository first checks for new comm
 
 ---
 
-<!-- Screenshots: add PNG captures to docs/image_assets/ and embed below when ready -->
+<table>
+  <tr>
+    <td><img src="docs/image_assets/dashboard.png" alt="Dashboard" width="100%"></td>
+    <td><img src="docs/image_assets/architecture.png" alt="Architecture" width="100%"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/image_assets/repo_health.png" alt="Repo Health" width="100%"></td>
+    <td><img src="docs/image_assets/heuristics.png" alt="Heuristics" width="100%"></td>
+  </tr>
+</table>
 
 ## Features
 

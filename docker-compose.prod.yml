@@ -124,14 +124,6 @@ services:
     profiles:
       - app
 
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    restart: unless-stopped
-    network_mode: host
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN required}
-    profiles:
-      - tunnel
-
 volumes:
   postgres_data:
   redis_data:
