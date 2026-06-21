@@ -19,39 +19,41 @@ interface NodeInfo {
   importedBy: string[]
 }
 
-const SUBSYSTEM_PREFIXES: Record<string, string[]> = {
-  frontend: ['src/', 'frontend/', 'client/', 'ui/', 'app/', 'web/', 'pages/', 'components/'],
-  api:      ['api/', 'routes/', 'routers/', 'endpoints/', 'views/', 'handlers/', 'controllers/', 'server/'],
-  data:     ['models/', 'db/', 'database/', 'migrations/', 'schemas/', 'repositories/'],
-  tests:    ['tests/', '__tests__/', 'spec/', 'test/', 'e2e/', 'integration/'],
-  config:   ['config/', 'scripts/', '.github/', 'ci/', 'infra/', 'deploy/'],
+const FOLDER_PALETTE = [
+  '#4A9EFF', '#3DD68C', '#A78BFA', '#F59E0B', '#FB7185',
+  '#34D399', '#60A5FA', '#FBBF24', '#C084FC', '#38BDF8',
+  '#4ADE80', '#F472B6',
+]
+
+function topFolder(id: string): string {
+  const parts = id.replace(/^\.{1,2}\//, '').split('/')
+  const first = parts[0]
+  if (parts.length === 1 || first === '.' || first === '..') return 'root'
+  return first
 }
 
-const AREA_COLORS: Record<string, string> = {
-  frontend: '#4A9EFF',
-  api:      '#3DD68C',
-  data:     '#A78BFA',
-  tests:    '#F59E0B',
-  config:   '#94A3B8',
-  other:    '#64748B',
+function folderColor(name: string): string {
+  if (name === 'root') return '#64748B'
+  let hash = 0
+  for (const c of name) hash = (hash * 31 + c.charCodeAt(0)) & 0xffffffff
+  return FOLDER_PALETTE[Math.abs(hash) % FOLDER_PALETTE.length]
 }
 
 const GOD_COLOR    = '#ef4444'
 const IMPACT_COLOR = '#f97316'
 
-function detectArea(id: string): string {
-  for (const [area, prefixes] of Object.entries(SUBSYSTEM_PREFIXES)) {
-    if (prefixes.some(p => id.includes(p))) return area
-  }
-  return 'other'
-}
-
 const selectedNode = ref<NodeInfo | null>(null)
 const searchQuery = ref('')
 const searchMatches = ref<string[]>([])
 const searchIndex = ref(0)
-const subsystemFilter = ref('all')
+const folderFilter = ref(new Set<string>())
 const showAllImpact = ref(false)
+
+const folderList = computed(() => {
+  const dirs = new Set<string>()
+  for (const n of props.graph.nodes.slice(0, 300)) dirs.add(topFolder(n.id))
+  return [...dirs].sort((a, b) => a === 'root' ? 1 : b === 'root' ? -1 : a.localeCompare(b))
+})
 
 function zoomToMatch(idx: number) {
   if (!cy || !searchMatches.value.length) return
@@ -189,22 +191,31 @@ function closeDrawer() {
   cy?.elements().removeClass('faded selected impact')
 }
 
-function applySubsystemFilter(filter: string) {
-  subsystemFilter.value = filter
+function _applyFolderFilter() {
   if (!cy) return
-  if (filter === 'all') {
+  if (folderFilter.value.size === 0) {
     cy.elements().removeClass('area-hidden')
     cy.fit(undefined, 32)
     return
   }
-  const prefixes = SUBSYSTEM_PREFIXES[filter] ?? []
   cy.nodes().forEach(node => {
-    const id = node.id()
-    const matches = prefixes.some(p => id.includes(p))
-    if (matches) node.removeClass('area-hidden')
+    if (folderFilter.value.has(node.data('folder') as string)) node.removeClass('area-hidden')
     else node.addClass('area-hidden')
   })
   cy.fit(cy.elements(':visible'), 32)
+}
+
+function toggleFolder(folder: string) {
+  const next = new Set(folderFilter.value)
+  if (next.has(folder)) next.delete(folder)
+  else next.add(folder)
+  folderFilter.value = next
+  _applyFolderFilter()
+}
+
+function resetFolderFilter() {
+  folderFilter.value = new Set()
+  _applyFolderFilter()
 }
 
 function cssVar(name: string): string {
@@ -252,15 +263,19 @@ function initGraph() {
 
   const godModuleIds = new Set(props.graph.god_modules.map(g => g.module))
 
-  const nodes = props.graph.nodes.slice(0, 300).map(n => ({
-    data: {
-      id: n.id,
-      label: n.id.split('/').pop() ?? n.id,
-      isGod: godModuleIds.has(n.id),
-      inDegree: n.in_degree,
-      area: detectArea(n.id),
-    },
-  }))
+  const nodes = props.graph.nodes.slice(0, 300).map(n => {
+    const folder = topFolder(n.id)
+    return {
+      data: {
+        id: n.id,
+        label: n.id.split('/').pop() ?? n.id,
+        isGod: godModuleIds.has(n.id),
+        inDegree: n.in_degree,
+        folder,
+        color: folderColor(folder),
+      },
+    }
+  })
 
   const nodeIds = new Set(nodes.map(n => n.data.id))
   const edges = props.graph.edges
@@ -282,15 +297,10 @@ function initGraph() {
           'text-margin-y': 3,
           width: 16,
           height: 16,
-          'background-color': AREA_COLORS.other,
+          'background-color': 'data(color)',
           color: cssVar('--color-text'),
         },
       },
-      // Area colors — order matters; god overrides below
-      ...Object.entries(AREA_COLORS).map(([area, color]) => ({
-        selector: `node[area="${area}"]`,
-        style: { 'background-color': color },
-      })),
       {
         selector: 'node[?isGod]',
         style: {
@@ -437,11 +447,11 @@ watch(() => props.graph, initGraph)
       <div class="dep-graph__legend">
         <div class="dep-graph__legend-row">
           <span
-            v-for="[area, color] in Object.entries(AREA_COLORS)"
-            :key="area"
+            v-for="folder in folderList"
+            :key="folder"
             class="dep-graph__legend-item"
-            :style="{ '--legend-dot': color }"
-          >{{ area }}</span>
+            :style="{ '--legend-dot': folderColor(folder) }"
+          >{{ folder }}</span>
         </div>
         <div class="dep-graph__legend-row">
           <span class="dep-graph__legend-item" :style="{ '--legend-dot': GOD_COLOR }" title="Imported by many other files — changing it could break a lot">Core file</span>
@@ -450,24 +460,24 @@ watch(() => props.graph, initGraph)
         </div>
       </div>
       <div class="dep-graph__filters">
-        <span class="dep-graph__filter-label">Filter by area:</span>
+        <span class="dep-graph__filter-label">Filter by folder:</span>
         <button
           class="dep-graph__filter-btn"
-          :class="{ 'dep-graph__filter-btn--active': subsystemFilter === 'all' }"
+          :class="{ 'dep-graph__filter-btn--active': folderFilter.size === 0 }"
           title="Show all files"
-          @click="applySubsystemFilter('all')"
+          @click="resetFolderFilter()"
         >all</button>
         <button
-          v-for="[area, color] in Object.entries(AREA_COLORS).filter(([a]) => a !== 'other')"
-          :key="area"
+          v-for="folder in folderList"
+          :key="folder"
           class="dep-graph__filter-btn"
-          :class="{ 'dep-graph__filter-btn--active': subsystemFilter === area }"
-          :style="subsystemFilter === area ? { background: color, borderColor: color, color: '#fff' } : { '--area-color': color }"
-          :title="`Show only files in the ${area} area`"
-          @click="applySubsystemFilter(area)"
+          :class="{ 'dep-graph__filter-btn--active': folderFilter.size === 0 || folderFilter.has(folder) }"
+          :style="(folderFilter.size === 0 || folderFilter.has(folder)) ? { background: folderColor(folder), borderColor: folderColor(folder), color: '#fff' } : { '--area-color': folderColor(folder) }"
+          :title="`Toggle ${folder}/ visibility`"
+          @click="toggleFolder(folder)"
         >
-          <span class="dep-graph__filter-dot" :style="{ background: color }" />
-          {{ area }}
+          <span class="dep-graph__filter-dot" :style="{ background: folderColor(folder) }" />
+          {{ folder }}
         </button>
       </div>
       <div class="dep-graph__stage">

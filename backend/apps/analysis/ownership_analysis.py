@@ -95,9 +95,10 @@ def _analyze(structure: dict, commits: dict, graph: dict) -> dict:
             if m in subsystem_set
         ]
 
+        sub_name = f'{dir_name}/' if stype == 'other' else f'{SUBSYSTEM_LABELS.get(stype, dir_name)} ({dir_name}/)'
         subsystems.append({
             'id': dir_name.replace('/', '_'),
-            'name': f'{SUBSYSTEM_LABELS.get(stype, dir_name)} ({dir_name}/)',
+            'name': sub_name,
             'subsystem_type': stype,
             'file_count': len(files),
             'activity_score': activity_score,
