@@ -34,9 +34,11 @@ def score_community_files(
     structure: dict | None,
     scoring_mode: str = 'oss',
     readme_quality_score: float | None = None,
+    has_wiki: bool = False,
 ) -> dict:
     readme = readme or {}
     structure = structure or {}
+    has_wiki = has_wiki or bool(structure.get('has_wiki'))
     oss_mode = scoring_mode == 'oss'
     weights = _WEIGHTS_OSS if oss_mode else _WEIGHTS_CLOSED
 
@@ -50,6 +52,9 @@ def score_community_files(
         readme, structure, scoring_mode, readme_quality_score,
     )
     if not readme_present and oss_mode:
+        hints = ['Create README.md with overview, install steps, and examples']
+        if has_wiki:
+            hints.append('A GitHub wiki exists — link to it from your README for extended docs')
         recommendations.append({
             'id': 'community_readme_missing',
             'file': 'readme',
@@ -57,7 +62,7 @@ def score_community_files(
             'title': 'Add a README',
             'description': 'No README file was found in the repository root.',
             'score_gain': round(_WEIGHTS_OSS['readme'] * 100, 1),
-            'hints': ['Create README.md with overview, install steps, and examples'],
+            'hints': hints,
         })
     files.append(_file_entry(
         'readme', 'README', readme_present, readme_score, weights['readme'],
@@ -97,6 +102,7 @@ def score_community_files(
         'files': files,
         'breakdown': breakdown,
         'recommendations': recommendations,
+        'has_wiki': has_wiki,
     }
 
 

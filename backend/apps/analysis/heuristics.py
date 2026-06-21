@@ -140,6 +140,7 @@ def compute_heuristics(
 
     # ── Documentation quality ────────────────────────────────────────────────
     if readme is not None:
+        has_wiki = bool(structure.get('has_wiki')) if structure else False
         doc_issues: list[str] = []
         if not readme.get('found'):
             doc_issues.append('no README found')
@@ -156,9 +157,15 @@ def compute_heuristics(
             elif wc < 300 and not readme.get('has_external_links'):
                 doc_issues.append('README brief with no external links or docs site')
             if not readme.get('has_installation'):
-                doc_issues.append('no installation instructions')
+                doc_issues.append(
+                    'no installation in README (may be in wiki)' if has_wiki
+                    else 'no installation instructions'
+                )
             if not readme.get('has_usage'):
-                doc_issues.append('no usage section')
+                doc_issues.append(
+                    'no usage in README (may be in wiki)' if has_wiki
+                    else 'no usage section'
+                )
             if scoring_mode == 'oss':
                 if not readme.get('has_changelog'):
                     doc_issues.append('no changelog')
@@ -169,16 +176,26 @@ def compute_heuristics(
             # Shallow sections carry half weight of a full missing section
             if len(shallow) >= 3:
                 doc_issues.append(f'{len(shallow)} sections too brief to be useful')
-            # "README short but has code examples" is a lighter issue — weight 8 instead of 15
-            weighted = sum(8 if 'short but has code' in i else 15 for i in doc_issues)
+            # wiki-backed missing sections and "short but has code" are lighter issues
+            weighted = sum(
+                8 if ('short but has code' in i or 'may be in wiki' in i) else 15
+                for i in doc_issues
+            )
             doc_score = min(100, weighted)
+
+        if doc_issues:
+            desc = ', '.join(doc_issues)
+            if has_wiki:
+                desc += ' · wiki enabled'
+        else:
+            desc = 'Documentation looks complete' + (' · wiki enabled' if has_wiki else '')
 
         signals.append({
             'signal': 'documentation_quality',
             'label': 'Documentation Quality',
             'score': doc_score,
             'confidence': 'high',
-            'description': ', '.join(doc_issues) if doc_issues else 'Documentation looks complete',
+            'description': desc,
         })
 
     # ── CI / testing health ───────────────────────────────────────────────────

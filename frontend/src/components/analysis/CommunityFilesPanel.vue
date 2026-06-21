@@ -96,6 +96,81 @@ const scoringModeLabel = computed(() => {
   if (mode === 'closed_source') return 'Closed source scoring — present files only'
   return 'Open source scoring — missing community files reduce the score'
 })
+
+interface DocLink {
+  label: string
+  url: string
+  description: string
+  badge: string
+}
+
+function isDocsLikeUrl(url: string): boolean {
+  const low = url.toLowerCase()
+  return (
+    low.includes('docs.') || low.includes('/docs') || low.includes('/documentation') ||
+    low.includes('/wiki') || low.includes('readthedocs') ||
+    low.includes('confluence.') || low.includes('notion.so')
+  )
+}
+
+const docsLinks = computed<DocLink[]>(() => {
+  const links: DocLink[] = []
+  const seen = new Set<string>()
+
+  function normalise(url: string): string {
+    try { return new URL(url).href.replace(/\/$/, '') } catch { return url }
+  }
+
+  function push(link: DocLink) {
+    const key = normalise(link.url)
+    if (!seen.has(key)) { seen.add(key); links.push(link) }
+  }
+
+  function hostLabel(url: string): string {
+    try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url }
+  }
+
+  function isLocal(url: string): boolean {
+    try {
+      const h = new URL(url).hostname
+      return h === 'localhost' || h === '127.0.0.1' || h === '::1' || h.endsWith('.local')
+    } catch { return false }
+  }
+
+  const gh = props.result.github_meta
+  const readmeData = props.result.readme
+
+  for (const link of readmeData?.docs_links ?? []) {
+    if (isLocal(link.url)) continue
+    push({
+      label: hostLabel(link.url),
+      url: link.url,
+      description: link.description || 'Documentation link found in README',
+      badge: link.label,
+    })
+  }
+
+  if (gh?.has_wiki && gh?.html_url) {
+    push({ label: 'GitHub Wiki', url: `${gh.html_url}/wiki`, description: 'Built-in wiki pages for this repository', badge: 'Wiki' })
+  }
+
+  if (gh?.homepage && isDocsLikeUrl(gh.homepage) && !isLocal(gh.homepage)) {
+    push({ label: hostLabel(gh.homepage), url: gh.homepage, description: 'Repository homepage links to documentation', badge: 'Homepage' })
+  }
+
+  const st = props.result.structure
+  if (st?.docs_dir && gh?.html_url) {
+    const branch = gh.default_branch ?? 'main'
+    push({
+      label: `/${st.docs_dir}`,
+      url: `${gh.html_url}/tree/${branch}/${st.docs_dir}`,
+      description: 'Docs folder in repository root',
+      badge: 'Folder',
+    })
+  }
+
+  return links
+})
 </script>
 
 <template>
@@ -132,6 +207,19 @@ const scoringModeLabel = computed(() => {
             <span v-if="item.present && fileContent(item.key)" class="health-item__expand">↗</span>
           </div>
         </div>
+      </AppCard>
+    </section>
+
+    <section v-if="activeSection === 'Checklist' && docsLinks.length" class="community-files-panel__section">
+      <h3 class="community-files-panel__heading">Documentation Links</h3>
+      <AppCard>
+        <ul class="doc-links">
+          <li v-for="link in docsLinks" :key="link.url" class="doc-links__item">
+            <span class="doc-links__badge">{{ link.badge }}</span>
+            <a :href="link.url" target="_blank" rel="noopener noreferrer" class="doc-links__label">{{ link.label }} ↗</a>
+            <span class="doc-links__desc">{{ link.description }}</span>
+          </li>
+        </ul>
       </AppCard>
     </section>
 
