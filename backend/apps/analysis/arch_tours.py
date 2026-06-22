@@ -119,6 +119,12 @@ def _detect_subsystem_type(dir_name: str) -> str:
     for stype, patterns in SUBSYSTEM_PATTERNS.items():
         if lower in patterns:
             return stype
+    # For monorepo paths like 'apps/web', also try the leaf segment
+    last = lower.rsplit('/', 1)[-1]
+    if last != lower:
+        for stype, patterns in SUBSYSTEM_PATTERNS.items():
+            if last in patterns:
+                return stype
     return 'other'
 
 
@@ -290,10 +296,11 @@ def _generate(structure: dict, graph: dict, commits: dict) -> list[dict]:
 
         label = SUBSYSTEM_LABELS.get(subsystem_type, dir_name)
         desc = _generate_description(dir_name, subsystem_type, files, key_files)
+        name = f'{dir_name}/' if subsystem_type == 'other' else f'{label} ({dir_name}/)'
 
         tours.append({
             'id': f'tour_{dir_name.replace("/", "_")}',
-            'name': f'{label} ({dir_name}/)',
+            'name': name,
             'description': desc,
             'subsystem_type': subsystem_type,
             'file_count': len(files),

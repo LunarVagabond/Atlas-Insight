@@ -77,7 +77,17 @@ function diffVariant(d: ContributionOpportunity['difficulty']) {
   return d === 'beginner' ? 'completed' : d === 'intermediate' ? 'warning' : 'failed'
 }
 
-const areas = Object.keys(AREA_META) as Area[]
+const availableAreas = computed(() =>
+  (Object.keys(AREA_META) as Area[]).filter(area => {
+    const types = AREA_META[area].subsystem_types
+    if (props.tours.some(t => types.includes(t.subsystem_type))) return true
+    if (props.allFiles?.length) {
+      const prefixes = AREA_PREFIXES[area]
+      return props.allFiles.some(f => prefixes.includes(f.split('/')[0] ?? ''))
+    }
+    return false
+  })
+)
 </script>
 
 <template>
@@ -89,7 +99,7 @@ const areas = Object.keys(AREA_META) as Area[]
 
     <div class="contrib-path__areas">
       <button
-        v-for="area in areas"
+        v-for="area in availableAreas"
         :key="area"
         :class="['contrib-path__area-btn', selectedArea === area && 'contrib-path__area-btn--active']"
         @click="selectedArea = selectedArea === area ? null : area"
