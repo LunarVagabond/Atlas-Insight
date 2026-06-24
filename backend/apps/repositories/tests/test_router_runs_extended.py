@@ -126,6 +126,31 @@ class TestListRuns:
         assert item['tags'] == ['python']
         assert item['primary_language'] == 'Python'
 
+    def test_top_languages_in_response(self, repo):
+        AnalysisRun.objects.create(
+            repo=repo,
+            status='completed',
+            result={
+                'github_meta': {'primary_language': 'Python', 'stars': 10},
+                'classification': {'tags': ['python']},
+                'oss_score': {'score': 7.0},
+                'structure': {
+                    'languages': [
+                        {'name': 'Python', 'pct': 80.0},
+                        {'name': 'JavaScript', 'pct': 15.0},
+                        {'name': 'CSS', 'pct': 3.0},
+                    ]
+                },
+            },
+        )
+        resp = Client().get('/api/v1/repositories/runs/')
+        assert resp.status_code == 200
+        item = resp.json()['items'][0]
+        assert item['top_languages'] == [
+            {'name': 'Python', 'pct': 80.0},
+            {'name': 'JavaScript', 'pct': 15.0},
+        ]
+
 
 @pytest.mark.django_db
 class TestGetRun:
