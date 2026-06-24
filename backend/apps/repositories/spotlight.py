@@ -17,6 +17,10 @@ def sync_spotlight_watches(week_start: date | None = None) -> None:
         .select_related('repo')
         .first()
     )
+    if current is None:
+        # No pick yet for this week — fall back to most recent so daily sync
+        # doesn't clear watches when weekly selection hasn't run or failed.
+        current = RepoOfTheWeek.objects.select_related('repo').first()
     current_repo_id = current.repo_id if current else None
 
     Repository.objects.filter(watch_reason='spotlight').exclude(pk=current_repo_id).update(
