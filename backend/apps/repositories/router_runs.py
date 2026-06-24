@@ -409,11 +409,9 @@ def analyze(request, payload: AnalyzeRequest):
 
     return AnalyzeResponse(run_id=run.id, status='pending', cached=False)
 
-
 def _top_languages(result) -> list[dict]:
-    langs = (result or {}).get('github_meta', {}).get('github_languages', [])
+    langs = (result or {}).get('structure', {}).get('languages', [])
     return [{"name": lang["name"], "pct": lang["pct"]} for lang in langs if lang.get("pct", 0) >= 5.0][:3]
-
 
 @router.get('/runs/', response=RunListSchema)
 @ratelimit(key='user_or_ip', rate='300/m', method='GET', block=False)
