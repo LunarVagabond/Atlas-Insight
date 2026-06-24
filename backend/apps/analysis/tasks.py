@@ -887,7 +887,7 @@ def evict_stale_clones():
     logger.info('Clone eviction complete: %d clones removed', evicted)
 
 
-@shared_task
+@shared_task(autoretry_for=(Exception,), max_retries=3, default_retry_delay=300)
 def select_repo_of_week():
     """Weekly task: pick a public repo for the spotlight using a fair-rotation, weighted algorithm.
 

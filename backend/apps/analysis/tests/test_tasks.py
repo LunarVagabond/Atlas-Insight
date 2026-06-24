@@ -243,6 +243,39 @@ class TestSelectRepoOfWeek:
 
 
 # ---------------------------------------------------------------------------
+# sync_spotlight_watches — fallback behaviour
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class TestSyncSpotlightWatches:
+    def test_preserves_previous_spotlight_when_no_current_week_pick(self, db):
+        """Daily sync must not clear the old spotlight when weekly selection hasn't run yet."""
+        from datetime import date, timedelta
+
+        from apps.repositories.models import AnalysisRun, RepoOfTheWeek, Repository
+        from apps.repositories.spotlight import sync_spotlight_watches
+
+        repo = Repository.objects.create(
+            url='https://github.com/test/prev',
+            owner='test',
+            name='prev',
+            is_watched=True,
+            watch_reason='spotlight',
+        )
+        AnalysisRun.objects.create(repo=repo, status='completed')
+        today = date.today()
+        prev_week = today - timedelta(days=today.weekday() + 7)
+        RepoOfTheWeek.objects.create(repo=repo, week_start=prev_week, pick_number=1)
+
+        # No current-week record exists — simulates failed weekly selection
+        sync_spotlight_watches()
+
+        repo.refresh_from_db()
+        assert repo.is_watched is True
+        assert repo.watch_reason == 'spotlight'
+
+
+# ---------------------------------------------------------------------------
 # reanalyze_watched_repos
 # ---------------------------------------------------------------------------
 
