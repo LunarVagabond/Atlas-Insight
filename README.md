@@ -18,13 +18,14 @@ Analysis results are archived. Re-running a repository first checks for new comm
 
 ---
 
-**Quick Links:** [Features](#features) • [Quick Start](#quick-start) • [API](#api-reference) • [Deployment](#deployment) • [Wiki](https://github.com/LunarVagabond/Atlas-Insight/wiki) • [Discussions](https://github.com/LunarVagabond/Atlas-Insight/discussions) • [Contributing](#contributing)
+**Quick Links:** [Features](#features) • [Quick Start](#quick-start) • [API](#api-reference) • [Deployment](#deployment) • [Wiki](https://github.com/LunarVagabond/Atlas-Insight/wiki) • [Discussions](https://github.com/LunarVagabond/Atlas-Insight/discussions) • [Discord](https://discord.gg/SG23W3BqCn) • [Contributing](#contributing)
 
 **Documentation & Community:**
 
 - **Project Wiki:** https://github.com/LunarVagabond/Atlas-Insight/wiki
 - **GitHub Discussions:** https://github.com/LunarVagabond/Atlas-Insight/discussions
 - **Project policies and contribution rules:** [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [LICENSE](LICENSE) remain canonical in this repository.
+- **Discord:** https://discord.gg/SG23W3BqCn — general tech community; drop in for Atlas Insight feedback, OSS discussion, or just to hang out
 
 ---
 
@@ -274,6 +275,19 @@ Atlas Insight welcomes contributors interested in repository structure, maintena
 3. Review the [Project Wiki](https://github.com/LunarVagabond/Atlas-Insight/wiki) for setup, project layout, and analysis pipeline guidance.
 
 Also review [SECURITY.md](SECURITY.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before submitting pull requests.
+
+---
+
+## Join the Community
+
+Not just an Atlas Insight server — a general tech community and hangout. Whether you want to give feedback on the project, talk OSS, or just connect with other developers, you're welcome.
+
+[![Discord](https://img.shields.io/badge/Discord-Join%20the%20Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/SG23W3BqCn)
+
+- Give feedback on Atlas Insight
+- Discuss OSS health, repo archaeology, and tooling
+- Talk tech, ask questions, share projects
+- Just hang out
 
 ---
 
