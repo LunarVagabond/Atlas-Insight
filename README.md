@@ -1,5 +1,5 @@
 
-> NOTICE: Sometime in the next few weeks I will be taking my homelab (this services host) down for reconfiguration. I'm sorry if this effects anyone negatively and thank you for baring with me!
+> NOTICE: This project is still going to be updated over time but the hosted environment I've been hosting on my homelab is going to be down for some time just due to some reconfigurations I'm doing internally. Please still feel free to fork and run this for yourself!
 
 # Atlas Insight
 
