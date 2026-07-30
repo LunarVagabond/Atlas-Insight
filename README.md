@@ -1,3 +1,5 @@
+> NOTICE: Some time in the next few weeks the main site will be going down as I reconfigure my homelab that is currently hosting this service. I apologize in advance if anyone is currently using this and it effects your day to day!
+
 # Atlas Insight
 
 [![Atlas Insight](https://atlas.dsyndicate.dev/api/v1/repositories/badge/LunarVagabond/Atlas-Insight.svg)](https://atlas.dsyndicate.dev/r/LunarVagabond/Atlas-Insight)
