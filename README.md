@@ -3,7 +3,7 @@
 
 # Atlas Insight
 
-[![Atlas Insight](https://atlas.dsyndicate.dev/api/v1/repositories/badge/LunarVagabond/Atlas-Insight.svg)](https://atlas.dsyndicate.dev/r/LunarVagabond/Atlas-Insight)
+<!--[![Atlas Insight](https://atlas.dsyndicate.dev/api/v1/repositories/badge/LunarVagabond/Atlas-Insight.svg)](https://atlas.dsyndicate.dev/r/LunarVagabond/Atlas-Insight)-->
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-42b883.svg)](https://vuejs.org/)
